@@ -25,7 +25,28 @@ const PARAM_SCHEMA = {
   ]
 };
 
-let activeTab = "agent-audit";
+const VALID_TABS = Object.keys(PARAM_SCHEMA);
+let activeTab = (function() {
+  const hash = window.location.hash.replace("#", "");
+  return VALID_TABS.includes(hash) ? hash : "agent-audit";
+})();
+
+const FEATURE_COPY = {
+  "agent-audit": {
+    title: "Agent Audit",
+    desc: "扫描 Skill/Agent 权限、敏感配置与日志，快速定位风险点。"
+  },
+  "multichain-contract-vuln": {
+    title: "Multichain Contract Vuln",
+    desc: "一键执行多链合约源码分析，结合 Slither/Anchor 等输出漏洞报告。"
+  },
+  "skill-stress-lab": {
+    title: "Skill Stress Lab",
+    desc: "配置命令模板即可跑并发压测、采集 CPU/RSS 与 API 指标。"
+  }
+};
+const contextTitle = document.getElementById("current-skill-title");
+const contextDesc = document.getElementById("current-skill-desc");
 const navButtons = document.querySelectorAll("#nav-tabs button");
 const paramContainer = document.getElementById("param-fields");
 const statusBox = document.getElementById("task-status");
@@ -35,10 +56,24 @@ const codePathInput = document.getElementById("code-path");
 const fileInput = document.getElementById("code-upload");
 const artifactBox = document.getElementById("artifact-links");
 
-function selectTab(tab) {
+function selectTab(tab, opts = {}) {
+  if (!PARAM_SCHEMA[tab]) return;
   activeTab = tab;
   navButtons.forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === tab));
+  if (!opts.skipHash) {
+    window.location.hash = tab;
+  }
   renderParamFields();
+  updateContextBanner();
+}
+
+function updateContextBanner() {
+  const copy = FEATURE_COPY[activeTab];
+  if (copy) {
+    if (contextTitle) contextTitle.textContent = copy.title;
+    if (contextDesc) contextDesc.textContent = copy.desc;
+    document.title = `Health AI · ${copy.title}`;
+  }
 }
 
 function renderField(field) {
@@ -210,7 +245,7 @@ async function runTask() {
 
 navButtons.forEach((btn) => btn.addEventListener("click", () => selectTab(btn.dataset.tab)));
 runBtn.addEventListener("click", runTask);
-renderParamFields();
+selectTab(activeTab, { skipHash: true });
 
 const heroButtons = document.querySelectorAll(".hero-btn");
 heroButtons.forEach((btn) => {

@@ -166,3 +166,22 @@ button#run-task {
 .hero-btn:hover {
   background: #3f5efb;
 }
+
+#context-banner {
+  text-align: center;
+  padding: 16px 32px 32px;
+}
+#context-banner .label {
+  font-size: 12px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8fd3ff;
+}
+#context-banner h3 {
+  margin: 8px 0;
+  font-size: 24px;
+}
+#context-banner p {
+  color: #c6cbe3;
+  margin: 0;
+}
