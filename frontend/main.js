@@ -211,3 +211,14 @@ async function runTask() {
 navButtons.forEach((btn) => btn.addEventListener("click", () => selectTab(btn.dataset.tab)));
 runBtn.addEventListener("click", runTask);
 renderParamFields();
+
+const heroButtons = document.querySelectorAll(".hero-btn");
+heroButtons.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const target = btn.dataset.target;
+    if (target) {
+      selectTab(target);
+      document.getElementById("input-panel").scrollIntoView({ behavior: "smooth" });
+    }
+  });
+});
