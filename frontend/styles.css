@@ -121,8 +121,12 @@ button#run-task {
 .status.error { background: #b33a3a; }
 
 #landing {
-  padding: 48px 32px;
+  padding: 48px 32px 80px;
   background: radial-gradient(circle at top, rgba(63,94,251,0.4), rgba(14,17,23,0));
+  min-height: calc(100vh - 140px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .hero-card {
   max-width: 960px;
