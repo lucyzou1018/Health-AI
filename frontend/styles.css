@@ -231,3 +231,23 @@ button#run-task {
 .hero-btn--primary:hover {
   background: #3247c2;
 }
+
+.workspace-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 32px 16px;
+}
+.workspace-tabs button {
+  background: transparent;
+  border: 1px solid #2f3b57;
+  color: #c8d2ff;
+  padding: 8px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.workspace-tabs button.active {
+  background: #3f5efb;
+  color: #fff;
+  border-color: #3f5efb;
+}

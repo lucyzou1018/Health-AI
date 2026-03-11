@@ -43,7 +43,7 @@ let activeTab = (function () {
   return VALID_TABS.includes(hash) ? hash : "agent-audit";
 })();
 
-const navButtons = document.querySelectorAll("#nav-tabs button");
+const navButtons = document.querySelectorAll("#workspace-tabs button");
 const statusBox = document.getElementById("task-status");
 const outputBox = document.getElementById("task-output");
 const artifactBox = document.getElementById("artifact-links");
