@@ -13,8 +13,9 @@ from .task_manager import SUPPORTED_SKILLS, TaskManager
 
 BASE_DIR = Path(__file__).resolve().parent.parent / "storage"
 BASE_DIR.mkdir(parents=True, exist_ok=True)
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
-task_manager = TaskManager(BASE_DIR)
+task_manager = TaskManager(BASE_DIR, repo_root=REPO_ROOT)
 
 app = FastAPI(title="Health AI", version="0.1.0")
 app.add_middleware(

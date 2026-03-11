@@ -43,21 +43,35 @@ main {
   border-radius: 12px;
   padding: 24px;
 }
-label {
+label.field {
   display: block;
   margin-bottom: 16px;
   font-size: 14px;
 }
+label.field span {
+  display: block;
+  margin-bottom: 6px;
+  color: #c6cbe3;
+}
 input[type="text"],
 input[type="file"],
-select {
+input[type="number"],
+input[type="password"],
+select,
+textarea {
   width: 100%;
-  margin-top: 6px;
   padding: 10px;
   border-radius: 8px;
   border: 1px solid #27304a;
   background: #0e1324;
   color: #f4f6ff;
+  box-sizing: border-box;
+}
+textarea {
+  min-height: 100px;
+}
+input[type="checkbox"] {
+  width: auto;
 }
 button#run-task {
   background: #3f5efb;
@@ -73,4 +87,5 @@ button#run-task {
   border-radius: 8px;
   padding: 16px;
   overflow-x: auto;
+  white-space: pre-wrap;
 }
