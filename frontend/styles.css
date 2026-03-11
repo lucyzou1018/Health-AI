@@ -269,3 +269,16 @@ button#run-task {
   color: #fff;
   box-shadow: 0 6px 18px rgba(63, 94, 251, 0.35);
 }
+
+body.landing-only header {
+  max-width: 960px;
+  margin: 0 auto;
+  background: transparent;
+  border: none;
+  padding: 32px 0 0;
+  justify-content: flex-start;
+}
+body.landing-only .landing-header h1,
+body.landing-only header h1 {
+  font-size: 28px;
+}
