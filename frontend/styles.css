@@ -218,3 +218,16 @@ button#run-task {
   border-radius: 8px;
   cursor: pointer;
 }
+
+.landing-header {
+  padding: 24px 32px 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+.hero-btn--primary {
+  background: #3f5efb;
+  border-color: #3f5efb;
+}
+.hero-btn--primary:hover {
+  background: #3247c2;
+}
