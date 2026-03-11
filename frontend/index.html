@@ -8,14 +8,10 @@
 <body>
   <header>
     <h1>Health AI</h1>
-    <nav id="nav-tabs">
-      <button data-tab="agent-audit" class="active">Agent Audit</button>
-      <button data-tab="multichain-contract-vuln">Contract Scanner</button>
-      <button data-tab="skill-stress-lab">Skill Stress Lab</button>
-    </nav>
+    <button id="back-home" class="ghost-btn hidden">返回首页</button>
   </header>
 
-  <section id="hero">
+  <section id="landing">
     <div class="hero-card">
       <p class="eyebrow">智能风控 · 扫描 · 压测一站式平台</p>
       <h2>Health AI 帮你即刻完成 Skill 体检、链上合约审计，以及压测验证。</h2>
@@ -28,32 +24,40 @@
     </div>
   </section>
 
-  <section id="context-banner">
-    <p class="label">当前功能</p>
-    <h3 id="current-skill-title">Agent Audit</h3>
-    <p id="current-skill-desc">扫描 Skill/Agent 权限、敏感配置与日志，快速定位风险点。</p>
+  <section id="app-shell" class="hidden">
+    <nav id="nav-tabs">
+      <button data-tab="agent-audit">Agent Audit</button>
+      <button data-tab="multichain-contract-vuln">Contract Scanner</button>
+      <button data-tab="skill-stress-lab">Skill Stress Lab</button>
+    </nav>
+
+    <section id="context-banner">
+      <p class="label">当前功能</p>
+      <h3 id="current-skill-title">Agent Audit</h3>
+      <p id="current-skill-desc">扫描 Skill/Agent 权限、敏感配置与日志，快速定位风险点。</p>
+    </section>
+
+    <main>
+      <section class="panel" id="input-panel">
+        <h2>代码输入</h2>
+        <label class="field">路径
+          <input type="text" id="code-path" placeholder="例如：/path/to/skill" />
+        </label>
+        <label class="field">或上传文件
+          <input type="file" id="code-upload" />
+        </label>
+        <div id="param-fields"></div>
+        <button id="run-task">开始分析</button>
+      </section>
+
+      <section class="panel" id="result-panel">
+        <h2>任务结果</h2>
+        <div id="task-status" class="status">未开始</div>
+        <pre id="task-output"></pre>
+        <div id="artifact-links" class="artifact-links hidden"></div>
+      </section>
+    </main>
   </section>
-
-  <main>
-    <section class="panel" id="input-panel">
-      <h2>代码输入</h2>
-      <label class="field">路径
-        <input type="text" id="code-path" placeholder="例如：/path/to/skill" />
-      </label>
-      <label class="field">或上传文件
-        <input type="file" id="code-upload" />
-      </label>
-      <div id="param-fields"></div>
-      <button id="run-task">开始分析</button>
-    </section>
-
-    <section class="panel" id="result-panel">
-      <h2>任务结果</h2>
-      <div id="task-status" class="status">未开始</div>
-      <pre id="task-output"></pre>
-      <div id="artifact-links" class="artifact-links hidden"></div>
-    </section>
-  </main>
 
   <script src="main.js" type="module"></script>
 </body>

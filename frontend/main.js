@@ -26,11 +26,14 @@ const PARAM_SCHEMA = {
 };
 
 const VALID_TABS = Object.keys(PARAM_SCHEMA);
-let activeTab = (function() {
-  const hash = window.location.hash.replace("#", "");
-  return VALID_TABS.includes(hash) ? hash : "agent-audit";
-})();
+const initialHash = window.location.hash.replace("#", "");
+const startInWorkspace = VALID_TABS.includes(initialHash);
+let activeTab = startInWorkspace ? initialHash : "agent-audit";
 
+
+const landingSection = document.getElementById("landing");
+const appShell = document.getElementById("app-shell");
+const backHomeBtn = document.getElementById("back-home");
 const FEATURE_COPY = {
   "agent-audit": {
     title: "Agent Audit",
@@ -74,6 +77,20 @@ function updateContextBanner() {
     if (contextDesc) contextDesc.textContent = copy.desc;
     document.title = `Health AI · ${copy.title}`;
   }
+}
+
+function enterWorkspace(tab, opts = {}) {
+  if (landingSection) landingSection.classList.add("hidden");
+  if (appShell) appShell.classList.remove("hidden");
+  if (backHomeBtn) backHomeBtn.classList.remove("hidden");
+  selectTab(tab || activeTab, opts);
+}
+
+function returnToLanding() {
+  if (landingSection) landingSection.classList.remove("hidden");
+  if (appShell) appShell.classList.add("hidden");
+  if (backHomeBtn) backHomeBtn.classList.add("hidden");
+  window.location.hash = "";
 }
 
 function renderField(field) {
@@ -243,17 +260,27 @@ async function runTask() {
   }
 }
 
-navButtons.forEach((btn) => btn.addEventListener("click", () => selectTab(btn.dataset.tab)));
+navButtons.forEach((btn) => btn.addEventListener("click", () => enterWorkspace(btn.dataset.tab)));
 runBtn.addEventListener("click", runTask);
-selectTab(activeTab, { skipHash: true });
+if (startInWorkspace) {
+  enterWorkspace(activeTab, { skipHash: true });
+} else {
+  if (landingSection) landingSection.classList.remove("hidden");
+  if (appShell) appShell.classList.add("hidden");
+  if (backHomeBtn) backHomeBtn.classList.add("hidden");
+  updateContextBanner();
+}
 
 const heroButtons = document.querySelectorAll(".hero-btn");
 heroButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
-    const target = btn.dataset.target;
-    if (target) {
-      selectTab(target);
-      document.getElementById("input-panel").scrollIntoView({ behavior: "smooth" });
-    }
+    const target = btn.dataset.target || "agent-audit";
+    enterWorkspace(target);
+    const panel = document.getElementById("input-panel");
+    if (panel) panel.scrollIntoView({ behavior: "smooth" });
   });
 });
+
+if (backHomeBtn) {
+  backHomeBtn.addEventListener("click", returnToLanding);
+}
