@@ -286,12 +286,12 @@ body.landing-only header h1 {
   font-size: 28px;
 }
 
-.landing-header .brand-stack {
+.brand-stack {
   display: inline-flex;
   align-items: center;
   gap: 12px;
 }
-.landing-header .brand-logo {
+.brand-logo {
   width: 36px;
   height: 36px;
   border-radius: 12px;
@@ -304,7 +304,7 @@ body.landing-only header h1 {
   color: #fff;
   letter-spacing: 1px;
 }
-.landing-header .brand-name {
+.brand-name {
   font-size: 28px;
   font-weight: 600;
 }
