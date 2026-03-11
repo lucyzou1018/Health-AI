@@ -6,8 +6,10 @@ import json
 import os
 import shutil
 import subprocess
+import threading
 import uuid
-from dataclasses import dataclass, asdict
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, asdict, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -34,7 +36,7 @@ class TaskRecord:
     report_path: Optional[str] = None
     summary_path: Optional[str] = None
     log_path: Optional[str] = None
-    params: Dict[str, Any] = None  # type: ignore[assignment]
+    params: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
@@ -51,6 +53,8 @@ class TaskManager:
         self.upload_dir.mkdir(parents=True, exist_ok=True)
         self.tasks_dir.mkdir(parents=True, exist_ok=True)
         self.tasks: Dict[str, TaskRecord] = {}
+        self._lock = threading.Lock()
+        self.executor = ThreadPoolExecutor(max_workers=2)
         self._load_index()
 
     # --------------------------- persistence ---------------------------
@@ -111,32 +115,30 @@ class TaskManager:
             updated_at=_now(),
             params=params or {},
         )
-        self.tasks[task_id] = record
-        self._save_index()
+        with self._lock:
+            self.tasks[task_id] = record
+            self._save_index()
+        workspace = self.tasks_dir / task_id
+        input_dir = workspace / "input"
         try:
-            workspace = self.tasks_dir / task_id
-            input_dir = workspace / "input"
             input_dir.mkdir(parents=True, exist_ok=True)
             if code_path:
                 self._copy_code(Path(code_path), input_dir)
             if upload_id:
                 self._extract_upload(upload_id, input_dir)
-            self._run_skill(record, workspace, input_dir)
-            record.status = "completed"
-            record.updated_at = _now()
-            self._save_index()
         except Exception as exc:
-            record.status = "failed"
-            record.updated_at = _now()
-            record.message = str(exc)
-            self._save_index()
+            self._set_task_state(task_id, status="failed", message=str(exc))
             raise
-        return record
+        self._set_task_state(task_id, status="queued", message="已加入执行队列")
+        self.executor.submit(self._execute_task, task_id, workspace, input_dir)
+        return self._snapshot(record)
 
     def get_task(self, task_id: str) -> TaskRecord:
-        if task_id not in self.tasks:
-            raise KeyError("task not found")
-        return self.tasks[task_id]
+        with self._lock:
+            record = self.tasks.get(task_id)
+            if not record:
+                raise KeyError("task not found")
+            return self._snapshot(record)
 
     # --------------------------- helpers ---------------------------
     def _copy_code(self, source: Path, dest: Path) -> None:
@@ -313,3 +315,54 @@ class TaskManager:
             "log": str(log_file),
             "message": "压力测试完成",
         }
+
+    def _snapshot(self, record: TaskRecord) -> TaskRecord:
+        return TaskRecord(**record.to_dict())
+
+    def _set_task_state(
+        self,
+        task_id: str,
+        *,
+        status: Optional[str] = None,
+        message: Optional[str] = None,
+        report: Optional[str] = None,
+        summary: Optional[str] = None,
+        log: Optional[str] = None,
+    ) -> TaskRecord:
+        with self._lock:
+            record = self.tasks.get(task_id)
+            if not record:
+                raise KeyError("task not found")
+            if status:
+                record.status = status
+            if message is not None:
+                record.message = message
+            if report is not None:
+                record.report_path = report
+            if summary is not None:
+                record.summary_path = summary
+            if log is not None:
+                record.log_path = log
+            record.updated_at = _now()
+            self._save_index()
+            return self._snapshot(record)
+
+    def _execute_task(self, task_id: str, workspace: Path, input_dir: Path) -> None:
+        try:
+            self._set_task_state(task_id, status="running", message="执行中")
+            with self._lock:
+                record = self.tasks.get(task_id)
+                if not record:
+                    raise KeyError("task not found")
+                record_copy = self._snapshot(record)
+            result = self._run_skill(record_copy, workspace, input_dir)
+            self._set_task_state(
+                task_id,
+                status="completed",
+                message=result.get("message", "完成"),
+                report=result.get("report"),
+                summary=result.get("summary"),
+                log=result.get("log"),
+            )
+        except Exception as exc:
+            self._set_task_state(task_id, status="failed", message=str(exc))

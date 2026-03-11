@@ -1,4 +1,6 @@
-const API_BASE = window.HEALTH_AI_API || "http://127.0.0.1:8000";
+const DEFAULT_API = window.location.origin.includes("4173") ? "http://127.0.0.1:8000" : window.location.origin;
+const API_BASE = window.HEALTH_AI_API || DEFAULT_API;
+const FINAL_STATUSES = new Set(["completed", "failed"]);
 const PARAM_SCHEMA = {
   "agent-audit": [],
   "multichain-contract-vuln": [
@@ -31,6 +33,7 @@ const outputBox = document.getElementById("task-output");
 const runBtn = document.getElementById("run-task");
 const codePathInput = document.getElementById("code-path");
 const fileInput = document.getElementById("code-upload");
+const artifactBox = document.getElementById("artifact-links");
 
 function selectTab(tab) {
   activeTab = tab;
@@ -98,24 +101,79 @@ function collectParams() {
     if (!el) return;
     if (field.type === "number") {
       const value = el.value ? Number(el.value) : undefined;
-      if (!Number.isNaN(value) && value !== undefined) {
-        params[field.id] = value;
-      }
-    } else if (field.type === "select" || field.type === "text" || field.type === "textarea" || field.type === "password") {
+      if (!Number.isNaN(value) && value !== undefined) params[field.id] = value;
+    } else if (["select", "text", "textarea", "password"].includes(field.type)) {
       if (el.value) params[field.id] = el.value;
     } else if (field.type === "checkbox") {
       params[field.id] = el.checked;
-    } else {
-      if (el.value) params[field.id] = el.value;
+    } else if (el.value) {
+      params[field.id] = el.value;
     }
   });
   return params;
 }
 
+function setStatus(text, variant = "info") {
+  statusBox.textContent = text;
+  statusBox.className = `status ${variant}`;
+}
+
+function renderArtifacts(task) {
+  if (!task || (!task.reportPath && !task.summaryPath && !task.logPath)) {
+    artifactBox.classList.add("hidden");
+    artifactBox.innerHTML = "";
+    return;
+  }
+  const links = [];
+  if (task.reportPath) links.push({ label: "下载报告", href: `${API_BASE}/api/tasks/${task.taskId}/report` });
+  if (task.summaryPath) links.push({ label: "下载摘要", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=summary` });
+  if (task.logPath) links.push({ label: "下载日志", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=log` });
+  if (!links.length) {
+    artifactBox.classList.add("hidden");
+    artifactBox.innerHTML = "";
+    return;
+  }
+  artifactBox.classList.remove("hidden");
+  artifactBox.innerHTML = links
+    .map((link) => `<a href="${link.href}" target="_blank" rel="noopener">${link.label}</a>`)
+    .join("");
+}
+
+function renderTask(task) {
+  if (!task) return;
+  const variant = task.status === "failed" ? "error" : task.status === "completed" ? "success" : "running";
+  setStatus(`状态：${task.status}`, variant);
+  outputBox.textContent = JSON.stringify(task, null, 2);
+  renderArtifacts(task);
+}
+
+async function fetchTask(taskId) {
+  const resp = await fetch(`${API_BASE}/api/tasks/${taskId}`);
+  if (!resp.ok) throw new Error(await resp.text());
+  return resp.json();
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function pollTask(taskId) {
+  let attempts = 0;
+  while (attempts < 120) {
+    const task = await fetchTask(taskId);
+    renderTask(task);
+    if (FINAL_STATUSES.has(task.status)) return task;
+    await delay(1500);
+    attempts += 1;
+  }
+  throw new Error("轮询超时，请手动刷新状态");
+}
+
 async function runTask() {
   try {
-    statusBox.textContent = "运行中...";
+    setStatus("运行中...", "running");
     outputBox.textContent = "";
+    artifactBox.classList.add("hidden");
     const uploadId = await uploadFileIfNeeded();
     const params = collectParams();
     if (!codePathInput.value && !uploadId) {
@@ -138,12 +196,15 @@ async function runTask() {
     if (!resp.ok) {
       throw new Error(await resp.text());
     }
-    const data = await resp.json();
-    statusBox.textContent = `状态：${data.status}`;
-    outputBox.textContent = JSON.stringify(data, null, 2);
+    const task = await resp.json();
+    renderTask(task);
+    if (!FINAL_STATUSES.has(task.status)) {
+      await pollTask(task.taskId);
+    }
   } catch (err) {
-    statusBox.textContent = "失败";
+    setStatus("失败", "error");
     outputBox.textContent = err instanceof Error ? err.message : String(err);
+    artifactBox.classList.add("hidden");
   }
 }
 

@@ -89,3 +89,32 @@ button#run-task {
   overflow-x: auto;
   white-space: pre-wrap;
 }
+
+.status {
+  padding: 8px 12px;
+  border-radius: 999px;
+  display: inline-block;
+  margin-bottom: 12px;
+  background: #27304a;
+}
+.artifact-links {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.artifact-links a {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #2f3b57;
+  color: #f4f6ff;
+  text-decoration: none;
+  font-size: 14px;
+}
+.artifact-links.hidden {
+  display: none;
+}
+
+.status.running { background: #5a4bf0; }
+.status.success { background: #1f8a53; }
+.status.error { background: #b33a3a; }

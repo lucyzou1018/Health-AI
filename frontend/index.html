@@ -18,10 +18,10 @@
   <main>
     <section class="panel" id="input-panel">
       <h2>代码输入</h2>
-      <label>Skill 代码路径
+      <label class="field">路径
         <input type="text" id="code-path" placeholder="例如：/path/to/skill" />
       </label>
-      <label>或上传压缩包/文件
+      <label class="field">或上传文件
         <input type="file" id="code-upload" />
       </label>
       <div id="param-fields"></div>
@@ -30,8 +30,9 @@
 
     <section class="panel" id="result-panel">
       <h2>任务结果</h2>
-      <div id="task-status">未开始</div>
+      <div id="task-status" class="status">未开始</div>
       <pre id="task-output"></pre>
+      <div id="artifact-links" class="artifact-links hidden"></div>
     </section>
   </main>
 

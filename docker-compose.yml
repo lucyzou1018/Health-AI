@@ -1,0 +1,10 @@
+version: "3.9"
+services:
+  health-ai:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/storage:/app/backend/storage
+    environment:
+      - UVICORN_RELOAD=false

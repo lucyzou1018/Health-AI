@@ -7,6 +7,7 @@ from typing import Any, Dict, Literal, Optional
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .task_manager import SUPPORTED_SKILLS, TaskManager
@@ -17,7 +18,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 task_manager = TaskManager(BASE_DIR, repo_root=REPO_ROOT)
 
-app = FastAPI(title="Health AI", version="0.1.0")
+app = FastAPI(title="Health AI", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -125,3 +126,23 @@ def download_report(task_id: str):
     if not path.exists():
         raise HTTPException(status_code=404, detail="report file missing")
     return FileResponse(path)
+
+@app.get("/api/tasks/{task_id}/artifact")
+def download_artifact(task_id: str, kind: Literal["summary", "log"]):
+    try:
+        record = task_manager.get_task(task_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="task not found")
+    attr = f"{kind}_path"
+    target = getattr(record, attr, None)
+    if not target:
+        raise HTTPException(status_code=404, detail=f"{kind} missing")
+    path = Path(target)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"{kind} file missing")
+    return FileResponse(path)
+
+
+FRONTEND_DIR = REPO_ROOT / "frontend"
+if FRONTEND_DIR.exists():
+    app.mount("/ui", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
