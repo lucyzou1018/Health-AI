@@ -162,6 +162,8 @@ button#run-task {
   border-radius: 8px;
   cursor: pointer;
   transition: background 0.2s;
+  text-decoration: none;
+  display: inline-block;
 }
 .hero-btn:hover {
   background: #3f5efb;

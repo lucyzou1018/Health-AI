@@ -1,6 +1,3 @@
-const DEFAULT_API = window.location.origin.includes("4173") ? "http://127.0.0.1:8000" : window.location.origin;
-const API_BASE = window.HEALTH_AI_API || DEFAULT_API;
-const FINAL_STATUSES = new Set(["completed", "failed"]);
 const PARAM_SCHEMA = {
   "agent-audit": [],
   "multichain-contract-vuln": [
@@ -25,15 +22,6 @@ const PARAM_SCHEMA = {
   ]
 };
 
-const VALID_TABS = Object.keys(PARAM_SCHEMA);
-const initialHash = window.location.hash.replace("#", "");
-const startInWorkspace = VALID_TABS.includes(initialHash);
-let activeTab = startInWorkspace ? initialHash : "agent-audit";
-
-
-const landingSection = document.getElementById("landing");
-const appShell = document.getElementById("app-shell");
-const backHomeBtn = document.getElementById("back-home");
 const FEATURE_COPY = {
   "agent-audit": {
     title: "Agent Audit",
@@ -48,16 +36,37 @@ const FEATURE_COPY = {
     desc: "配置命令模板即可跑并发压测、采集 CPU/RSS 与 API 指标。"
   }
 };
-const contextTitle = document.getElementById("current-skill-title");
-const contextDesc = document.getElementById("current-skill-desc");
+
+const VALID_TABS = Object.keys(PARAM_SCHEMA);
+let activeTab = (function () {
+  const hash = window.location.hash.replace("#", "");
+  return VALID_TABS.includes(hash) ? hash : "agent-audit";
+})();
+
 const navButtons = document.querySelectorAll("#nav-tabs button");
-const paramContainer = document.getElementById("param-fields");
 const statusBox = document.getElementById("task-status");
 const outputBox = document.getElementById("task-output");
+const artifactBox = document.getElementById("artifact-links");
 const runBtn = document.getElementById("run-task");
 const codePathInput = document.getElementById("code-path");
 const fileInput = document.getElementById("code-upload");
-const artifactBox = document.getElementById("artifact-links");
+const contextTitle = document.getElementById("current-skill-title");
+const contextDesc = document.getElementById("current-skill-desc");
+
+const FINAL_STATUSES = new Set(["completed", "failed"]);
+const DEFAULT_API = window.location.origin;
+const API_BASE = window.HEALTH_AI_API || DEFAULT_API;
+
+navButtons.forEach((btn) => btn.addEventListener("click", () => selectTab(btn.dataset.tab)));
+if (runBtn) runBtn.addEventListener("click", runTask);
+window.addEventListener("hashchange", () => {
+  const target = window.location.hash.replace("#", "");
+  if (VALID_TABS.includes(target)) {
+    selectTab(target, { skipHash: true });
+  }
+});
+
+selectTab(activeTab, { skipHash: true });
 
 function selectTab(tab, opts = {}) {
   if (!PARAM_SCHEMA[tab]) return;
@@ -79,60 +88,8 @@ function updateContextBanner() {
   }
 }
 
-function enterWorkspace(tab, opts = {}) {
-  if (landingSection) landingSection.classList.add("hidden");
-  if (appShell) appShell.classList.remove("hidden");
-  if (backHomeBtn) backHomeBtn.classList.remove("hidden");
-  selectTab(tab || activeTab, opts);
-}
-
-function returnToLanding() {
-  if (landingSection) landingSection.classList.remove("hidden");
-  if (appShell) appShell.classList.add("hidden");
-  if (backHomeBtn) backHomeBtn.classList.add("hidden");
-  window.location.hash = "";
-}
-
-function renderField(field) {
-  const wrapper = document.createElement("label");
-  wrapper.className = "field";
-  const span = document.createElement("span");
-  span.textContent = field.label;
-  wrapper.appendChild(span);
-  let input;
-  if (field.type === "select") {
-    input = document.createElement("select");
-    (field.options || []).forEach((opt) => {
-      const option = document.createElement("option");
-      option.value = opt;
-      option.textContent = opt;
-      input.appendChild(option);
-    });
-  } else if (field.type === "textarea") {
-    input = document.createElement("textarea");
-    input.rows = 4;
-    input.placeholder = field.placeholder || "";
-  } else if (field.type === "checkbox") {
-    input = document.createElement("input");
-    input.type = "checkbox";
-  } else {
-    input = document.createElement("input");
-    input.type = field.type || "text";
-    input.placeholder = field.placeholder || "";
-  }
-  input.id = `param-${field.id}`;
-  wrapper.appendChild(input);
-  return wrapper;
-}
-
-function renderParamFields() {
-  paramContainer.innerHTML = "";
-  const schema = PARAM_SCHEMA[activeTab] || [];
-  schema.forEach((field) => paramContainer.appendChild(renderField(field)));
-}
-
 async function uploadFileIfNeeded() {
-  const file = fileInput.files[0];
+  const file = fileInput?.files?.[0];
   if (!file) return null;
   const formData = new FormData();
   formData.append("file", file);
@@ -165,67 +122,49 @@ function collectParams() {
   return params;
 }
 
-function setStatus(text, variant = "info") {
-  statusBox.textContent = text;
-  statusBox.className = `status ${variant}`;
-}
-
-function renderArtifacts(task) {
-  if (!task || (!task.reportPath && !task.summaryPath && !task.logPath)) {
-    artifactBox.classList.add("hidden");
-    artifactBox.innerHTML = "";
-    return;
-  }
-  const links = [];
-  if (task.reportPath) links.push({ label: "下载报告", href: `${API_BASE}/api/tasks/${task.taskId}/report` });
-  if (task.summaryPath) links.push({ label: "下载摘要", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=summary` });
-  if (task.logPath) links.push({ label: "下载日志", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=log` });
-  if (!links.length) {
-    artifactBox.classList.add("hidden");
-    artifactBox.innerHTML = "";
-    return;
-  }
-  artifactBox.classList.remove("hidden");
-  artifactBox.innerHTML = links
-    .map((link) => `<a href="${link.href}" target="_blank" rel="noopener">${link.label}</a>`)
-    .join("");
-}
-
-function renderTask(task) {
-  if (!task) return;
-  const variant = task.status === "failed" ? "error" : task.status === "completed" ? "success" : "running";
-  setStatus(`状态：${task.status}`, variant);
-  outputBox.textContent = JSON.stringify(task, null, 2);
-  renderArtifacts(task);
-}
-
-async function fetchTask(taskId) {
-  const resp = await fetch(`${API_BASE}/api/tasks/${taskId}`);
-  if (!resp.ok) throw new Error(await resp.text());
-  return resp.json();
-}
-
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function pollTask(taskId) {
-  let attempts = 0;
-  while (attempts < 120) {
-    const task = await fetchTask(taskId);
-    renderTask(task);
-    if (FINAL_STATUSES.has(task.status)) return task;
-    await delay(1500);
-    attempts += 1;
-  }
-  throw new Error("轮询超时，请手动刷新状态");
+function renderParamFields() {
+  const paramContainer = document.getElementById("param-fields");
+  if (!paramContainer) return;
+  paramContainer.innerHTML = "";
+  const schema = PARAM_SCHEMA[activeTab] || [];
+  schema.forEach((field) => {
+    const wrapper = document.createElement("label");
+    wrapper.className = "field";
+    const span = document.createElement("span");
+    span.textContent = field.label;
+    wrapper.appendChild(span);
+    let input;
+    if (field.type === "select") {
+      input = document.createElement("select");
+      (field.options || []).forEach((opt) => {
+        const option = document.createElement("option");
+        option.value = opt;
+        option.textContent = opt;
+        input.appendChild(option);
+      });
+    } else if (field.type === "textarea") {
+      input = document.createElement("textarea");
+      input.rows = 4;
+      input.placeholder = field.placeholder || "";
+    } else if (field.type === "checkbox") {
+      input = document.createElement("input");
+      input.type = "checkbox";
+    } else {
+      input = document.createElement("input");
+      input.type = field.type || "text";
+      input.placeholder = field.placeholder || "";
+    }
+    input.id = `param-${field.id}`;
+    wrapper.appendChild(input);
+    paramContainer.appendChild(wrapper);
+  });
 }
 
 async function runTask() {
   try {
     setStatus("运行中...", "running");
     outputBox.textContent = "";
-    artifactBox.classList.add("hidden");
+    artifactBox?.classList.add("hidden");
     const uploadId = await uploadFileIfNeeded();
     const params = collectParams();
     if (!codePathInput.value && !uploadId) {
@@ -256,31 +195,64 @@ async function runTask() {
   } catch (err) {
     setStatus("失败", "error");
     outputBox.textContent = err instanceof Error ? err.message : String(err);
-    artifactBox.classList.add("hidden");
+    artifactBox?.classList.add("hidden");
   }
 }
 
-navButtons.forEach((btn) => btn.addEventListener("click", () => enterWorkspace(btn.dataset.tab)));
-runBtn.addEventListener("click", runTask);
-if (startInWorkspace) {
-  enterWorkspace(activeTab, { skipHash: true });
-} else {
-  if (landingSection) landingSection.classList.remove("hidden");
-  if (appShell) appShell.classList.add("hidden");
-  if (backHomeBtn) backHomeBtn.classList.add("hidden");
-  updateContextBanner();
+function setStatus(text, variant = "info") {
+  if (!statusBox) return;
+  statusBox.textContent = text;
+  statusBox.className = `status ${variant}`;
 }
 
-const heroButtons = document.querySelectorAll(".hero-btn");
-heroButtons.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const target = btn.dataset.target || "agent-audit";
-    enterWorkspace(target);
-    const panel = document.getElementById("input-panel");
-    if (panel) panel.scrollIntoView({ behavior: "smooth" });
-  });
-});
+function renderArtifacts(task) {
+  if (!artifactBox) return;
+  if (!task || (!task.reportPath && !task.summaryPath && !task.logPath)) {
+    artifactBox.classList.add("hidden");
+    artifactBox.innerHTML = "";
+    return;
+  }
+  const links = [];
+  if (task.reportPath) links.push({ label: "下载报告", href: `${API_BASE}/api/tasks/${task.taskId}/report` });
+  if (task.summaryPath) links.push({ label: "下载摘要", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=summary` });
+  if (task.logPath) links.push({ label: "下载日志", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=log` });
+  if (!links.length) {
+    artifactBox.classList.add("hidden");
+    artifactBox.innerHTML = "";
+    return;
+  }
+  artifactBox.classList.remove("hidden");
+  artifactBox.innerHTML = links
+    .map((link) => `<a href="${link.href}" target="_blank" rel="noopener">${link.label}</a>`)
+    .join("");
+}
 
-if (backHomeBtn) {
-  backHomeBtn.addEventListener("click", returnToLanding);
+async function fetchTask(taskId) {
+  const resp = await fetch(`${API_BASE}/api/tasks/${taskId}`);
+  if (!resp.ok) throw new Error(await resp.text());
+  return resp.json();
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function pollTask(taskId) {
+  let attempts = 0;
+  while (attempts < 120) {
+    const task = await fetchTask(taskId);
+    renderTask(task);
+    if (FINAL_STATUSES.has(task.status)) return task;
+    await delay(1500);
+    attempts += 1;
+  }
+  throw new Error("轮询超时，请手动刷新状态");
+}
+
+function renderTask(task) {
+  if (!task) return;
+  const variant = task.status === "failed" ? "error" : task.status === "completed" ? "success" : "running";
+  setStatus(`状态：${task.status}`, variant);
+  outputBox.textContent = JSON.stringify(task, null, 2);
+  renderArtifacts(task);
 }
