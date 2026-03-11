@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Health AI 控制台</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Health AI</h1>
+    <nav id="nav-tabs">
+      <button data-tab="agent-audit" class="active">Agent Audit</button>
+      <button data-tab="multichain-contract-vuln">Contract Scanner</button>
+      <button data-tab="skill-stress-lab">Skill Stress Lab</button>
+    </nav>
+  </header>
+
+  <main>
+    <section class="panel" id="input-panel">
+      <h2>代码输入</h2>
+      <label>Skill 代码路径
+        <input type="text" id="code-path" placeholder="例如：/path/to/skill" />
+      </label>
+      <label>或上传压缩包/文件
+        <input type="file" id="code-upload" />
+      </label>
+      <div id="param-fields"></div>
+      <button id="run-task">开始分析</button>
+    </section>
+
+    <section class="panel" id="result-panel">
+      <h2>任务结果</h2>
+      <div id="task-status">未开始</div>
+      <pre id="task-output"></pre>
+    </section>
+  </main>
+
+  <script src="main.js" type="module"></script>
+</body>
+</html>

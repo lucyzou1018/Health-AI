@@ -1,0 +1,76 @@
+:root {
+  font-family: 'Inter', 'PingFang SC', system-ui, sans-serif;
+  background: #0e1117;
+  color: #f4f6ff;
+}
+body {
+  margin: 0;
+}
+header {
+  background: #161b2e;
+  padding: 20px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+h1 {
+  margin: 0;
+  font-size: 24px;
+}
+nav button {
+  background: transparent;
+  border: 1px solid #2f3b57;
+  color: #c8d2ff;
+  padding: 8px 16px;
+  margin-left: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+nav button.active {
+  background: #3f5efb;
+  color: #fff;
+  border-color: #3f5efb;
+}
+main {
+  display: flex;
+  gap: 24px;
+  padding: 24px 32px 48px;
+}
+.panel {
+  flex: 1;
+  background: #161b2e;
+  border: 1px solid #2a3350;
+  border-radius: 12px;
+  padding: 24px;
+}
+label {
+  display: block;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+input[type="text"],
+input[type="file"],
+select {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #27304a;
+  background: #0e1324;
+  color: #f4f6ff;
+}
+button#run-task {
+  background: #3f5efb;
+  border: none;
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+#task-output {
+  min-height: 200px;
+  background: #0e1324;
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+}
