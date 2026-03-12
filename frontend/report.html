@@ -85,6 +85,25 @@
       low: { keywords: ['assembly', 'naming-convention', 'pragma', 'solc-version', 'unindexed'], label: '低风险' }
     };
     
+    // Detector 名称中文映射
+    const DETECTOR_NAMES = {
+      'arbitrary-send-eth': 'ETH 任意转账',
+      'reentrancy': '重入攻击',
+      'unchecked-transfer': '未检查转账返回值',
+      'delegatecall': '委托调用风险',
+      'divide-before-multiply': '先除后乘精度损失',
+      'incorrect-equality': '危险严格等式',
+      'timestamp': '时间戳依赖',
+      'low-level-calls': '低级别调用',
+      'assembly': '内联汇编',
+      'naming-convention': '命名规范',
+      'pragma': '编译器版本混用',
+      'solc-version': 'Solidity 版本问题',
+      'unindexed-event-address': '事件参数未索引',
+      'unused-return': '未使用返回值',
+      'missing-zero-check': '缺少零地址检查'
+    };
+    
     function parseReport(text) {
       try {
         const detectors = [];
@@ -215,7 +234,8 @@
       let html = `<div class="issue-category"><div class="category-header" data-category="${level}"><div class="category-icon ${level}">${icon}</div><div class="category-name">${config.label}</div><div class="category-count ${level}">${items.length} 个</div><div class="category-arrow">▶</div></div><div class="issue-list" id="list-${level}">`;
       
       for (const [name, groupItems] of Object.entries(grouped)) {
-        html += `<div class="issue-item ${level}"><div class="issue-title">${name}</div><div class="issue-location">📍 ${groupItems.length} 处</div><div class="issue-desc">${groupItems[0].desc || '详见报告'}</div></div>`;
+        const cnName = DETECTOR_NAMES[name] || name;
+        html += `<div class="issue-item ${level}"><div class="issue-title">${cnName}</div><div class="issue-location">📍 ${groupItems.length} 处</div><div class="issue-desc">${groupItems[0].desc || '详见报告'}</div></div>`;
       }
       
       html += '</div></div>';
