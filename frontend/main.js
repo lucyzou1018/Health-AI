@@ -145,6 +145,7 @@ function setCurrentFile(file) {
   if (fileSize) fileSize.textContent = formatFileSize(file.size);
   if (uploadZone) uploadZone.classList.add("has-file");
   if (fileInfo) fileInfo.classList.remove("hidden");
+  updateRunButtonState();
 }
 
 function clearCurrentFile() {
@@ -154,6 +155,7 @@ function clearCurrentFile() {
   if (fileInfo) fileInfo.classList.add("hidden");
   if (fileName) fileName.textContent = "";
   if (fileSize) fileSize.textContent = "";
+  updateRunButtonState();
 }
 
 function clearResults() {
@@ -169,6 +171,16 @@ function clearResults() {
     reportPreviewBox.innerHTML = "";
     previewTaskId = null;
   }
+  updateRunButtonState();
+}
+
+function updateRunButtonState() {
+  if (!runBtn) return;
+  const hasFile = currentFile !== null || (fileInput && fileInput.files && fileInput.files[0]);
+  const isRunning = statusBox && statusBox.textContent === "运行中...";
+  runBtn.disabled = !hasFile || isRunning;
+  runBtn.style.opacity = runBtn.disabled ? "0.5" : "1";
+  runBtn.style.cursor = runBtn.disabled ? "not-allowed" : "pointer";
 }
 
 function formatFileSize(bytes) {
@@ -180,6 +192,7 @@ function formatFileSize(bytes) {
 }
 
 selectTab(activeTab, { skipHash: true });
+updateRunButtonState(); // 初始化按钮状态
 
 function selectTab(tab, opts = {}) {
   if (!PARAM_SCHEMA[tab]) return;
@@ -321,6 +334,7 @@ function setStatus(text, variant = "info") {
   if (!statusBox) return;
   statusBox.textContent = text;
   statusBox.className = `status ${variant}`;
+  updateRunButtonState();
 }
 
 function setSummary(text) {
