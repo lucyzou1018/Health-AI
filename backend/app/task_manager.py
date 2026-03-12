@@ -88,7 +88,9 @@ class TaskManager:
         src = matches[0]
         dest.mkdir(parents=True, exist_ok=True)
         suffix = src.suffix.lower()
-        if suffix in {".zip", ".tar", ".gz", ".bz2", ".xz"}:
+        if suffix == ".skill":
+            shutil.unpack_archive(str(src), dest, format="zip")
+        elif suffix in {".zip", ".tar", ".gz", ".bz2", ".xz"}:
             shutil.unpack_archive(str(src), dest)
         else:
             target = dest / src.name
@@ -207,7 +209,10 @@ class TaskManager:
             str(report_md),
         ]
         if code_dir.exists():
-            cmd.extend(["--skill-path", str(code_dir)])
+            skill_dirs = sorted({str(path.parent) for path in code_dir.rglob("SKILL.md")})
+            targets = skill_dirs or [str(code_dir)]
+            for target in targets:
+                cmd.extend(["--skill-path", target])
         self._run_command(cmd, cwd=self.repo_root, log_file=log_file)
         summary_data = json.loads(report_json.read_text(encoding="utf-8")) if report_json.exists() else {}
         return {
