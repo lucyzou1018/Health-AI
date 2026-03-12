@@ -565,11 +565,14 @@ function extractKeyRisks(text) {
       continue;
     }
     
+    // 跳过缩进的子行
+    if (line.match(/^\s/)) continue;
+    
     // 匹配风险点位置信息 (文件路径#行号)
     const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)\s*\)/);
     if (match && currentDetector) {
       const location = match[1];
-      // 获取描述（当前行或下一行）
+      // 获取描述（当前行）
       let description = "";
       const descMatch = line.match(/\)\s*(.+?)(?:\s+Reference:|$)/);
       if (descMatch) {
@@ -602,12 +605,16 @@ function extractDetectorSummaries(text) {
       continue;
     }
     
+    // 跳过缩进的子行（以空格或制表符开头）
+    if (line.match(/^\s/)) continue;
+    
     // 获取描述（第一行非空内容）
     if (currentDetector && !currentDesc && line.trim() && !line.startsWith("Reference:")) {
       currentDesc = line.trim().replace(/^[-•]\s*/, '');
+      continue;
     }
     
-    // 匹配具体的风险实例
+    // 匹配具体的风险实例（只匹配非缩进行）
     const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)\s*\)/);
     if (match && currentDetector) {
       items.push({ 
