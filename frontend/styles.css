@@ -36,9 +36,9 @@ nav button.active {
 }
 .workspace-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 24px;
-  padding: 24px 32px 48px;
+  padding: 24px;
   align-items: stretch;
   width: min(1120px, 100%);
   margin: 0 auto;
