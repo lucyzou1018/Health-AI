@@ -551,42 +551,58 @@ function buildReportSummary(text) {
   return html;
 }
 
-function extractKeyRisks(text) {
-  const risks = [];
+// 统一的问题提取函数
+function extractAllIssues(text) {
+  const items = [];
   const lines = text.split(/\r?\n/);
   let currentDetector = "";
+  let currentDesc = "";
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     
-    // 记录当前 Detector 类型
     if (line.startsWith("Detector:")) {
       currentDetector = line.replace("Detector:", "").trim();
+      currentDesc = "";
       continue;
     }
     
-    // 跳过缩进的子行
     if (line.match(/^\s/)) continue;
     
-    // 匹配风险点位置信息 (文件路径#行号)
-    const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)/);
-    if (match && currentDetector) {
-      const location = match[1];
-      // 获取描述（当前行）
-      let description = "";
-      const descMatch = line.match(/\)\s*(.+?)(?:\s+Reference:|$)/);
-      if (descMatch) {
-        description = descMatch[1].trim();
-      }
-      
-      risks.push({
-        type: currentDetector,
-        location: location,
-        desc: description || "详见报告"
+    if (currentDetector && !currentDesc && line.trim() && !line.startsWith("Reference:")) {
+      currentDesc = line.trim().replace(/^[-•]\s*/, '');
+      continue;
+    }
+    
+    // 匹配位置 - 统一三种格式
+    let location = null;
+    const match1 = line.match(/(\w+\.sol#\d+(?:-\d+)?)/);
+    const match2 = line.match(/in\s+\w+\([^)]*\)\s*\(([^)]+\.sol#\d+(?:-\d+)?)\)/);
+    const match3 = line.match(/\((src\/[^)]+\.sol#\d+(?:-\d+)?)\)/);
+    location = match1 ? match1[1] : (match2 ? match2[1] : (match3 ? match3[1] : null));
+    
+    if (location && currentDetector) {
+      items.push({
+        name: currentDetector,
+        desc: currentDesc || "详见报告",
+        location: location
       });
     }
   }
-  return risks;
+  return items;
+}
+
+function extractKeyRisks(text) {
+  const items = extractAllIssues(text);
+  return items.map(item => ({
+    type: item.name,
+    location: item.location,
+    desc: item.desc
+  }));
+}
+
+function extractDetectorSummaries(text) {
+  return extractAllIssues(text);
 }
 
 function extractDetectorSummaries(text) {
