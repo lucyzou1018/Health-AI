@@ -151,7 +151,7 @@ class TaskManager:
             dest.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(src, dest / src.name)
 
-    def _run_skill(self, record: TaskRecord, workspace: Path, input_dir: Path) -> None:
+    def _run_skill(self, record: TaskRecord, workspace: Path, input_dir: Path) -> Dict[str, Any]:
         report_dir = workspace / "report"
         report_dir.mkdir(parents=True, exist_ok=True)
         if record.skill_type == "agent-audit":
@@ -164,6 +164,7 @@ class TaskManager:
         record.summary_path = result.get("summary")
         record.log_path = result.get("log")
         record.message = result.get("message", "")
+        return result
 
     def _run_command(
         self,
