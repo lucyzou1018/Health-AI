@@ -58,7 +58,7 @@ nav button.active {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 24px;
-  padding: 24px;
+  padding: 0;
   align-items: stretch;
   width: min(1120px, 100%);
   margin: 0 auto;
@@ -291,7 +291,7 @@ button#run-task:active {
 }
 
 #app-shell {
-  padding-bottom: 48px;
+  padding: 0 24px 48px;
 }
 #nav-tabs {
   display: flex;
@@ -384,7 +384,7 @@ button#run-task:active {
 }
 
 .history-panel {
-  margin: 48px auto 48px;
+  margin: 64px auto 64px;
   width: min(1120px, 100%);
 }
 .history-head {
@@ -485,9 +485,11 @@ button#run-task:active {
 }
 
 @media (max-width: 960px) {
+  #app-shell {
+    padding: 0 16px 32px;
+  }
   .workspace-grid {
     grid-template-columns: 1fr;
-    padding: 16px 20px 32px;
   }
   button#run-task {
     width: 100%;
