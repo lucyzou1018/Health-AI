@@ -182,6 +182,68 @@ def bundle_sources(target: Path, bundle_path: Path) -> Optional[str]:
     return f"源码聚合文件：{bundle_path}（共 {len(sources)} 个文件）"
 
 
+def _resolve_project_path(target: Path) -> Tuple[Path, Optional[str]]:
+    if target.is_file():
+        return target, None
+    current = target
+    markers = {"foundry.toml", "Anchor.toml"}
+    visited = 0
+    while current.is_dir():
+        if any((current / marker).exists() for marker in markers):
+            if current != target:
+                return current, f"自动定位项目根目录：{current}"
+            return current, None
+        entries = list(current.iterdir())
+        dirs = [p for p in entries if p.is_dir()]
+        files = [p for p in entries if p.is_file()]
+        if files or len(dirs) != 1:
+            break
+        visited += 1
+        if visited > 4:
+            break
+        current = dirs[0]
+    return target, None
+
+
+def _prepare_foundry_project(target: Path) -> List[str]:
+    project_dir = target if target.is_dir() else target.parent
+    foundry_toml = project_dir / "foundry.toml"
+    if not foundry_toml.exists():
+        return []
+
+    notes: List[str] = []
+    git_dir = project_dir / ".git"
+    if not git_dir.exists():
+        code, out, err = run_cmd(["git", "init"], cwd=project_dir)
+        if code == 0:
+            notes.append("检测到 Foundry 项目但缺少 .git，已自动执行 git init 以便 forge install。")
+        else:
+            notes.append(f"❌ git init 失败：{err or out}")
+            return notes
+
+    deps = {
+        "openzeppelin-contracts": "OpenZeppelin/openzeppelin-contracts",
+        "forge-std": "foundry-rs/forge-std",
+    }
+    for folder, repo in deps.items():
+        dest = project_dir / "lib" / folder
+        has_files = dest.exists() and any(dest.iterdir())
+        if has_files:
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        code, out, err = run_cmd([
+            "git",
+            "clone",
+            f"https://github.com/{repo}.git",
+            str(dest),
+        ], cwd=project_dir)
+        if code == 0:
+            notes.append(f"已自动下载依赖 {repo} → lib/{folder}")
+        else:
+            notes.append(f"❌ 下载 {repo} 失败：{err or out}")
+    return notes
+
+
 def run_slither(target: Path, json_path: Path, slither_bin: str | None = None) -> Tuple[bool, str]:
     binary = slither_bin or shutil.which("slither")
     if not binary:
@@ -345,6 +407,11 @@ def main() -> int:
 
     chain_hint = args.chain or ("evm" if args.evm_address else None)
     chain = detect_chain(target, chain_hint)
+    resolved_target, root_note = _resolve_project_path(target)
+    if root_note:
+        notes.append(root_note)
+    target = resolved_target
+
     scope = args.scope or slugify(target.stem if target.is_file() else target.name)
     report_path = Path(args.report).expanduser().resolve() if args.report else Path.cwd() / "reports" / f"{scope}-multichain-audit.md"
     bundle_path = (
@@ -363,6 +430,7 @@ def main() -> int:
         notes.append("未生成源码聚合（未检测到支持的源码后缀）")
 
     if chain == "evm":
+        notes.extend(_prepare_foundry_project(target))
         json_path = report_path.with_suffix(".slither.json")
         ok, message = run_slither(target, json_path, args.slither_bin)
         if ok:
