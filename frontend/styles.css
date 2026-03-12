@@ -109,6 +109,108 @@ label.field span {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+/* Upload Zone Styles */
+.upload-zone {
+  border: 2px dashed color-mix(in oklch, var(--border), transparent 30%);
+  border-radius: 16px;
+  padding: 32px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 200ms ease;
+  background: color-mix(in oklch, var(--card), black 2%);
+  margin-bottom: 20px;
+  position: relative;
+}
+.upload-zone:hover {
+  border-color: var(--primary);
+  background: color-mix(in oklch, var(--primary), transparent 95%);
+}
+.upload-zone.dragover {
+  border-color: var(--primary);
+  background: color-mix(in oklch, var(--primary), transparent 90%);
+  transform: scale(1.02);
+}
+.upload-zone.has-file {
+  border-style: solid;
+  border-color: var(--success);
+  background: color-mix(in oklch, var(--success), transparent 95%);
+}
+.upload-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.upload-zone.has-file .upload-hint {
+  display: none;
+}
+.upload-icon {
+  font-size: 40px;
+  margin-bottom: 4px;
+}
+.upload-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+.upload-subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.upload-file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+.upload-file-info.hidden {
+  display: none;
+}
+.file-icon {
+  font-size: 28px;
+}
+.file-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.file-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.file-size {
+  font-size: 12px;
+  color: var(--muted);
+}
+.file-remove {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 150ms ease;
+}
+.file-remove:hover {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
+}
 input[type="text"],
 input[type="file"],
 input[type="number"],

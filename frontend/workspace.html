@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Health AI 控制台</title>
-  <link rel="stylesheet" href="styles.css?v=20260312" />
+  <link rel="stylesheet" href="styles.css?v=20260313" />
 </head>
 <body>
   <header class="brand-nav workspace-header">
@@ -30,9 +30,24 @@
       <section class="panel" id="input-panel">
         <h2>上传代码包</h2>
         <p class="panel-desc">请选择 Skill/Agent 的压缩包，直接上传即可触发体检。</p>
-        <label class="field">上传文件
-          <input type="file" id="code-upload" />
-        </label>
+
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="code-upload" accept=".zip" hidden />
+          <div class="upload-hint" id="upload-hint">
+            <span class="upload-icon">📦</span>
+            <p class="upload-title">点击或拖拽上传压缩包</p>
+            <p class="upload-subtitle">支持 .zip 格式，最大 50MB</p>
+          </div>
+          <div class="upload-file-info hidden" id="file-info">
+            <span class="file-icon">📄</span>
+            <div class="file-details">
+              <span class="file-name" id="file-name"></span>
+              <span class="file-size" id="file-size"></span>
+            </div>
+            <button class="file-remove" id="file-remove" title="移除文件">✕</button>
+          </div>
+        </div>
+
         <div id="param-fields"></div>
         <button id="run-task">开始分析</button>
       </section>
@@ -57,6 +72,6 @@
     </section>
   </section>
 
-  <script src="main.js?v=20260312c" type="module"></script>
+  <script src="main.js?v=20260313" type="module"></script>
 </body>
 </html>

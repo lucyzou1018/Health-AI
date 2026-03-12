@@ -45,6 +45,11 @@ const artifactBox = document.getElementById("artifact-links");
 const runBtn = document.getElementById("run-task");
 const codePathInput = document.getElementById("code-path");
 const fileInput = document.getElementById("code-upload");
+const uploadZone = document.getElementById("upload-zone");
+const fileInfo = document.getElementById("file-info");
+const fileName = document.getElementById("file-name");
+const fileSize = document.getElementById("file-size");
+const fileRemove = document.getElementById("file-remove");
 const contextTitle = document.getElementById("current-skill-title");
 const contextDesc = document.getElementById("current-skill-desc");
 const historyList = document.getElementById("history-list");
@@ -52,6 +57,7 @@ const historyPanel = document.querySelector(".history-panel");
 const reportPreviewBox = document.getElementById("report-preview");
 const recordedHistory = new Set();
 let previewTaskId = null;
+let currentFile = null;
 historyPanel?.classList.add("is-empty");
 
 const FINAL_STATUSES = new Set(["completed", "failed"]);
@@ -73,6 +79,90 @@ window.addEventListener("hashchange", () => {
     selectTab(target, { skipHash: true });
   }
 });
+
+// Upload zone event listeners
+if (uploadZone && fileInput) {
+  // Click to select
+  uploadZone.addEventListener("click", (e) => {
+    if (e.target.closest(".file-remove")) return;
+    fileInput.click();
+  });
+
+  // File selected via input
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    if (file) {
+      setCurrentFile(file);
+    }
+  });
+
+  // Drag events
+  uploadZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    uploadZone.classList.add("dragover");
+  });
+
+  uploadZone.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    uploadZone.classList.remove("dragover");
+  });
+
+  uploadZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    uploadZone.classList.remove("dragover");
+
+    const files = e.dataTransfer?.files;
+    if (files?.length > 0) {
+      const file = files[0];
+      if (file.name.endsWith(".zip")) {
+        // Set the file to the input for form submission
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        setCurrentFile(file);
+      } else {
+        setSummary("请上传 .zip 格式的压缩包");
+        setStatus("格式错误", "error");
+      }
+    }
+  });
+}
+
+// Remove file button
+if (fileRemove) {
+  fileRemove.addEventListener("click", (e) => {
+    e.stopPropagation();
+    clearCurrentFile();
+  });
+}
+
+function setCurrentFile(file) {
+  currentFile = file;
+  if (fileName) fileName.textContent = file.name;
+  if (fileSize) fileSize.textContent = formatFileSize(file.size);
+  if (uploadZone) uploadZone.classList.add("has-file");
+  if (fileInfo) fileInfo.classList.remove("hidden");
+}
+
+function clearCurrentFile() {
+  currentFile = null;
+  if (fileInput) fileInput.value = "";
+  if (uploadZone) uploadZone.classList.remove("has-file");
+  if (fileInfo) fileInfo.classList.add("hidden");
+  if (fileName) fileName.textContent = "";
+  if (fileSize) fileSize.textContent = "";
+}
+
+function formatFileSize(bytes) {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
+}
 
 selectTab(activeTab, { skipHash: true });
 
@@ -105,7 +195,7 @@ async function uploadFileIfNeeded() {
   if (!resp.ok) {
     throw new Error(`上传失败：${await resp.text()}`);
   }
-  fileInput.value = "";
+  // Don't clear file input here - we want to keep showing the selected file
   const data = await resp.json();
   return data.uploadId;
 }
