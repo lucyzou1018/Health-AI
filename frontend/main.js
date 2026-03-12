@@ -3,18 +3,7 @@ const PARAM_SCHEMA = {
   "multichain-contract-vuln": [
     { id: "chain", label: "链类型", type: "select", options: ["evm", "solana"], placeholder: "evm" }
   ],
-  "skill-stress-lab": [
-    {
-      id: "command",
-      label: "命令模板",
-      type: "textarea",
-      placeholder: "python3 skills/skill-stress-lab/tests/helpers/run_http_load.py --url ...",
-    },
-    { id: "workdir", label: "工作目录", type: "text", placeholder: "例如：skills/skill-stress-lab" },
-    { id: "runs", label: "Runs", type: "number", placeholder: "10" },
-    { id: "concurrency", label: "Concurrency", type: "number", placeholder: "1" },
-    { id: "collectMetrics", label: "Collect Metrics", type: "checkbox" }
-  ]
+  "skill-stress-lab": []
 };
 
 const FEATURE_COPY = {
@@ -43,6 +32,9 @@ const statusBox = document.getElementById("task-status");
 const summaryBox = document.getElementById("task-summary");
 const artifactBox = document.getElementById("artifact-links");
 const runBtn = document.getElementById("run-task");
+const DEFAULT_RUN_LABEL = "开始分析";
+const DISABLED_RUN_LABEL = "功能暂未开放";
+const DISABLED_TABS = new Set(["skill-stress-lab"]);
 const codePathInput = document.getElementById("code-path");
 const fileInput = document.getElementById("code-upload");
 const contextTitle = document.getElementById("current-skill-title");
@@ -76,6 +68,7 @@ function selectTab(tab, opts = {}) {
   }
   renderParamFields();
   updateContextBanner();
+  updateRunButtonState();
 }
 
 function updateContextBanner() {
@@ -85,6 +78,13 @@ function updateContextBanner() {
     if (contextDesc) contextDesc.textContent = copy.desc;
     document.title = `Health AI · ${copy.title}`;
   }
+}
+
+function updateRunButtonState() {
+  if (!runBtn) return;
+  const disabled = DISABLED_TABS.has(activeTab);
+  runBtn.disabled = disabled;
+  runBtn.textContent = disabled ? DISABLED_RUN_LABEL : DEFAULT_RUN_LABEL;
 }
 
 async function uploadFileIfNeeded() {
@@ -160,6 +160,11 @@ function renderParamFields() {
 }
 
 async function runTask() {
+  if (DISABLED_TABS.has(activeTab)) {
+    setStatus("暂未开放", "info");
+    setSummary("该功能已在后台关闭");
+    return;
+  }
   try {
     setStatus("运行中...", "running");
     setSummary("正在准备任务……");
