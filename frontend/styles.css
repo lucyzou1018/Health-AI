@@ -272,8 +272,8 @@ button#run-task:active {
 #context-banner {
   text-align: center;
   padding: 12px 32px 32px;
-  width: min(720px, 100%);
-  margin: 0 auto;
+  width: min(1120px, 100%);
+  margin: 0 auto 32px;
 }
 #context-banner .label {
   font-size: 12px;
