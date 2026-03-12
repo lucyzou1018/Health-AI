@@ -553,20 +553,22 @@ button#run-task:active {
   color: var(--primary-foreground);
 }
 
-.history-panel {
-  margin: 32px 0 0 0;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  position: relative;
+.history-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
 }
-.history-panel.is-empty {
-  margin: 32px 0 0 0;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  background: var(--card);
-  text-align: center;
+.history-section .history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.history-section .history-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--foreground);
 }
 .history-panel.is-empty::before,
 .history-panel.is-empty .history-list::before {
@@ -589,26 +591,16 @@ button#run-task:active {
   margin: 0;
 }
 .history-hint {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
 }
 .history-list {
   list-style: none;
-  padding: 0 0 0 20px;
+  padding: 0;
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  position: relative;
-}
-.history-list::before {
-  content: '';
-  position: absolute;
-  left: 6px;
-  top: 4px;
-  bottom: 4px;
-  width: 1px;
-  background: var(--border);
+  gap: 8px;
 }
 .history-list li {
   margin: 0;
@@ -617,31 +609,18 @@ button#run-task:active {
 .history-list li.empty {
   text-align: center;
   color: var(--muted);
-  padding: 16px 0;
-  border: 1px dashed var(--border);
-  border-radius: 12px;
+  padding: 12px;
+  font-size: 13px;
 }
 .history-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 18px;
-  border-radius: 12px;
-  background: color-mix(in oklch, var(--card), black 3%);
-  border: 1px solid color-mix(in oklch, var(--border), transparent 20%);
-  position: relative;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: color-mix(in oklch, var(--background), white 3%);
+  border: 1px solid color-mix(in oklch, var(--border), transparent 40%);
   animation: fadeInUp 0.35s ease-out;
-}
-.history-item::before {
-  content: '';
-  position: absolute;
-  left: -14px;
-  top: 18px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--primary);
-  box-shadow: 0 0 0 4px rgba(63, 94, 251, 0.15);
 }
 .history-meta {
   display: flex;

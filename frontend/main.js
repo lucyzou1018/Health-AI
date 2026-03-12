@@ -53,12 +53,12 @@ const fileRemove = document.getElementById("file-remove");
 const contextTitle = document.getElementById("current-skill-title");
 const contextDesc = document.getElementById("current-skill-desc");
 const historyList = document.getElementById("history-list");
-const historyPanel = document.querySelector(".history-panel");
+const historySection = document.querySelector(".history-section");
 const reportPreviewBox = document.getElementById("report-preview");
 const recordedHistory = new Set();
 let previewTaskId = null;
 let currentFile = null;
-historyPanel?.classList.add("is-empty");
+historySection?.classList.add("is-empty");
 
 const FINAL_STATUSES = new Set(["completed", "failed"]);
 const DEFAULT_API = window.location.origin;
@@ -344,7 +344,7 @@ function appendHistoryEntry(task) {
   recordedHistory.add(task.taskId);
   const emptyRow = historyList.querySelector("li.empty");
   if (emptyRow) emptyRow.remove();
-  historyPanel?.classList.remove("is-empty");
+  historySection?.classList.remove("is-empty");
   const item = document.createElement("li");
   item.className = "history-item";
 

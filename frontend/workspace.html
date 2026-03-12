@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Health AI 控制台</title>
-  <link rel="stylesheet" href="styles.css?v=20260314" />
+  <link rel="stylesheet" href="styles.css?v=20260315" />
 </head>
 <body>
   <header class="brand-nav workspace-header">
@@ -58,20 +58,20 @@
         <p id="task-summary" class="task-summary">上传 Skill 包后，可在这里查看状态并下载报告。</p>
         <div id="artifact-links" class="artifact-links hidden"></div>
         <div id="report-preview" class="report-preview hidden"></div>
+
+        <div class="history-section">
+          <div class="history-head">
+            <h3>分析历史</h3>
+            <span class="history-hint">最近 5 条</span>
+          </div>
+          <ul id="history-list" class="history-list">
+            <li class="empty">暂无历史记录</li>
+          </ul>
+        </div>
       </section>
     </main>
-
-    <section class="panel history-panel">
-      <div class="history-head">
-        <h2>分析历史</h2>
-        <span class="history-hint">最近 5 条</span>
-      </div>
-      <ul id="history-list" class="history-list">
-        <li class="empty">暂无历史记录</li>
-      </ul>
-    </section>
   </section>
 
-  <script src="main.js?v=20260314" type="module"></script>
+  <script src="main.js?v=20260315" type="module"></script>
 </body>
 </html>
