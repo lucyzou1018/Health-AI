@@ -185,17 +185,6 @@ button#run-task:active {
   position: relative;
   gap: 16px;
 }
-#input-panel::before,
-#result-panel::before {
-  position: absolute;
-  top: -36px;
-  left: 0;
-  font-size: 12px;
-  letter-spacing: 0.4em;
-  color: var(--muted);
-}
-#input-panel::before { content: "STEP 1"; }
-#result-panel::before { content: "STEP 2"; }
 #input-panel { padding-right: 16px; }
 #result-panel { padding-left: 16px; }
 
