@@ -45,7 +45,7 @@ let activeTab = (function () {
 
 const navButtons = document.querySelectorAll("#workspace-tabs button");
 const statusBox = document.getElementById("task-status");
-const outputBox = document.getElementById("task-output");
+const summaryBox = document.getElementById("task-summary");
 const artifactBox = document.getElementById("artifact-links");
 const runBtn = document.getElementById("run-task");
 const codePathInput = document.getElementById("code-path");
@@ -163,19 +163,20 @@ function renderParamFields() {
 async function runTask() {
   try {
     setStatus("运行中...", "running");
-    outputBox.textContent = "";
+    setSummary("正在准备任务……");
     artifactBox?.classList.add("hidden");
     const uploadId = await uploadFileIfNeeded();
     const params = collectParams();
-    if (!codePathInput.value && !uploadId) {
-      throw new Error("请填写代码路径或上传文件");
+    const codePathValue = codePathInput?.value?.trim();
+    if (!codePathValue && !uploadId) {
+      throw new Error("请先上传 Skill/Agent 压缩包");
     }
     if (activeTab === "skill-stress-lab" && !params.command) {
       throw new Error("Stress Lab 需要命令模板");
     }
     const body = {
       skillType: activeTab,
-      codePath: codePathInput.value || null,
+      codePath: codePathValue || null,
       uploadId: uploadId,
       params,
     };
@@ -194,7 +195,8 @@ async function runTask() {
     }
   } catch (err) {
     setStatus("失败", "error");
-    outputBox.textContent = err instanceof Error ? err.message : String(err);
+    const message = err instanceof Error ? err.message : String(err);
+    setSummary(message);
     artifactBox?.classList.add("hidden");
   }
 }
@@ -203,6 +205,22 @@ function setStatus(text, variant = "info") {
   if (!statusBox) return;
   statusBox.textContent = text;
   statusBox.className = `status ${variant}`;
+}
+
+function setSummary(text) {
+  if (!summaryBox) return;
+  summaryBox.textContent = text;
+}
+
+function describeTask(task) {
+  if (!task) return "上传 Skill 包后，可在这里查看状态并下载报告。";
+  if (task.status === "failed") {
+    return task.message ? `任务失败：${task.message}` : "任务失败，请检查日志";
+  }
+  if (task.status === "completed") {
+    return `任务 ${task.taskId} 已完成，可下载报告 / 摘要 / 日志。`;
+  }
+  return `任务 ${task.taskId} 正在执行...`;
 }
 
 function renderArtifacts(task) {
@@ -253,6 +271,6 @@ function renderTask(task) {
   if (!task) return;
   const variant = task.status === "failed" ? "error" : task.status === "completed" ? "success" : "running";
   setStatus(`状态：${task.status}`, variant);
-  outputBox.textContent = JSON.stringify(task, null, 2);
+  setSummary(describeTask(task));
   renderArtifacts(task);
 }

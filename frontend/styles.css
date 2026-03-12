@@ -6,14 +6,16 @@
 body {
   margin: 0;
 }
-header {
-  background: #161b2e;
-  padding: 16px 32px 10px;
+.brand-nav {
+  background: rgba(7, 11, 22, 0.92);
+  padding: 18px 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(6px);
 }
+
 h1 {
   margin: 0;
   font-size: 24px;
@@ -33,12 +35,13 @@ nav button.active {
   border-color: #3f5efb;
 }
 main {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
   gap: 24px;
   padding: 24px 32px 48px;
+  align-items: start;
 }
 .panel {
-  flex: 1;
   background: #161b2e;
   border: 1px solid #2a3350;
   border-radius: 12px;
@@ -81,14 +84,24 @@ button#run-task {
   padding: 12px 24px;
   border-radius: 8px;
   cursor: pointer;
+  width: 100%;
+  font-size: 16px;
+  margin-top: 8px;
 }
-#task-output {
-  min-height: 200px;
-  background: #0e1324;
-  border-radius: 8px;
-  padding: 16px;
-  overflow-x: auto;
-  white-space: pre-wrap;
+
+.panel h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+.panel-desc {
+  margin: 0 0 18px;
+  color: #9aa3c9;
+  line-height: 1.6;
+}
+.task-summary {
+  margin: 0 0 12px;
+  color: #c6cbe3;
+  line-height: 1.6;
 }
 
 .status {
@@ -264,6 +277,15 @@ button#run-task {
   font-weight: 500;
   transition: all 0.2s ease;
 }
+
+@media (max-width: 960px) {
+  main {
+    grid-template-columns: 1fr;
+  }
+  button#run-task {
+    width: 100%;
+  }
+}
 .workspace-tabs button:hover {
   color: #ffffff;
   background: rgba(63, 94, 251, 0.12);
@@ -274,12 +296,9 @@ button#run-task {
   box-shadow: 0 6px 18px rgba(63, 94, 251, 0.35);
 }
 
-body.landing-only header {
-  background: transparent;
-  border: none;
-  padding: 24px 32px 0;
-  margin: 0;
+.landing-header {
   justify-content: flex-start;
+  border-bottom: none;
 }
 body.landing-only .landing-header h1,
 body.landing-only header h1 {
@@ -307,4 +326,8 @@ body.landing-only header h1 {
 .brand-name {
   font-size: 28px;
   font-weight: 600;
+}
+
+.workspace-header {
+  justify-content: space-between;
 }

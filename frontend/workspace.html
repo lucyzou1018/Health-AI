@@ -6,7 +6,7 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header>
+  <header class="brand-nav workspace-header">
     <div class="brand-stack">
       <span class="brand-logo">AI</span>
       <h1 class="brand-name">Health AI</h1>
@@ -28,11 +28,9 @@
 
     <main>
       <section class="panel" id="input-panel">
-        <h2>代码输入</h2>
-        <label class="field">路径
-          <input type="text" id="code-path" placeholder="例如：/path/to/skill" />
-        </label>
-        <label class="field">或上传文件
+        <h2>上传代码包</h2>
+        <p class="panel-desc">请选择 Skill/Agent 的压缩包，直接上传即可触发体检。</p>
+        <label class="field">上传文件
           <input type="file" id="code-upload" />
         </label>
         <div id="param-fields"></div>
@@ -42,7 +40,7 @@
       <section class="panel" id="result-panel">
         <h2>任务结果</h2>
         <div id="task-status" class="status">未开始</div>
-        <pre id="task-output"></pre>
+        <p id="task-summary" class="task-summary">上传 Skill 包后，可在这里查看状态并下载报告。</p>
         <div id="artifact-links" class="artifact-links hidden"></div>
       </section>
     </main>
