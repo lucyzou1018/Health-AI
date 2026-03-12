@@ -384,7 +384,7 @@ button#run-task:active {
 }
 
 .history-panel {
-  margin: 64px auto 64px;
+  margin: 96px auto 64px;
   width: min(1120px, 100%);
 }
 .history-head {
