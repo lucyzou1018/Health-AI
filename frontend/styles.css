@@ -512,7 +512,7 @@ button#run-task:active {
   color: var(--text-primary);
   font-size: 12px;
   line-height: 1.7;
-  max-height: 400px;
+  max-height: 500px;
   overflow-y: auto;
 }
 
@@ -520,22 +520,101 @@ button#run-task:active {
   display: none;
 }
 
-.report-preview .report-stats {
-  padding: 8px 12px;
-  background: var(--bg-hover);
+/* Stats Cards */
+.report-stats-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  padding: 12px 8px;
   border-radius: var(--radius-sm);
-  margin-bottom: 12px;
-  font-weight: 500;
+  text-align: center;
+  border: 1px solid var(--border-subtle);
+}
+
+.stat-card .stat-number {
+  display: block;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.stat-card .stat-label {
+  display: block;
+  font-size: 11px;
   color: var(--text-secondary);
 }
 
+.stat-card.high {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.stat-card.high .stat-number { color: #ef4444; }
+
+.stat-card.medium {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.stat-card.medium .stat-number { color: #f59e0b; }
+
+.stat-card.low {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+.stat-card.low .stat-number { color: #22c55e; }
+
+.stat-card.total {
+  background: var(--bg-hover);
+}
+.stat-card.total .stat-number { color: var(--accent); }
+
+/* Key Risks */
+.key-risks {
+  margin-bottom: 16px;
+}
+
+.risk-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--accent);
+}
+
+.risk-item .risk-type {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.risk-item .risk-location {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  font-family: monospace;
+}
+
+.risk-more {
+  text-align: center;
+  padding: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-style: italic;
+}
+
 .report-preview h4 {
-  margin: 12px 0 8px;
+  margin: 16px 0 10px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-subtle);
-  padding-bottom: 4px;
+  padding-bottom: 6px;
 }
 
 .report-preview h4:first-of-type {

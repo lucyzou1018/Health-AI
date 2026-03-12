@@ -476,9 +476,32 @@ function buildReportSummary(text) {
   const mediumFindings = detectorSummaries.filter(f => mediumRisk.some(r => f.name.toLowerCase().includes(r)));
   const otherFindings = detectorSummaries.filter(f => !highFindings.includes(f) && !mediumFindings.includes(f));
   
-  let html = "";
-  html += `<div class="report-stats">共发现 ${detectorSummaries.length} 个问题</div>`;
+  // 提取关键风险点详情
+  const keyRisks = extractKeyRisks(text);
   
+  let html = "";
+  
+  // 统计卡片
+  html += `<div class="report-stats-cards">`;
+  html += `<div class="stat-card high"><span class="stat-number">${highFindings.length}</span><span class="stat-label">高风险</span></div>`;
+  html += `<div class="stat-card medium"><span class="stat-number">${mediumFindings.length}</span><span class="stat-label">中风险</span></div>`;
+  html += `<div class="stat-card low"><span class="stat-number">${otherFindings.length}</span><span class="stat-label">低风险</span></div>`;
+  html += `<div class="stat-card total"><span class="stat-number">${detectorSummaries.length}</span><span class="stat-label">总计</span></div>`;
+  html += `</div>`;
+  
+  // 关键风险点
+  if (keyRisks.length > 0) {
+    html += `<h4>⚠️ 关键风险点</h4><div class="key-risks">`;
+    html += keyRisks.slice(0, 5).map(risk => 
+      `<div class="risk-item"><span class="risk-type">${risk.type}</span><span class="risk-location">${risk.location}</span></div>`
+    ).join("");
+    if (keyRisks.length > 5) {
+      html += `<div class="risk-more">...还有 ${keyRisks.length - 5} 个风险点</div>`;
+    }
+    html += `</div>`;
+  }
+  
+  // 详细问题列表
   if (highFindings.length) {
     html += `<h4>🔴 高风险 (${highFindings.length})</h4><ol>${highFindings
       .map((item) => `<li><strong>${item.name}</strong> · ${item.desc || "详见报告"}</li>`)
@@ -498,6 +521,37 @@ function buildReportSummary(text) {
   }
   
   return html;
+}
+
+function extractKeyRisks(text) {
+  const risks = [];
+  const lines = text.split(/\r?\n/);
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // 匹配风险点位置信息 (文件路径#行号)
+    const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)\s*\)\s*([^\n]+)/);
+    if (match) {
+      const location = match[1];
+      const description = match[2].trim();
+      // 找到对应的 Detector 类型
+      let detectorType = "";
+      for (let j = i - 1; j >= 0; j--) {
+        if (lines[j].startsWith("Detector:")) {
+          detectorType = lines[j].replace("Detector:", "").trim();
+          break;
+        }
+      }
+      if (detectorType && description) {
+        risks.push({
+          type: detectorType,
+          location: location,
+          desc: description
+        });
+      }
+    }
+  }
+  return risks;
 }
 
 function extractDetectorSummaries(text) {
