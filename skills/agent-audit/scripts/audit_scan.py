@@ -691,12 +691,17 @@ def _collect_session_token_stats() -> Dict[str, Any]:
         except Exception:
             continue
         for session_key, payload in data.items():
+            if not isinstance(payload, dict):
+                # sessions.json 里可能出现 null 或其它占位，直接跳过以免 NoneType 报错
+                continue
             tokens = payload.get("totalTokens")
             if not isinstance(tokens, int) or tokens <= 0:
                 continue
             total += tokens
             model = payload.get("model") or "unknown"
             model_totals[model] = model_totals.get(model, 0) + tokens
+            origin_meta = payload.get("origin")
+            origin_label = origin_meta.get("label") if isinstance(origin_meta, dict) else origin_meta
             sessions_data.append(
                 {
                     "session": session_key,
@@ -705,7 +710,7 @@ def _collect_session_token_stats() -> Dict[str, Any]:
                     "tokens": tokens,
                     "updatedAt": payload.get("updatedAt"),
                     "chatType": payload.get("chatType"),
-                    "origin": (payload.get("origin") or {}).get("label"),
+                    "origin": origin_label,
                 }
             )
 
