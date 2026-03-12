@@ -4,10 +4,13 @@ WORKDIR /app
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
-# 安装系统依赖（可按需扩展 slither / anchor 等工具）
+# 安装系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl build-essential \
     && rm -rf /var/lib/apt/lists/*
+
+# 安装 Python 依赖（包括 Slither）
+RUN pip install slither-analyzer
 
 COPY backend ./backend
 COPY skills ./skills
