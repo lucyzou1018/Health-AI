@@ -386,6 +386,17 @@ button#run-task:active {
 .history-panel {
   margin: 96px auto 64px;
   width: min(1120px, 100%);
+  background: color-mix(in oklch, var(--card), black 8%);
+  position: relative;
+}
+.history-panel::before {
+  content: '';
+  position: absolute;
+  top: -56px;
+  left: 32px;
+  right: 32px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
 }
 .history-head {
   display: flex;
