@@ -156,6 +156,21 @@ function clearCurrentFile() {
   if (fileSize) fileSize.textContent = "";
 }
 
+function clearResults() {
+  // 清除任务状态
+  if (statusBox) {
+    statusBox.textContent = "未开始";
+    statusBox.className = "status";
+  }
+  if (summaryBox) summaryBox.textContent = "上传 Skill 包后，可在这里查看状态并下载报告。";
+  if (artifactBox) artifactBox.classList.add("hidden");
+  if (reportPreviewBox) {
+    reportPreviewBox.classList.add("hidden");
+    reportPreviewBox.innerHTML = "";
+    previewTaskId = null;
+  }
+}
+
 function formatFileSize(bytes) {
   if (bytes === 0) return "0 B";
   const k = 1024;
@@ -175,6 +190,9 @@ function selectTab(tab, opts = {}) {
   }
   renderParamFields();
   updateContextBanner();
+  // 清除上传的文件和结果
+  clearCurrentFile();
+  clearResults();
 }
 
 function updateContextBanner() {
