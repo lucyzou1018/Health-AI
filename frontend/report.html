@@ -187,6 +187,14 @@
         
         html += `<div class="risk-dashboard"><div class="risk-card high"><div class="risk-number">${high.length}</div><div class="risk-label">🔴 高风险</div></div><div class="risk-card medium"><div class="risk-number">${medium.length}</div><div class="risk-label">🟡 中风险</div></div><div class="risk-card low"><div class="risk-number">${low.length}</div><div class="risk-label">🟢 低风险</div></div><div class="risk-card total"><div class="risk-number">${detectors.length}</div><div class="risk-label">📊 总计</div></div></div>`;
         
+        // 关键风险点
+        const keyRisks = detectors.filter(d => d.level === 'high' || d.level === 'medium').slice(0, 10);
+        if (keyRisks.length > 0) {
+          html += `<div class="issues-section" style="margin-bottom: 24px;"><div class="issues-header">⚠️ 关键风险点</div><div style="padding: 16px 20px;">`;
+          html += keyRisks.map(risk => `<div class="issue-item ${risk.level}" style="margin-bottom: 8px;"><div class="issue-title">${risk.name}</div><div class="issue-location">📍 ${risk.location}</div><div class="issue-desc">${risk.desc}</div></div>`).join('');
+          html += `</div></div>`;
+        }
+        
         html += `<div class="issues-section"><div class="issues-header">📑 详细问题列表</div>`;
         if (high.length > 0) html += renderCategory('high', '🔴', high);
         if (medium.length > 0) html += renderCategory('medium', '🟡', medium);
