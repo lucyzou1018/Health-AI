@@ -1,12 +1,7 @@
 const PARAM_SCHEMA = {
   "agent-audit": [],
   "multichain-contract-vuln": [
-    { id: "evmAddress", label: "EVM 地址", type: "text", placeholder: "0x...（可选）" },
-    { id: "network", label: "EVM 网络", type: "text", placeholder: "mainnet" },
-    { id: "chain", label: "链类型", type: "select", options: ["evm", "solana"], placeholder: "evm" },
-    { id: "scope", label: "报告前缀", type: "text", placeholder: "health-ai" },
-    { id: "runAnchor", label: "运行 anchor test", type: "checkbox" },
-    { id: "etherscanApiKey", label: "Etherscan API Key", type: "password", placeholder: "仅在链上抓取时需要" }
+    { id: "chain", label: "链类型", type: "select", options: ["evm", "solana"], placeholder: "evm" }
   ],
   "skill-stress-lab": [
     {
