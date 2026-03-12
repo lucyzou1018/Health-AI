@@ -49,7 +49,9 @@ const contextTitle = document.getElementById("current-skill-title");
 const contextDesc = document.getElementById("current-skill-desc");
 const historyList = document.getElementById("history-list");
 const historyPanel = document.querySelector(".history-panel");
+const reportPreviewBox = document.getElementById("report-preview");
 const recordedHistory = new Set();
+let previewTaskId = null;
 historyPanel?.classList.add("is-empty");
 
 const FINAL_STATUSES = new Set(["completed", "failed"]);
@@ -323,4 +325,93 @@ function renderTask(task) {
   setSummary(describeTask(task));
   renderArtifacts(task);
   appendHistoryEntry(task);
+  renderReportPreview(task);
+}
+
+function renderReportPreview(task) {
+  if (!reportPreviewBox) return;
+  if (!task || task.skillType !== "multichain-contract-vuln" || task.status !== "completed") {
+    reportPreviewBox.classList.add("hidden");
+    reportPreviewBox.innerHTML = "";
+    previewTaskId = null;
+    return;
+  }
+  if (previewTaskId === task.taskId && !reportPreviewBox.classList.contains("hidden")) {
+    return;
+  }
+  const targetId = task.taskId;
+  previewTaskId = targetId;
+  fetch(`${API_BASE}/api/tasks/${task.taskId}/report`)
+    .then((resp) => {
+      if (!resp.ok) throw new Error("report fetch failed");
+      return resp.text();
+    })
+    .then((text) => {
+      if (previewTaskId !== targetId) return;
+      const html = buildReportSummary(text);
+      if (html) {
+        reportPreviewBox.innerHTML = html;
+        reportPreviewBox.classList.remove("hidden");
+      } else {
+        reportPreviewBox.classList.add("hidden");
+        reportPreviewBox.innerHTML = "";
+      }
+    })
+    .catch(() => {
+      if (previewTaskId === targetId) {
+        reportPreviewBox.classList.add("hidden");
+        reportPreviewBox.innerHTML = "";
+        previewTaskId = null;
+      }
+    });
+}
+
+function buildReportSummary(text) {
+  if (!text) return "";
+  const notes = extractSectionLines(text, "附加说明").slice(0, 3);
+  const detectorSummaries = extractDetectorSummaries(text).slice(0, 3);
+  let html = "";
+  if (notes.length) {
+    html += `<h4>附加说明</h4><ul>${notes.map((line) => `<li>${line.replace(/^[-•]\s*/, '').trim()}</li>`).join("")}</ul>`;
+  }
+  if (detectorSummaries.length) {
+    html += `<h4>Slither 告警</h4><ul>${detectorSummaries
+      .map((item) => `<li><strong>${item.name}</strong> · ${item.desc}</li>`)
+      .join("")}</ul>`;
+  }
+  return html || "";
+}
+
+function extractSectionLines(text, headerLabel) {
+  const lines = text.split(/\r?\n/);
+  const collected = [];
+  let capture = false;
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line.startsWith("## ")) {
+      if (capture) break;
+      capture = line.includes(headerLabel);
+      continue;
+    }
+    if (capture && line) {
+      collected.push(line);
+    }
+  }
+  return collected;
+}
+
+function extractDetectorSummaries(text) {
+  const parts = text.split(/\nDetector:/);
+  const items = [];
+  for (let i = 1; i < parts.length; i++) {
+    const chunk = parts[i].trim();
+    if (!chunk) continue;
+    const lines = chunk.split(/\r?\n/);
+    const name = lines[0]?.trim();
+    if (!name) continue;
+    const detailLine = lines.slice(1).find((l) => l.trim());
+    const desc = detailLine ? detailLine.replace(/^[-•]\s*/, '').trim() : "";
+    items.push({ name, desc });
+  }
+  return items;
 }

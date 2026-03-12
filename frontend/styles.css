@@ -229,6 +229,37 @@ button#run-task:active {
   display: none;
 }
 
+.report-preview {
+  margin-top: 12px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: color-mix(in oklch, var(--card), white 4%);
+  color: var(--muted-foreground);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.report-preview h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.report-preview ul {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+.report-preview ul:last-child {
+  margin-bottom: 0;
+}
+.report-preview li {
+  margin-bottom: 6px;
+}
+.report-preview.hidden {
+  display: none;
+}
+
 .status.running { color: var(--primary); }
 .status.success { color: var(--success); }
 .status.error { color: var(--error); }
