@@ -57,11 +57,25 @@ nav button.active {
 .workspace-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 24px;
-  padding: 0;
+  gap: 16px;
+  padding: 32px;
   align-items: stretch;
-  width: min(1120px, 100%);
-  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--card), black 4%);
+  box-shadow: var(--shadow);
+  box-sizing: border-box;
+  position: relative;
+}
+.workspace-grid::after {
+  content: '';
+  position: absolute;
+  top: 48px;
+  bottom: 48px;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--border), transparent);
+  opacity: 0.5;
 }
 .panel {
   background: var(--card);
@@ -164,7 +178,26 @@ button#run-task:active {
 #input-panel,
 #result-panel {
   min-height: 240px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  position: relative;
+  gap: 16px;
 }
+#input-panel::before,
+#result-panel::before {
+  position: absolute;
+  top: -36px;
+  left: 0;
+  font-size: 12px;
+  letter-spacing: 0.4em;
+  color: var(--muted);
+}
+#input-panel::before { content: "STEP 1"; }
+#result-panel::before { content: "STEP 2"; }
+#input-panel { padding-right: 16px; }
+#result-panel { padding-left: 16px; }
 
 .status {
   padding: 8px 14px;
@@ -272,7 +305,7 @@ button#run-task:active {
 #context-banner {
   text-align: center;
   padding: 12px 32px 32px;
-  width: min(1120px, 100%);
+  width: 100%;
   margin: 0 auto 48px;
 }
 #context-banner .label {
@@ -291,7 +324,9 @@ button#run-task:active {
 }
 
 #app-shell {
-  padding: 0 24px 48px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 32px 48px;
 }
 #nav-tabs {
   display: flex;
@@ -385,7 +420,6 @@ button#run-task:active {
 
 .history-panel {
   margin: 120px auto 64px;
-  width: min(1120px, 100%);
   background: color-mix(in oklch, var(--card), black 8%);
   position: relative;
 }
@@ -397,6 +431,24 @@ button#run-task:active {
   right: 32px;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+}
+.history-panel.is-empty {
+  margin: 64px auto;
+  border: 1px dashed var(--border);
+  box-shadow: none;
+  background: transparent;
+  text-align: center;
+}
+.history-panel.is-empty::before,
+.history-panel.is-empty .history-list::before {
+  display: none;
+}
+.history-panel.is-empty .history-list li.empty {
+  padding: 32px 0;
+  color: var(--muted);
+}
+.history-panel.is-empty .history-list li:not(.empty) {
+  display: none;
 }
 .history-head {
   display: flex;
@@ -501,6 +553,14 @@ button#run-task:active {
   }
   .workspace-grid {
     grid-template-columns: 1fr;
+    padding: 24px;
+  }
+  .workspace-grid::after {
+    display: none;
+  }
+  #input-panel,
+  #result-panel {
+    padding: 0;
   }
   button#run-task {
     width: 100%;

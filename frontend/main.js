@@ -53,7 +53,9 @@ const fileInput = document.getElementById("code-upload");
 const contextTitle = document.getElementById("current-skill-title");
 const contextDesc = document.getElementById("current-skill-desc");
 const historyList = document.getElementById("history-list");
+const historyPanel = document.querySelector(".history-panel");
 const recordedHistory = new Set();
+historyPanel?.classList.add("is-empty");
 
 const FINAL_STATUSES = new Set(["completed", "failed"]);
 const DEFAULT_API = window.location.origin;
@@ -248,6 +250,7 @@ function appendHistoryEntry(task) {
   recordedHistory.add(task.taskId);
   const emptyRow = historyList.querySelector("li.empty");
   if (emptyRow) emptyRow.remove();
+  historyPanel?.classList.remove("is-empty");
   const item = document.createElement("li");
   item.className = "history-item";
 
