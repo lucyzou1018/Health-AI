@@ -427,7 +427,7 @@
         }
         
         // 匹配具体的风险实例位置（只匹配非缩进行）
-        const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)\s*\)/);
+        const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)/);
         if (match && currentDetector) {
           const location = match[1];
           

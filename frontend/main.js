@@ -569,7 +569,7 @@ function extractKeyRisks(text) {
     if (line.match(/^\s/)) continue;
     
     // 匹配风险点位置信息 (文件路径#行号)
-    const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)\s*\)/);
+    const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)/);
     if (match && currentDetector) {
       const location = match[1];
       // 获取描述（当前行）
@@ -614,8 +614,8 @@ function extractDetectorSummaries(text) {
       continue;
     }
     
-    // 匹配具体的风险实例（只匹配非缩进行）
-    const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)\s*\)/);
+    // 匹配具体的风险实例（只匹配非缩进行，不要求行尾是）)
+    const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)/);
     if (match && currentDetector) {
       items.push({ 
         name: currentDetector, 
