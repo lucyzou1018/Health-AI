@@ -478,10 +478,7 @@ function buildReportSummary(text) {
   const highFindings = detectorSummaries.filter(f => highRisk.some(r => f.name.toLowerCase().includes(r)));
   const mediumFindings = detectorSummaries.filter(f => mediumRisk.some(r => f.name.toLowerCase().includes(r)));
   const otherFindings = detectorSummaries.filter(f => !highFindings.includes(f) && !mediumFindings.includes(f));
-  
-  // 提取关键风险点详情
-  const keyRisks = extractKeyRisks(text);
-  
+
   let html = "";
   
   // 统计卡片
@@ -491,18 +488,6 @@ function buildReportSummary(text) {
   html += `<div class="stat-card low"><span class="stat-number">${otherFindings.length}</span><span class="stat-label">低风险</span></div>`;
   html += `<div class="stat-card total"><span class="stat-number">${detectorSummaries.length}</span><span class="stat-label">总计</span></div>`;
   html += `</div>`;
-  
-  // 关键风险点
-  if (keyRisks.length > 0) {
-    html += `<h4>⚠️ 关键风险点 (${keyRisks.length})</h4><div class="key-risks">`;
-    html += keyRisks.slice(0, 8).map(risk => 
-      `<div class="risk-item"><span class="risk-type">${risk.type}</span><span class="risk-location">${risk.location}</span></div>`
-    ).join("");
-    if (keyRisks.length > 8) {
-      html += `<div class="risk-more">...还有 ${keyRisks.length - 8} 个风险点，查看完整报告</div>`;
-    }
-    html += `</div>`;
-  }
   
   // 按类型分组显示
   const grouped = {};
