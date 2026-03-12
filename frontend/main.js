@@ -494,33 +494,58 @@ function buildReportSummary(text) {
   
   // 关键风险点
   if (keyRisks.length > 0) {
-    html += `<h4>⚠️ 关键风险点</h4><div class="key-risks">`;
-    html += keyRisks.slice(0, 5).map(risk => 
+    html += `<h4>⚠️ 关键风险点 (${keyRisks.length})</h4><div class="key-risks">`;
+    html += keyRisks.slice(0, 8).map(risk => 
       `<div class="risk-item"><span class="risk-type">${risk.type}</span><span class="risk-location">${risk.location}</span></div>`
     ).join("");
-    if (keyRisks.length > 5) {
-      html += `<div class="risk-more">...还有 ${keyRisks.length - 5} 个风险点</div>`;
+    if (keyRisks.length > 8) {
+      html += `<div class="risk-more">...还有 ${keyRisks.length - 8} 个风险点，查看完整报告</div>`;
     }
     html += `</div>`;
   }
   
-  // 详细问题列表
+  // 按类型分组显示
+  const grouped = {};
+  for (const item of detectorSummaries) {
+    if (!grouped[item.name]) grouped[item.name] = [];
+    grouped[item.name].push(item);
+  }
+  
+  // 详细问题列表 - 高风险
   if (highFindings.length) {
-    html += `<h4>🔴 高风险 (${highFindings.length})</h4><ol>${highFindings
-      .map((item) => `<li><strong>${item.name}</strong> · ${item.desc || "详见报告"}</li>`)
-      .join("")}</ol>`;
+    html += `<h4>🔴 高风险 (${highFindings.length})</h4>`;
+    for (const [name, items] of Object.entries(grouped)) {
+      if (highRisk.some(r => name.toLowerCase().includes(r))) {
+        html += `<div class="issue-group"><strong>${name}</strong> (${items.length})<ul>`;
+        html += items.slice(0, 3).map(item => `<li>${item.location}</li>`).join("");
+        if (items.length > 3) html += `<li>...等${items.length}处</li>`;
+        html += `</ul></div>`;
+      }
+    }
   }
   
+  // 中风险
   if (mediumFindings.length) {
-    html += `<h4>🟡 中风险 (${mediumFindings.length})</h4><ol>${mediumFindings
-      .map((item) => `<li><strong>${item.name}</strong> · ${item.desc || "详见报告"}</li>`)
-      .join("")}</ol>`;
+    html += `<h4>🟡 中风险 (${mediumFindings.length})</h4>`;
+    for (const [name, items] of Object.entries(grouped)) {
+      if (mediumRisk.some(r => name.toLowerCase().includes(r))) {
+        html += `<div class="issue-group"><strong>${name}</strong> (${items.length})<ul>`;
+        html += items.slice(0, 3).map(item => `<li>${item.location}</li>`).join("");
+        if (items.length > 3) html += `<li>...等${items.length}处</li>`;
+        html += `</ul></div>`;
+      }
+    }
   }
   
+  // 低风险
   if (otherFindings.length) {
-    html += `<h4>🟢 低风险 (${otherFindings.length})</h4><ol>${otherFindings
-      .map((item) => `<li><strong>${item.name}</strong> · ${item.desc || "详见报告"}</li>`)
-      .join("")}</ol>`;
+    html += `<h4>🟢 低风险 (${otherFindings.length})</h4><ul>`;
+    for (const [name, items] of Object.entries(grouped)) {
+      if (!highRisk.some(r => name.toLowerCase().includes(r)) && !mediumRisk.some(r => name.toLowerCase().includes(r))) {
+        html += `<li><strong>${name}</strong>: ${items.length} 处</li>`;
+      }
+    }
+    html += `</ul>`;
   }
   
   return html;
@@ -529,46 +554,68 @@ function buildReportSummary(text) {
 function extractKeyRisks(text) {
   const risks = [];
   const lines = text.split(/\r?\n/);
+  let currentDetector = "";
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    
+    // 记录当前 Detector 类型
+    if (line.startsWith("Detector:")) {
+      currentDetector = line.replace("Detector:", "").trim();
+      continue;
+    }
+    
     // 匹配风险点位置信息 (文件路径#行号)
-    const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)\s*\)\s*([^\n]+)/);
-    if (match) {
+    const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)\s*\)/);
+    if (match && currentDetector) {
       const location = match[1];
-      const description = match[2].trim();
-      // 找到对应的 Detector 类型
-      let detectorType = "";
-      for (let j = i - 1; j >= 0; j--) {
-        if (lines[j].startsWith("Detector:")) {
-          detectorType = lines[j].replace("Detector:", "").trim();
-          break;
-        }
+      // 获取描述（当前行或下一行）
+      let description = "";
+      const descMatch = line.match(/\)\s*(.+?)(?:\s+Reference:|$)/);
+      if (descMatch) {
+        description = descMatch[1].trim();
       }
-      if (detectorType && description) {
-        risks.push({
-          type: detectorType,
-          location: location,
-          desc: description
-        });
-      }
+      
+      risks.push({
+        type: currentDetector,
+        location: location,
+        desc: description || "详见报告"
+      });
     }
   }
   return risks;
 }
 
 function extractDetectorSummaries(text) {
-  const parts = text.split(/\nDetector:/);
   const items = [];
-  for (let i = 1; i < parts.length; i++) {
-    const chunk = parts[i].trim();
-    if (!chunk) continue;
-    const lines = chunk.split(/\r?\n/);
-    const name = lines[0]?.trim();
-    if (!name) continue;
-    const detailLine = lines.slice(1).find((l) => l.trim());
-    const desc = detailLine ? detailLine.replace(/^[-•]\s*/, '').trim() : "";
-    items.push({ name, desc });
+  const lines = text.split(/\r?\n/);
+  let currentDetector = "";
+  let currentDesc = "";
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // 新的 Detector
+    if (line.startsWith("Detector:")) {
+      currentDetector = line.replace("Detector:", "").trim();
+      currentDesc = "";
+      continue;
+    }
+    
+    // 获取描述（第一行非空内容）
+    if (currentDetector && !currentDesc && line.trim() && !line.startsWith("Reference:")) {
+      currentDesc = line.trim().replace(/^[-•]\s*/, '');
+    }
+    
+    // 匹配具体的风险实例
+    const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)\s*\)/);
+    if (match && currentDetector) {
+      items.push({ 
+        name: currentDetector, 
+        desc: currentDesc || "详见报告",
+        location: match[1]
+      });
+    }
   }
   return items;
 }

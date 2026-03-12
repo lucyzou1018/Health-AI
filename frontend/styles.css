@@ -636,6 +636,31 @@ button#run-task:active {
   font-weight: 500;
 }
 
+/* Issue Groups */
+.issue-group {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
+}
+
+.issue-group strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.issue-group ul {
+  margin: 6px 0 0;
+  padding-left: 16px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.issue-group li {
+  margin-bottom: 2px;
+  font-family: monospace;
+}
+
 /* History Panel */
 .history-panel {
   margin: 16px 0 0 0;
