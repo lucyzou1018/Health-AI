@@ -379,9 +379,12 @@ function renderArtifacts(task) {
     return;
   }
   const links = [];
-  if (task.reportPath) links.push({ label: "下载报告", href: `${API_BASE}/api/tasks/${task.taskId}/report` });
-  if (task.summaryPath) links.push({ label: "下载摘要", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=summary` });
-  if (task.logPath) links.push({ label: "下载日志", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=log` });
+  if (task.reportPath) {
+    links.push({ label: "📊 图文报告", href: `report.html?task=${task.taskId}` });
+    links.push({ label: "📄 下载报告", href: `${API_BASE}/api/tasks/${task.taskId}/report` });
+  }
+  if (task.summaryPath) links.push({ label: "📋 下载摘要", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=summary` });
+  if (task.logPath) links.push({ label: "📝 下载日志", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=log` });
   if (!links.length) {
     artifactBox.classList.add("hidden");
     artifactBox.innerHTML = "";
