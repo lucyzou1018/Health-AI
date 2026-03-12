@@ -645,86 +645,11 @@ def scan_logs_and_tokens(directory: Path) -> Tuple[Dict[str, Any], Dict[str, Any
         {"model": model, "tokens": count}
         for model, count in sorted(token_totals.items(), key=lambda item: item[1], reverse=True)
     ]
-
-    session_tokens = _collect_session_token_stats()
-    token_info: Dict[str, Any]
-    if session_tokens.get("dataAvailable"):
-        token_info = session_tokens
-        token_info["source"] = "sessions"
-        token_info["logTokens"] = {
-            "totalTokens": total_tokens,
-            "byModel": per_model,
-            "dataAvailable": bool(token_totals),
-        }
-    else:
-        token_info = {
-            "totalTokens": total_tokens,
-            "byModel": per_model,
-            "dataAvailable": bool(token_totals),
-            "sessions": [],
-            "source": "logs",
-        }
     return (
         {"files": log_entries, "errorRate": rate, "dataAvailable": True},
-        token_info,
+        {"totalTokens": total_tokens, "byModel": per_model, "dataAvailable": True},
     )
 
-
-
-
-def _collect_session_token_stats() -> Dict[str, Any]:
-    agents_dir = HOME / ".openclaw" / "agents"
-    sessions_data: List[Dict[str, Any]] = []
-    model_totals: Dict[str, int] = {}
-    total = 0
-    if not agents_dir.exists():
-        return {"totalTokens": 0, "byModel": [], "sessions": [], "dataAvailable": False}
-
-    for agent_dir in agents_dir.iterdir():
-        if not agent_dir.is_dir():
-            continue
-        sessions_file = agent_dir / "sessions" / "sessions.json"
-        if not sessions_file.exists():
-            continue
-        try:
-            data = json.loads(sessions_file.read_text())
-        except Exception:
-            continue
-        for session_key, payload in data.items():
-            if not isinstance(payload, dict):
-                # sessions.json 里可能出现 null 或其它占位，直接跳过以免 NoneType 报错
-                continue
-            tokens = payload.get("totalTokens")
-            if not isinstance(tokens, int) or tokens <= 0:
-                continue
-            total += tokens
-            model = payload.get("model") or "unknown"
-            model_totals[model] = model_totals.get(model, 0) + tokens
-            origin_meta = payload.get("origin")
-            origin_label = origin_meta.get("label") if isinstance(origin_meta, dict) else origin_meta
-            sessions_data.append(
-                {
-                    "session": session_key,
-                    "sessionId": payload.get("sessionId"),
-                    "model": model,
-                    "tokens": tokens,
-                    "updatedAt": payload.get("updatedAt"),
-                    "chatType": payload.get("chatType"),
-                    "origin": origin_label,
-                }
-            )
-
-    sessions_data.sort(key=lambda item: item.get("tokens", 0), reverse=True)
-    by_model = [
-        {"model": model, "tokens": count}
-        for model, count in sorted(model_totals.items(), key=lambda item: item[1], reverse=True)
-    ]
-    return {
-        "totalTokens": total,
-        "byModel": by_model,
-        "sessions": sessions_data,
-        "dataAvailable": total > 0,
-    }
 
 def score_privacy(sensitive_hits: int) -> int:
     if sensitive_hits == 0:
@@ -795,25 +720,6 @@ def generate_report(extra_skills: Optional[List[Dict[str, Any]]] = None) -> Dict
     report["tokenRisk"] = score_tokens(token_info.get("totalTokens", 0))
     report["failureRisk"] = score_failures(log_info.get("errorRate", 0.0))
     report["suggestions"] = build_suggestions(report)
-
-    external_entries = extra_skills or []
-    if external_entries:
-        dimensions = ("privacy", "privilege", "memory", "token", "failure")
-        aggregated = {key: 0 for key in dimensions}
-        for entry in external_entries:
-            scores = entry.get("externalScores") or {}
-            for key in dimensions:
-                try:
-                    value = int(scores.get(key, 0) or 0)
-                except (TypeError, ValueError):
-                    value = 0
-                aggregated[key] = max(aggregated[key], value)
-        report["externalRisk"] = aggregated
-        report["privacyRisk"] = max(report["privacyRisk"], aggregated["privacy"])
-        report["privilegeRisk"] = max(report["privilegeRisk"], aggregated["privilege"])
-        report["memoryRisk"] = max(report["memoryRisk"], aggregated["memory"])
-        report["tokenRisk"] = max(report["tokenRisk"], aggregated["token"])
-        report["failureRisk"] = max(report["failureRisk"], aggregated["failure"])
     return report
 
 
@@ -842,48 +748,14 @@ def to_markdown(report: Dict[str, Any]) -> str:
         f"- 记忆膨胀：{report['memoryRisk']}",
         f"- Token 成本：{report['tokenRisk']}",
         f"- 失败率：{report['failureRisk']}",
-    ]
-
-    if report.get("externalRisk"):
-        ext = report["externalRisk"]
-        lines.extend([
-            "",
-            "### 未安装 Skill 风险（上传包）",
-            f"- 隐私：{ext['privacy']}",
-            f"- 越权：{ext['privilege']}",
-            f"- 记忆：{ext['memory']}",
-            f"- Token：{ext['token']}",
-            f"- 失败：{ext['failure']}",
-        ])
-
-    lines.extend([
         "",
         "## 修复建议",
-    ])
+    ]
     if report.get("suggestions"):
         for item in report["suggestions"]:
             lines.append(f"- {item}")
     else:
         lines.append("- 暂无高风险项。")
-
-    external_rows = [
-        entry for entry in report["permissions"]
-        if entry.get("type") == "skill" and entry.get("externalScores")
-    ]
-    if external_rows:
-        lines.extend([
-            "",
-            "## 外部 Skill 风险",
-            "| Skill | 隐私 | 越权 | 记忆 | Token | 失败 | 备注 |",
-            "| --- | --- | --- | --- | --- | --- | --- |",
-        ])
-        for entry in external_rows:
-            scores = entry.get("externalScores", {})
-            notes = "; ".join(entry.get("notes", [])) or "-"
-            lines.append(
-                f"| {entry.get('name','-')} | {scores.get('privacy', '-')} | {scores.get('privilege', '-')} | "
-                f"{scores.get('memory', '-')} | {scores.get('token', '-')} | {scores.get('failure', '-')} | {notes} |"
-            )
 
     lines.extend([
         "",
