@@ -466,16 +466,37 @@ function renderReportPreview(task) {
 function buildReportSummary(text) {
   if (!text) return "";
   const detectorSummaries = extractDetectorSummaries(text);
-  const keyFindings = detectorSummaries.slice(0, 3);
-  if (!keyFindings.length) return "";
-  const recommendations = keyFindings.map((item) => buildDetectorRecommendation(item.name));
+  if (!detectorSummaries.length) return "";
+  
+  // 按严重程度分组
+  const highRisk = ['arbitrary-send-eth', 'reentrancy', 'unchecked-transfer', 'delegatecall'];
+  const mediumRisk = ['divide-before-multiply', 'incorrect-equality', 'timestamp', 'low-level-calls'];
+  
+  const highFindings = detectorSummaries.filter(f => highRisk.some(r => f.name.toLowerCase().includes(r)));
+  const mediumFindings = detectorSummaries.filter(f => mediumRisk.some(r => f.name.toLowerCase().includes(r)));
+  const otherFindings = detectorSummaries.filter(f => !highFindings.includes(f) && !mediumFindings.includes(f));
+  
   let html = "";
-  html += `<h4>关键结论</h4><ol>${keyFindings
-    .map((item) => `<li><strong>${item.name}</strong> · ${item.desc || "详见报告"}</li>`)
-    .join("")}</ol>`;
-  html += `<h4>建议方向</h4><ul>${recommendations
-    .map((rec) => `<li>${rec}</li>`)
-    .join("")}</ul>`;
+  html += `<div class="report-stats">共发现 ${detectorSummaries.length} 个问题</div>`;
+  
+  if (highFindings.length) {
+    html += `<h4>🔴 高风险 (${highFindings.length})</h4><ol>${highFindings
+      .map((item) => `<li><strong>${item.name}</strong> · ${item.desc || "详见报告"}</li>`)
+      .join("")}</ol>`;
+  }
+  
+  if (mediumFindings.length) {
+    html += `<h4>🟡 中风险 (${mediumFindings.length})</h4><ol>${mediumFindings
+      .map((item) => `<li><strong>${item.name}</strong> · ${item.desc || "详见报告"}</li>`)
+      .join("")}</ol>`;
+  }
+  
+  if (otherFindings.length) {
+    html += `<h4>🟢 低风险 (${otherFindings.length})</h4><ol>${otherFindings
+      .map((item) => `<li><strong>${item.name}</strong> · ${item.desc || "详见报告"}</li>`)
+      .join("")}</ol>`;
+  }
+  
   return html;
 }
 

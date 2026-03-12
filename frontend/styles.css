@@ -505,36 +505,56 @@ button#run-task:active {
 
 /* Report Preview */
 .report-preview {
-  padding: 14px;
+  padding: 16px;
   border-radius: var(--radius);
   border: 1px solid var(--border-subtle);
   background: var(--bg-tertiary);
   color: var(--text-primary);
   font-size: 12px;
   line-height: 1.7;
+  max-height: 400px;
+  overflow-y: auto;
 }
 
 .report-preview.hidden {
   display: none;
 }
 
+.report-preview .report-stats {
+  padding: 8px 12px;
+  background: var(--bg-hover);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 .report-preview h4 {
-  margin: 0 0 6px;
-  font-size: 11px;
+  margin: 12px 0 8px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 4px;
+}
+
+.report-preview h4:first-of-type {
+  margin-top: 0;
 }
 
 .report-preview ul,
 .report-preview ol {
-  margin: 0 0 6px;
-  padding-left: 14px;
+  margin: 0 0 12px;
+  padding-left: 16px;
 }
 
 .report-preview li {
-  margin-bottom: 3px;
+  margin-bottom: 6px;
+}
+
+.report-preview li strong {
+  color: var(--accent);
+  font-weight: 500;
 }
 
 /* History Panel */
