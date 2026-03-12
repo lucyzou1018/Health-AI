@@ -409,7 +409,10 @@ button#run-task:active {
 
 .history-panel {
   margin: 120px auto 64px;
-  background: color-mix(in oklch, var(--card), black 8%);
+  background: color-mix(in oklch, var(--card), black 4%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   position: relative;
 }
 .history-panel::before {
@@ -423,9 +426,9 @@ button#run-task:active {
 }
 .history-panel.is-empty {
   margin: 64px auto;
-  border: 1px dashed color-mix(in oklch, var(--border), white 25%);
-  box-shadow: none;
-  background: color-mix(in oklch, var(--card), white 8%);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  background: color-mix(in oklch, var(--card), black 4%);
   text-align: center;
 }
 .history-panel.is-empty::before,
