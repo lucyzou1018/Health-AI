@@ -212,8 +212,9 @@ button#run-task:active {
 .status.error { color: var(--error); }
 
 #landing {
-  padding: 48px 32px 80px;
-  background: radial-gradient(circle at top, rgba(63,94,251,0.4), rgba(14,17,23,0));
+  padding: 56px 32px 96px;
+  background: radial-gradient(140% 140% at 0% 0%, rgba(63, 94, 251, 0.15), transparent 55%),
+              radial-gradient(120% 120% at 80% 10%, rgba(123, 100, 255, 0.12), transparent 50%);
   min-height: calc(100vh - 140px);
   display: flex;
   align-items: center;
@@ -222,28 +223,28 @@ button#run-task:active {
 .hero-card {
   max-width: 960px;
   margin: 0 auto;
-  background: rgba(22,27,46,0.85);
-  border: 1px solid #2a3350;
-  border-radius: 16px;
-  padding: 40px;
+  background: color-mix(in oklch, var(--card), black 3%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 48px;
   text-align: left;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow);
 }
 .hero-card h2 {
   margin: 12px 0;
-  font-size: 32px;
+  font-size: 36px;
   line-height: 1.3;
 }
 .hero-card .hero-desc {
-  color: #c6cbe3;
+  color: var(--muted-foreground);
   margin-bottom: 24px;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 .eyebrow {
   text-transform: uppercase;
-  letter-spacing: 2px;
+  letter-spacing: 0.4em;
   font-size: 12px;
-  color: #8fd3ff;
+  color: var(--muted);
 }
 .hero-buttons {
   display: flex;
@@ -251,18 +252,21 @@ button#run-task:active {
   gap: 12px;
 }
 .hero-btn {
-  border: 1px solid #3f5efb;
+  border: 1px solid color-mix(in oklch, var(--primary), transparent 60%);
   background: transparent;
-  color: #fff;
-  padding: 12px 20px;
-  border-radius: 8px;
+  color: var(--foreground);
+  padding: 12px 24px;
+  border-radius: 999px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, color 0.2s, transform 0.2s;
   text-decoration: none;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
 }
 .hero-btn:hover {
-  background: #3f5efb;
+  background: color-mix(in oklch, var(--primary), transparent 80%);
 }
 
 #context-banner {
@@ -273,9 +277,9 @@ button#run-task:active {
 }
 #context-banner .label {
   font-size: 12px;
-  letter-spacing: 2px;
+  letter-spacing: 0.4em;
   text-transform: uppercase;
-  color: #8fd3ff;
+  color: var(--muted);
 }
 #context-banner h3 {
   margin: 8px 0;
@@ -327,14 +331,14 @@ button#run-task:active {
   font-weight: 600;
 }
 .hero-btn--primary {
-  background: linear-gradient(135deg, #3f5efb, #7b64ff);
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   border-color: transparent;
-  color: #fff;
-  box-shadow: 0 10px 25px rgba(63, 94, 251, 0.35);
+  color: var(--primary-foreground);
+  box-shadow: 0 18px 35px rgba(63, 94, 251, 0.35);
 }
 .hero-btn--primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 14px 30px rgba(63, 94, 251, 0.45);
+  transform: translateY(-2px);
+  box-shadow: 0 24px 45px rgba(63, 94, 251, 0.45);
 }
 
 .workspace-tabs {
