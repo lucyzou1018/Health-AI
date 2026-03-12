@@ -296,7 +296,7 @@ button#run-task {
 }
 
 .history-panel {
-  margin: 32px auto 48px;
+  margin: 48px auto 48px;
   width: min(1120px, 100%);
 }
 .history-head {
