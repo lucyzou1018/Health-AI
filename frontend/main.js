@@ -614,14 +614,33 @@ function extractDetectorSummaries(text) {
       continue;
     }
     
-    // 匹配具体的风险实例（只匹配非缩进行，不要求行尾是）)
-    const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)/);
-    if (match && currentDetector) {
+    // 匹配具体的风险实例（支持多种格式）
+    // 格式1: Function (src/File.sol#123) description
+    const match1 = line.match(/(\w+\.sol#\d+(?:-\d+)?)/);
+    // 格式2: Low level call in Function (src/File.sol#123):
+    const match2 = line.match(/in\s+\w+\([^)]*\)\s*\(([^)]+\.sol#\d+(?:-\d+)?)\)/);
+    // 格式3: Parameter/Variable/Event 位置 (src/File.sol#123)
+    const match3 = line.match(/\((src\/[^)]+\.sol#\d+(?:-\d+)?)\)/);
+    
+    const location = match1 ? match1[1] : (match2 ? match2[1] : (match3 ? match3[1] : null));
+    
+    if (location && currentDetector) {
       items.push({ 
         name: currentDetector, 
         desc: currentDesc || "详见报告",
-        location: match[1]
+        location: location
       });
+    }
+    // 没有位置的问题（如 pragma、solc-version）也记录
+    else if (currentDetector && line.trim() && !line.startsWith("Reference:") && !line.startsWith("Detector:")) {
+      // 检查是否是问题描述行
+      if (line.match(/\d+\s+different|Version|severe|issues/)) {
+        items.push({
+          name: currentDetector,
+          desc: line.trim(),
+          location: "N/A"
+        });
+      }
     }
   }
   return items;

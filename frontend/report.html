@@ -426,11 +426,14 @@
           continue;
         }
         
-        // 匹配具体的风险实例位置（只匹配非缩进行）
-        const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)/);
-        if (match && currentDetector) {
-          const location = match[1];
-          
+        // 匹配具体的风险实例位置（支持多种格式）
+        const match1 = line.match(/(\w+\.sol#\d+(?:-\d+)?)/);
+        const match2 = line.match(/in\s+\w+\([^)]*\)\s*\(([^)]+\.sol#\d+(?:-\d+)?)\)/);
+        const match3 = line.match(/\((src\/[^)]+\.sol#\d+(?:-\d+)?)\)/);
+        
+        const location = match1 ? match1[1] : (match2 ? match2[1] : (match3 ? match3[1] : null));
+        
+        if (location && currentDetector) {
           // 确定风险等级
           let level = 'low';
           if (RISK_CONFIG.high.keywords.some(k => currentDetector.toLowerCase().includes(k))) level = 'high';
@@ -443,6 +446,18 @@
             level: level,
             reference: currentReference
           });
+        }
+        // 没有位置的问题也记录
+        else if (currentDetector && line.trim() && !line.startsWith("Reference:")) {
+          if (line.match(/\d+\s+different|Version|severe|issues/)) {
+            detectors.push({
+              name: currentDetector,
+              desc: line.trim(),
+              location: "N/A",
+              level: 'low',
+              reference: currentReference
+            });
+          }
         }
       }
       
