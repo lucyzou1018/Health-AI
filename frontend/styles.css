@@ -423,9 +423,9 @@ button#run-task:active {
 }
 .history-panel.is-empty {
   margin: 64px auto;
-  border: 1px dashed var(--border);
+  border: 1px dashed color-mix(in oklch, var(--border), white 25%);
   box-shadow: none;
-  background: transparent;
+  background: color-mix(in oklch, var(--card), white 8%);
   text-align: center;
 }
 .history-panel.is-empty::before,
