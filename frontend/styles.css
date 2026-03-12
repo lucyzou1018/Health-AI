@@ -684,12 +684,12 @@ button#run-task:active {
 .history-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 12px;
 }
 
 .history-head h2 {
-  margin: 0;
+  margin: 0 0 8px 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
@@ -872,6 +872,122 @@ button#run-task:active {
 body.landing-only .landing-header h1,
 body.landing-only header h1 {
   font-size: 22px;
+}
+
+/* Wallet Button */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.wallet-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.wallet-btn:hover {
+  background: var(--accent);
+  color: white;
+}
+
+.wallet-btn.connected {
+  background: var(--success-subtle);
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.wallet-btn.connected:hover {
+  background: var(--success);
+  color: white;
+}
+
+.wallet-icon {
+  font-size: 14px;
+}
+
+/* History Filters */
+.history-filters {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.filter-btn:hover {
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.filter-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+/* History Item */
+.history-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.history-skill {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.history-time {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.history-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.history-link {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.history-link:hover {
+  text-decoration: underline;
 }
 
 /* Workspace Header specific */

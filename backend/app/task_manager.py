@@ -37,6 +37,7 @@ class TaskRecord:
     summary_path: Optional[str] = None
     log_path: Optional[str] = None
     params: Dict[str, Any] = field(default_factory=dict)
+    wallet_address: Optional[str] = None  # 关联的钱包地址
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
@@ -103,6 +104,7 @@ class TaskManager:
         code_path: Optional[str],
         upload_id: Optional[str],
         params: Optional[Dict[str, Any]] = None,
+        wallet_address: Optional[str] = None,
     ) -> TaskRecord:
         if skill_type not in SUPPORTED_SKILLS:
             raise ValueError(f"unsupported skill_type: {skill_type}")
@@ -116,6 +118,7 @@ class TaskManager:
             created_at=_now(),
             updated_at=_now(),
             params=params or {},
+            wallet_address=wallet_address,
         )
         with self._lock:
             self.tasks[task_id] = record
@@ -141,6 +144,21 @@ class TaskManager:
             if not record:
                 raise KeyError("task not found")
             return self._snapshot(record)
+
+    def get_tasks_by_wallet(self, wallet_address: str, skill_type: Optional[str] = None, limit: int = 50) -> list:
+        """获取指定钱包的分析历史"""
+        with self._lock:
+            tasks = [
+                self._snapshot(record)
+                for record in self.tasks.values()
+                if record.wallet_address and record.wallet_address.lower() == wallet_address.lower()
+            ]
+            # 按时间倒序
+            tasks.sort(key=lambda x: x.created_at, reverse=True)
+            # 按 skill_type 筛选
+            if skill_type:
+                tasks = [t for t in tasks if t.skill_type == skill_type]
+            return tasks[:limit]
 
     # --------------------------- helpers ---------------------------
     def _copy_code(self, source: Path, dest: Path) -> None:

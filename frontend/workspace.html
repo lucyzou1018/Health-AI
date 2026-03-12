@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Health AI 控制台</title>
-  <link rel="stylesheet" href="styles.css?v=20260333" />
+  <link rel="stylesheet" href="styles.css?v=20260334" />
 </head>
 <body>
   <header class="brand-nav workspace-header">
@@ -11,7 +11,13 @@
       <span class="brand-logo">AI</span>
       <h1 class="brand-name">Health AI</h1>
     </div>
-    <a class="ghost-btn" href="index.html">返回首页</a>
+    <div class="header-actions">
+      <button id="wallet-connect" class="wallet-btn">
+        <span class="wallet-icon">👛</span>
+        <span id="wallet-text">连接钱包</span>
+      </button>
+      <a class="ghost-btn" href="index.html">返回首页</a>
+    </div>
   </header>
 
   <div id="workspace-tabs" class="workspace-tabs">
@@ -63,15 +69,23 @@
 
     <section class="panel history-panel" id="history-panel">
       <div class="history-head">
-        <h2>分析历史</h2>
-        <span class="history-hint">最近 5 条</span>
+        <div>
+          <h2>分析历史</h2>
+          <div class="history-filters" id="history-filters">
+            <button class="filter-btn active" data-filter="all">全部</button>
+            <button class="filter-btn" data-filter="agent-audit">Agent Audit</button>
+            <button class="filter-btn" data-filter="multichain-contract-vuln">合约审计</button>
+            <button class="filter-btn" data-filter="skill-stress-lab">压力测试</button>
+          </div>
+        </div>
+        <span class="history-hint" id="history-count">最近 20 条</span>
       </div>
       <ul id="history-list" class="history-list">
-        <li class="empty">暂无历史记录</li>
+        <li class="empty" id="history-empty">请先连接钱包查看历史记录</li>
       </ul>
     </section>
   </section>
 
-  <script src="main.js?v=20260333" type="module"></script>
+  <script src="main.js?v=20260334" type="module"></script>
 </body>
 </html>

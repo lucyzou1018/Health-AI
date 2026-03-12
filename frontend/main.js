@@ -38,6 +38,15 @@ let activeTab = (function () {
   return VALID_TABS.includes(hash) ? hash : "agent-audit";
 })();
 
+// Wallet State
+let currentWallet = null;
+let walletToken = localStorage.getItem("wallet_token");
+const SKILL_LABELS = {
+  "agent-audit": "Agent Audit",
+  "multichain-contract-vuln": "合约审计",
+  "skill-stress-lab": "压力测试"
+};
+
 const navButtons = document.querySelectorAll("#workspace-tabs button");
 const statusBox = document.getElementById("task-status");
 const summaryBox = document.getElementById("task-summary");
@@ -53,6 +62,11 @@ const fileRemove = document.getElementById("file-remove");
 const contextTitle = document.getElementById("current-skill-title");
 const contextDesc = document.getElementById("current-skill-desc");
 const historyList = document.getElementById("history-list");
+const walletBtn = document.getElementById("wallet-connect");
+const walletText = document.getElementById("wallet-text");
+const historyFilters = document.querySelectorAll(".filter-btn");
+const historyCount = document.getElementById("history-count");
+const historyEmpty = document.getElementById("history-empty");
 const historyPanel = document.getElementById("history-panel");
 const reportPreviewBox = document.getElementById("report-preview");
 const recordedHistory = new Set();
@@ -308,10 +322,15 @@ async function runTask() {
       codePath: codePathValue || null,
       uploadId: uploadId,
       params,
+      walletAddress: currentWallet,
     };
+    const headers = { "Content-Type": "application/json" };
+    if (walletToken) {
+      headers["X-Wallet-Token"] = walletToken;
+    }
     const resp = await fetch(`${API_BASE}/api/tasks`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: headers,
       body: JSON.stringify(body),
     });
     if (!resp.ok) {
@@ -584,3 +603,199 @@ function buildDetectorRecommendation(name) {
     `针对 ${name} 告警，请复核相应业务逻辑并按报告中的修复建议加固。`
   );
 }
+
+// --------------------------- Wallet Functions ---------------------------
+
+function formatWalletAddress(address) {
+  if (!address) return "";
+  return address.slice(0, 6) + "..." + address.slice(-4);
+}
+
+function updateWalletUI() {
+  if (currentWallet && walletBtn && walletText) {
+    walletBtn.classList.add("connected");
+    walletText.textContent = formatWalletAddress(currentWallet);
+  } else if (walletBtn && walletText) {
+    walletBtn.classList.remove("connected");
+    walletText.textContent = "连接钱包";
+  }
+}
+
+async function connectWallet() {
+  // 检查是否已安装 MetaMask
+  if (typeof window.ethereum === "undefined") {
+    alert("请先安装 MetaMask 钱包插件");
+    window.open("https://metamask.io/download/", "_blank");
+    return;
+  }
+
+  try {
+    // 请求连接钱包
+    const accounts = await window.ethereum.request({
+      method: "eth_requestAccounts"
+    });
+    
+    if (accounts.length === 0) {
+      alert("请授权连接钱包");
+      return;
+    }
+
+    const walletAddress = accounts[0];
+    
+    // 获取 nonce
+    const nonceResp = await fetch(`${API_BASE}/api/wallet/nonce?wallet_address=${walletAddress}`);
+    const { message } = await nonceResp.json();
+    
+    // 请求签名
+    const signature = await window.ethereum.request({
+      method: "personal_sign",
+      params: [message, walletAddress]
+    });
+    
+    // 验证签名
+    const verifyResp = await fetch(`${API_BASE}/api/wallet/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        walletAddress: walletAddress,
+        signature: signature,
+        message: message
+      })
+    });
+    
+    if (!verifyResp.ok) {
+      throw new Error("验证失败");
+    }
+    
+    const { token } = await verifyResp.json();
+    
+    // 保存 token 和钱包地址
+    localStorage.setItem("wallet_token", token);
+    localStorage.setItem("wallet_address", walletAddress);
+    walletToken = token;
+    currentWallet = walletAddress;
+    
+    updateWalletUI();
+    loadWalletHistory();
+    
+  } catch (err) {
+    console.error("Wallet connection failed:", err);
+    alert("连接钱包失败: " + err.message);
+  }
+}
+
+function disconnectWallet() {
+  localStorage.removeItem("wallet_token");
+  localStorage.removeItem("wallet_address");
+  walletToken = null;
+  currentWallet = null;
+  updateWalletUI();
+  
+  // 清空历史列表
+  if (historyList) {
+    historyList.innerHTML = '<li class="empty" id="history-empty">请先连接钱包查看历史记录</li>';
+  }
+}
+
+async function loadWalletHistory(skillType = "all") {
+  if (!walletToken || !historyList) return;
+  
+  try {
+    const url = new URL(`${API_BASE}/api/wallet/history`);
+    if (skillType && skillType !== "all") {
+      url.searchParams.set("skill_type", skillType);
+    }
+    url.searchParams.set("limit", "20");
+    
+    const resp = await fetch(url, {
+      headers: { "X-Wallet-Token": walletToken }
+    });
+    
+    if (!resp.ok) {
+      if (resp.status === 401) {
+        // Token 过期，重新登录
+        disconnectWallet();
+        return;
+      }
+      throw new Error("获取历史记录失败");
+    }
+    
+    const tasks = await resp.json();
+    renderWalletHistory(tasks);
+    
+  } catch (err) {
+    console.error("Failed to load history:", err);
+  }
+}
+
+function renderWalletHistory(tasks) {
+  if (!historyList) return;
+  
+  if (tasks.length === 0) {
+    historyList.innerHTML = '<li class="empty">暂无分析记录</li>';
+    if (historyCount) historyCount.textContent = "0 条记录";
+    return;
+  }
+  
+  historyList.innerHTML = "";
+  if (historyCount) historyCount.textContent = `${tasks.length} 条记录`;
+  
+  for (const task of tasks) {
+    const li = document.createElement("li");
+    li.className = "history-item";
+    
+    const isCompleted = task.status === "completed";
+    const isFailed = task.status === "failed";
+    const statusIcon = isCompleted ? "✅" : isFailed ? "❌" : "⏳";
+    const skillLabel = SKILL_LABELS[task.skillType] || task.skillType;
+    
+    li.innerHTML = `
+      <div class="history-row">
+        <span class="history-skill">${skillLabel}</span>
+        <span class="history-time">${formatHistoryTime(task.createdAt)}</span>
+      </div>
+      <div class="history-status">${statusIcon} ${task.status}</div>
+      ${isCompleted ? `<a href="report.html?task=${task.taskId}" target="_blank" class="history-link">查看报告</a>` : ""}
+    `;
+    
+    historyList.appendChild(li);
+  }
+}
+
+// 钱包按钮事件
+if (walletBtn) {
+  walletBtn.addEventListener("click", () => {
+    if (currentWallet) {
+      if (confirm("是否断开钱包连接？")) {
+        disconnectWallet();
+      }
+    } else {
+      connectWallet();
+    }
+  });
+}
+
+// 历史记录筛选按钮
+historyFilters.forEach(btn => {
+  btn.addEventListener("click", () => {
+    historyFilters.forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    const filter = btn.dataset.filter;
+    loadWalletHistory(filter);
+  });
+});
+
+// 检查本地存储的钱包登录状态
+function initWallet() {
+  const savedAddress = localStorage.getItem("wallet_address");
+  const savedToken = localStorage.getItem("wallet_token");
+  if (savedAddress && savedToken) {
+    currentWallet = savedAddress;
+    walletToken = savedToken;
+    updateWalletUI();
+    loadWalletHistory();
+  }
+}
+
+// 页面加载时初始化钱包
+initWallet();
