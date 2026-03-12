@@ -56,26 +56,30 @@ nav button.active {
 }
 .workspace-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 16px;
-  padding: 32px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  padding: 0;
   align-items: stretch;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: color-mix(in oklch, var(--card), black 4%);
-  box-shadow: var(--shadow);
   box-sizing: border-box;
   position: relative;
 }
 .workspace-grid::after {
   content: '';
   position: absolute;
-  top: 48px;
-  bottom: 48px;
+  top: 24px;
+  bottom: 24px;
   left: 50%;
   width: 1px;
   background: linear-gradient(180deg, transparent, var(--border), transparent);
   opacity: 0.5;
+}
+@media (max-width: 960px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+  .workspace-grid::after {
+    display: none;
+  }
 }
 .panel {
   background: var(--card);
@@ -279,16 +283,23 @@ button#run-task:active {
 
 #input-panel,
 #result-panel {
-  min-height: 240px;
-  background: transparent;
-  border: none;
-  box-shadow: none;
-  padding: 0;
+  min-height: 320px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px;
+  box-shadow: var(--shadow);
   position: relative;
   gap: 16px;
 }
-#input-panel { padding-right: 16px; }
-#result-panel { padding-left: 16px; }
+#input-panel { margin-right: 12px; }
+#result-panel { margin-left: 12px; }
+@media (max-width: 960px) {
+  #input-panel,
+  #result-panel {
+    margin: 0;
+  }
+}
 
 .status {
   padding: 8px 14px;
@@ -428,9 +439,9 @@ button#run-task:active {
 
 #context-banner {
   text-align: center;
-  padding: 12px 32px 32px;
+  padding: 8px 32px 24px;
   width: 100%;
-  margin: 0 auto 48px;
+  margin: 0 auto 24px;
 }
 #context-banner .label {
   font-size: 12px;
@@ -448,9 +459,9 @@ button#run-task:active {
 }
 
 #app-shell {
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 0 32px 48px;
+  padding: 0 24px 48px;
 }
 #nav-tabs {
   display: flex;
@@ -543,27 +554,18 @@ button#run-task:active {
 }
 
 .history-panel {
-  margin: 120px auto 64px;
-  background: color-mix(in oklch, var(--card), black 4%);
+  margin: 32px 0 0 0;
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   position: relative;
 }
-.history-panel::before {
-  content: '';
-  position: absolute;
-  top: -72px;
-  left: 32px;
-  right: 32px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
-}
 .history-panel.is-empty {
-  margin: 64px auto;
+  margin: 32px 0 0 0;
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
-  background: color-mix(in oklch, var(--card), black 4%);
+  background: var(--card);
   text-align: center;
 }
 .history-panel.is-empty::before,
