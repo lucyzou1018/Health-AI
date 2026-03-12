@@ -288,6 +288,74 @@ button#run-task {
   transition: all 0.2s ease;
 }
 
+.history-panel {
+  margin: 0 auto 48px;
+  width: min(1120px, 100%);
+}
+.history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.history-head h2 {
+  margin: 0;
+}
+.history-hint {
+  font-size: 13px;
+  color: #8da0d8;
+}
+.history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.history-list li {
+  margin: 0;
+  padding: 0;
+}
+.history-list li.empty {
+  text-align: center;
+  color: #8da0d8;
+  padding: 16px 0;
+  border: 1px dashed #27304a;
+  border-radius: 12px;
+}
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: #0e1324;
+  border: 1px solid #27304a;
+}
+.history-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.history-meta .time {
+  font-size: 14px;
+  color: #c6cbe3;
+}
+.history-meta .task-id {
+  font-size: 12px;
+  color: #7f8bbb;
+}
+.history-status {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  text-transform: capitalize;
+  color: #fff;
+}
+.history-status.success { background: #1f8a53; }
+.history-status.error { background: #b33a3a; }
+
 @media (max-width: 960px) {
   .workspace-grid {
     grid-template-columns: 1fr;

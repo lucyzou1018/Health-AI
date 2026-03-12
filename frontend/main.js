@@ -52,6 +52,8 @@ const codePathInput = document.getElementById("code-path");
 const fileInput = document.getElementById("code-upload");
 const contextTitle = document.getElementById("current-skill-title");
 const contextDesc = document.getElementById("current-skill-desc");
+const historyList = document.getElementById("history-list");
+const recordedHistory = new Set();
 
 const FINAL_STATUSES = new Set(["completed", "failed"]);
 const DEFAULT_API = window.location.origin;
@@ -223,6 +225,55 @@ function describeTask(task) {
   return `任务 ${task.taskId} 正在执行...`;
 }
 
+const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
+function formatHistoryTime(value) {
+  try {
+    return timeFormatter.format(value ? new Date(value) : new Date());
+  } catch (err) {
+    return new Date().toLocaleString();
+  }
+}
+
+function appendHistoryEntry(task) {
+  if (!historyList || !FINAL_STATUSES.has(task.status)) return;
+  if (recordedHistory.has(task.taskId)) return;
+  recordedHistory.add(task.taskId);
+  const emptyRow = historyList.querySelector("li.empty");
+  if (emptyRow) emptyRow.remove();
+  const item = document.createElement("li");
+  item.className = "history-item";
+
+  const meta = document.createElement("div");
+  meta.className = "history-meta";
+  const time = document.createElement("span");
+  time.className = "time";
+  time.textContent = formatHistoryTime(task.updatedAt || task.createdAt);
+  const taskId = document.createElement("span");
+  taskId.className = "task-id";
+  taskId.textContent = task.taskId;
+  meta.append(time, taskId);
+
+  const badge = document.createElement("span");
+  const statusClass = task.status === "failed" ? "error" : "success";
+  badge.className = `history-status ${statusClass}`;
+  badge.textContent = task.status;
+
+  item.append(meta, badge);
+  historyList.prepend(item);
+
+  while (historyList.children.length > 5) {
+    historyList.lastElementChild?.remove();
+  }
+}
+
 function renderArtifacts(task) {
   if (!artifactBox) return;
   if (!task || (!task.reportPath && !task.summaryPath && !task.logPath)) {
@@ -273,4 +324,5 @@ function renderTask(task) {
   setStatus(`状态：${task.status}`, variant);
   setSummary(describeTask(task));
   renderArtifacts(task);
+  appendHistoryEntry(task);
 }
