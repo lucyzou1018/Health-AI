@@ -246,11 +246,13 @@ button#run-task:active {
   text-transform: uppercase;
   color: var(--muted);
 }
-.report-preview ul {
+.report-preview ul,
+.report-preview ol {
   margin: 0 0 10px;
   padding-left: 20px;
 }
-.report-preview ul:last-child {
+.report-preview ul:last-child,
+.report-preview ol:last-child {
   margin-bottom: 0;
 }
 .report-preview li {

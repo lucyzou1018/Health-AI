@@ -57,6 +57,13 @@ historyPanel?.classList.add("is-empty");
 const FINAL_STATUSES = new Set(["completed", "failed"]);
 const DEFAULT_API = window.location.origin;
 const API_BASE = window.HEALTH_AI_API || DEFAULT_API;
+const DETECTOR_REMEDIATIONS = {
+  "arbitrary-send-eth": "将资金分发改为 pull/payment 模式，并结合 ReentrancyGuard 与 CEI 避免外部 call 风险。",
+  "divide-before-multiply": "避免先除后乘造成截断，可改为先乘再除或使用数学库确保精度。",
+  "incorrect-equality": "不要依赖严格等式判断用户状态，改用布尔标记或 <=、>= 范围比较。",
+  "timestamp": "不要用 block.timestamp 作为严格控制，需增加时间缓冲或改用区块高度/预言机。",
+  "low-level-calls": "统一改用 OpenZeppelin Address 库，或确保低级 call 有完整回退和重入防护。"
+};
 
 navButtons.forEach((btn) => btn.addEventListener("click", () => selectTab(btn.dataset.tab)));
 if (runBtn) runBtn.addEventListener("click", runTask);
@@ -368,36 +375,18 @@ function renderReportPreview(task) {
 
 function buildReportSummary(text) {
   if (!text) return "";
-  const notes = extractSectionLines(text, "附加说明").slice(0, 3);
-  const detectorSummaries = extractDetectorSummaries(text).slice(0, 3);
+  const detectorSummaries = extractDetectorSummaries(text);
+  const keyFindings = detectorSummaries.slice(0, 3);
+  if (!keyFindings.length) return "";
+  const recommendations = keyFindings.map((item) => buildDetectorRecommendation(item.name));
   let html = "";
-  if (notes.length) {
-    html += `<h4>附加说明</h4><ul>${notes.map((line) => `<li>${line.replace(/^[-•]\s*/, '').trim()}</li>`).join("")}</ul>`;
-  }
-  if (detectorSummaries.length) {
-    html += `<h4>Slither 告警</h4><ul>${detectorSummaries
-      .map((item) => `<li><strong>${item.name}</strong> · ${item.desc}</li>`)
-      .join("")}</ul>`;
-  }
-  return html || "";
-}
-
-function extractSectionLines(text, headerLabel) {
-  const lines = text.split(/\r?\n/);
-  const collected = [];
-  let capture = false;
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (line.startsWith("## ")) {
-      if (capture) break;
-      capture = line.includes(headerLabel);
-      continue;
-    }
-    if (capture && line) {
-      collected.push(line);
-    }
-  }
-  return collected;
+  html += `<h4>关键结论</h4><ol>${keyFindings
+    .map((item) => `<li><strong>${item.name}</strong> · ${item.desc || "详见报告"}</li>`)
+    .join("")}</ol>`;
+  html += `<h4>建议方向</h4><ul>${recommendations
+    .map((rec) => `<li>${rec}</li>`)
+    .join("")}</ul>`;
+  return html;
 }
 
 function extractDetectorSummaries(text) {
@@ -414,4 +403,11 @@ function extractDetectorSummaries(text) {
     items.push({ name, desc });
   }
   return items;
+}
+
+function buildDetectorRecommendation(name) {
+  return (
+    DETECTOR_REMEDIATIONS[name] ||
+    `针对 ${name} 告警，请复核相应业务逻辑并按报告中的修复建议加固。`
+  );
 }
