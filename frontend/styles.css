@@ -273,7 +273,7 @@ button#run-task:active {
   text-align: center;
   padding: 12px 32px 32px;
   width: min(1120px, 100%);
-  margin: 0 auto 32px;
+  margin: 0 auto 48px;
 }
 #context-banner .label {
   font-size: 12px;
@@ -347,7 +347,7 @@ button#run-task:active {
   justify-content: center;
   gap: 8px;
   padding: 10px 14px;
-  margin: 12px auto 24px;
+  margin: 24px auto 32px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: color-mix(in oklch, var(--card), black 4%);
@@ -384,7 +384,7 @@ button#run-task:active {
 }
 
 .history-panel {
-  margin: 96px auto 64px;
+  margin: 120px auto 64px;
   width: min(1120px, 100%);
   background: color-mix(in oklch, var(--card), black 8%);
   position: relative;
@@ -392,7 +392,7 @@ button#run-task:active {
 .history-panel::before {
   content: '';
   position: absolute;
-  top: -56px;
+  top: -72px;
   left: 32px;
   right: 32px;
   height: 1px;
