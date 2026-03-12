@@ -392,52 +392,55 @@
       }
     };
     
-    // 提取报告数据
+    // 提取报告数据 - 提取每个问题实例
     function parseReport(text) {
       const detectors = [];
-      const parts = text.split(/\nDetector:/);
+      const lines = text.split(/\r?\n/);
+      let currentDetector = "";
+      let currentDesc = "";
+      let currentReference = "";
       
-      for (let i = 1; i < parts.length; i++) {
-        const chunk = parts[i].trim();
-        if (!chunk) continue;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
         
-        const lines = chunk.split(/\r?\n/);
-        const name = lines[0]?.trim();
-        if (!name) continue;
-        
-        // 提取描述
-        let desc = '';
-        for (let line of lines.slice(1)) {
-          if (line.trim() && !line.startsWith('Reference:')) {
-            desc = line.trim().replace(/^[-•]\s*/, '');
-            break;
-          }
+        // 新的 Detector
+        if (line.startsWith("Detector:")) {
+          currentDetector = line.replace("Detector:", "").trim();
+          currentDesc = "";
+          currentReference = "";
+          continue;
         }
-        
-        // 提取代码位置
-        const locations = [];
-        for (let line of lines) {
-          const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)/);
-          if (match && !locations.includes(match[1])) {
-            locations.push(match[1]);
-          }
-        }
-        
-        // 确定风险等级
-        let level = 'low';
-        if (RISK_CONFIG.high.keywords.some(k => name.toLowerCase().includes(k))) level = 'high';
-        else if (RISK_CONFIG.medium.keywords.some(k => name.toLowerCase().includes(k))) level = 'medium';
         
         // 提取参考链接
-        let reference = '';
-        for (let line of lines) {
-          if (line.startsWith('Reference:')) {
-            reference = line.replace('Reference:', '').trim();
-            break;
-          }
+        if (line.startsWith("Reference:")) {
+          currentReference = line.replace("Reference:", "").trim();
+          continue;
         }
         
-        detectors.push({ name, desc, locations, level, reference });
+        // 获取描述（第一行非空内容）
+        if (currentDetector && !currentDesc && line.trim() && !line.startsWith("Reference:")) {
+          currentDesc = line.trim().replace(/^[-•]\s*/, '');
+          continue;
+        }
+        
+        // 匹配具体的风险实例位置
+        const match = line.match(/(\w+\.sol#\d+(?:-\d+)?)\s*\)/);
+        if (match && currentDetector) {
+          const location = match[1];
+          
+          // 确定风险等级
+          let level = 'low';
+          if (RISK_CONFIG.high.keywords.some(k => currentDetector.toLowerCase().includes(k))) level = 'high';
+          else if (RISK_CONFIG.medium.keywords.some(k => currentDetector.toLowerCase().includes(k))) level = 'medium';
+          
+          detectors.push({ 
+            name: currentDetector, 
+            desc: currentDesc || "详见报告",
+            location: location,
+            level: level,
+            reference: currentReference
+          });
+        }
       }
       
       return detectors;
@@ -588,6 +591,13 @@
     function renderCategory(level, icon, items) {
       const config = RISK_CONFIG[level];
       
+      // 按类型分组
+      const grouped = {};
+      for (const item of items) {
+        if (!grouped[item.name]) grouped[item.name] = [];
+        grouped[item.name].push(item);
+      }
+      
       let html = `
         <div class="issue-category">
           <div class="category-header" data-category="${level}">
@@ -599,13 +609,13 @@
           <div class="issue-list" id="list-${level}">
       `;
       
-      for (const item of items) {
+      for (const [name, groupItems] of Object.entries(grouped)) {
         html += `
           <div class="issue-item ${level}">
-            <div class="issue-title">${item.name}</div>
-            ${item.locations.length ? `<div class="issue-location">📍 ${item.locations.slice(0, 3).join(', ')}${item.locations.length > 3 ? ` ...等${item.locations.length}处` : ''}</div>` : ''}
-            <div class="issue-desc">${item.desc || '详见报告'}</div>
-            ${item.reference ? `<div class="issue-link"><a href="${item.reference}" target="_blank">📖 查看文档 →</a></div>` : ''}
+            <div class="issue-title">${name}</div>
+            <div class="issue-location">📍 ${groupItems.length} 处</div>
+            <div class="issue-desc">${groupItems[0].desc || '详见报告'}</div>
+            ${groupItems[0].reference ? `<div class="issue-link"><a href="${groupItems[0].reference}" target="_blank">📖 查看文档 →</a></div>` : ''}
           </div>
         `;
       }
