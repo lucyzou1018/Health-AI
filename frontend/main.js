@@ -488,51 +488,7 @@ function buildReportSummary(text) {
   html += `<div class="stat-card low"><span class="stat-number">${otherFindings.length}</span><span class="stat-label">低风险</span></div>`;
   html += `<div class="stat-card total"><span class="stat-number">${detectorSummaries.length}</span><span class="stat-label">总计</span></div>`;
   html += `</div>`;
-  
-  // 按类型分组显示
-  const grouped = {};
-  for (const item of detectorSummaries) {
-    if (!grouped[item.name]) grouped[item.name] = [];
-    grouped[item.name].push(item);
-  }
-  
-  // 详细问题列表 - 高风险
-  if (highFindings.length) {
-    html += `<h4>🔴 高风险 (${highFindings.length})</h4>`;
-    for (const [name, items] of Object.entries(grouped)) {
-      if (highRisk.some(r => name.toLowerCase().includes(r))) {
-        html += `<div class="issue-group"><strong>${name}</strong> (${items.length})<ul>`;
-        html += items.slice(0, 3).map(item => `<li>${item.location}</li>`).join("");
-        if (items.length > 3) html += `<li>...等${items.length}处</li>`;
-        html += `</ul></div>`;
-      }
-    }
-  }
-  
-  // 中风险
-  if (mediumFindings.length) {
-    html += `<h4>🟡 中风险 (${mediumFindings.length})</h4>`;
-    for (const [name, items] of Object.entries(grouped)) {
-      if (mediumRisk.some(r => name.toLowerCase().includes(r))) {
-        html += `<div class="issue-group"><strong>${name}</strong> (${items.length})<ul>`;
-        html += items.slice(0, 3).map(item => `<li>${item.location}</li>`).join("");
-        if (items.length > 3) html += `<li>...等${items.length}处</li>`;
-        html += `</ul></div>`;
-      }
-    }
-  }
-  
-  // 低风险
-  if (otherFindings.length) {
-    html += `<h4>🟢 低风险 (${otherFindings.length})</h4><ul>`;
-    for (const [name, items] of Object.entries(grouped)) {
-      if (!highRisk.some(r => name.toLowerCase().includes(r)) && !mediumRisk.some(r => name.toLowerCase().includes(r))) {
-        html += `<li><strong>${name}</strong>: ${items.length} 处</li>`;
-      }
-    }
-    html += `</ul>`;
-  }
-  
+
   return html;
 }
 
