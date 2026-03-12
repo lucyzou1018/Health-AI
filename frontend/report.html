@@ -130,6 +130,80 @@
       }
     }
     
+    function generateKeyRisksSummary(detectors) {
+      const summary = [];
+      
+      // 按 detector 名称分组
+      const grouped = {};
+      for (const d of detectors) {
+        if (!grouped[d.name]) grouped[d.name] = [];
+        grouped[d.name].push(d);
+      }
+      
+      // ETH 转账风险 (arbitrary-send-eth, low-level-calls)
+      const ethCalls = detectors.filter(d => 
+        d.name.toLowerCase().includes('arbitrary-send-eth') || 
+        d.name.toLowerCase().includes('low-level-calls')
+      );
+      if (ethCalls.length > 0) {
+        const functions = [...new Set(ethCalls.map(d => d.location.split('.')[1]?.split('(')[0] || '').filter(Boolean))].slice(0, 5);
+        summary.push({
+          level: 'high',
+          title: 'ETH 转账风险',
+          desc: `${functions.join(', ') || '多个函数'} 等使用 .call 发送 ETH，需确保有重入保护和权限控制`
+        });
+      }
+      
+      // 时间依赖风险 (timestamp)
+      const timestamps = detectors.filter(d => d.name.toLowerCase().includes('timestamp'));
+      if (timestamps.length > 0) {
+        summary.push({
+          level: 'medium',
+          title: '时间依赖风险',
+          desc: `大量使用 block.timestamp（${timestamps.length} 处），在关键逻辑中可能被矿工操纵`
+        });
+      }
+      
+      // 精度问题 (divide-before-multiply)
+      const divisions = detectors.filter(d => d.name.toLowerCase().includes('divide-before-multiply'));
+      if (divisions.length > 0) {
+        summary.push({
+          level: 'medium',
+          title: '精度损失风险',
+          desc: '存在先除后乘的计算（如 dayIndex），可能导致整数截断和精度损失'
+        });
+      }
+      
+      // 严格等式问题
+      const equalities = detectors.filter(d => d.name.toLowerCase().includes('incorrect-equality'));
+      if (equalities.length > 0) {
+        summary.push({
+          level: 'medium',
+          title: '严格等式风险',
+          desc: '使用危险严格等式判断状态，建议改用布尔标记或范围比较'
+        });
+      }
+      
+      // 重入攻击风险
+      const reentrancy = detectors.filter(d => d.name.toLowerCase().includes('reentrancy'));
+      if (reentrancy.length > 0) {
+        summary.push({
+          level: 'high',
+          title: '重入攻击风险',
+          desc: '检测到潜在重入漏洞，建议使用 Checks-Effects-Interactions 模式或 ReentrancyGuard'
+        });
+      }
+      
+      if (summary.length === 0) return '';
+      
+      let html = `<div class="issues-section" style="margin-bottom: 24px;"><div class="issues-header">⚠️ 关键风险点</div><div style="padding: 16px 20px;">`;
+      for (const risk of summary) {
+        html += `<div class="issue-item ${risk.level}" style="margin-bottom: 12px;"><div class="issue-title">${risk.level === 'high' ? '🔴' : '🟡'} ${risk.title}</div><div class="issue-desc">${risk.desc}</div></div>`;
+      }
+      html += `</div></div>`;
+      return html;
+    }
+    
     function renderCategory(level, icon, items) {
       const config = RISK_CONFIG[level];
       const grouped = {};
@@ -187,13 +261,8 @@
         
         html += `<div class="risk-dashboard"><div class="risk-card high"><div class="risk-number">${high.length}</div><div class="risk-label">🔴 高风险</div></div><div class="risk-card medium"><div class="risk-number">${medium.length}</div><div class="risk-label">🟡 中风险</div></div><div class="risk-card low"><div class="risk-number">${low.length}</div><div class="risk-label">🟢 低风险</div></div><div class="risk-card total"><div class="risk-number">${detectors.length}</div><div class="risk-label">📊 总计</div></div></div>`;
         
-        // 关键风险点
-        const keyRisks = detectors.filter(d => d.level === 'high' || d.level === 'medium').slice(0, 10);
-        if (keyRisks.length > 0) {
-          html += `<div class="issues-section" style="margin-bottom: 24px;"><div class="issues-header">⚠️ 关键风险点</div><div style="padding: 16px 20px;">`;
-          html += keyRisks.map(risk => `<div class="issue-item ${risk.level}" style="margin-bottom: 8px;"><div class="issue-title">${risk.name}</div><div class="issue-location">📍 ${risk.location}</div><div class="issue-desc">${risk.desc}</div></div>`).join('');
-          html += `</div></div>`;
-        }
+        // 关键风险点 - 聚合总结
+        html += generateKeyRisksSummary(detectors);
         
         html += `<div class="issues-section"><div class="issues-header">📑 详细问题列表</div>`;
         if (high.length > 0) html += renderCategory('high', '🔴', high);
