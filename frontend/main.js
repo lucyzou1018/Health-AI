@@ -1074,8 +1074,10 @@ function renderWalletHistory(tasks) {
         <span class="history-skill">${skillLabel}</span>
         <span class="history-time">${formatHistoryTime(task.createdAt)}</span>
       </div>
-      <div class="history-status">${statusIcon} ${task.status}</div>
-      ${isCompleted ? `<a href="report.html?task=${task.taskId}" target="_blank" class="history-link">查看报告</a>` : ""}
+      <div class="history-footer">
+        <span class="history-status">${statusIcon} ${task.status}</span>
+        ${isCompleted ? `<a href="report.html?task=${task.taskId}" target="_blank" class="history-link">查看报告</a>` : `<span class="history-link-empty"></span>`}
+      </div>
     `;
     
     historyList.appendChild(li);

@@ -960,7 +960,11 @@ body.landing-only header h1 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.history-header .history-time {
+  margin-left: 32px;
 }
 
 .history-skill {
@@ -974,20 +978,31 @@ body.landing-only header h1 {
   color: var(--text-tertiary);
 }
 
+.history-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .history-status {
   font-size: 12px;
   color: var(--text-secondary);
-  margin-bottom: 6px;
 }
 
 .history-link {
   font-size: 12px;
   color: var(--accent);
   text-decoration: none;
+  min-width: 60px;
+  text-align: right;
 }
 
 .history-link:hover {
   text-decoration: underline;
+}
+
+.history-link-empty {
+  min-width: 60px;
 }
 
 /* Workspace Header specific */
