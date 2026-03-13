@@ -980,11 +980,14 @@ body.landing-only header h1 {
 
 .history-status-row {
   margin-bottom: 4px;
+  display: flex;
+  align-items: center;
 }
 
 .history-status {
   font-size: 12px;
   color: var(--text-secondary);
+  min-width: 120px;
 }
 
 .history-report-row {
