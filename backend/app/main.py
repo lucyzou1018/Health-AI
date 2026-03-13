@@ -200,7 +200,7 @@ def download_artifact(task_id: str, kind: Literal["summary", "log"]):
 
 # --------------------------- Wallet Authentication ---------------------------
 
-@app.post("/api/wallet/nonce")
+@app.get("/api/wallet/nonce")
 def get_wallet_nonce(wallet_address: str):
     """获取用于签名的 nonce"""
     nonce = secrets.token_hex(16)

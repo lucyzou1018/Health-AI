@@ -190,9 +190,25 @@ function clearResults() {
 
 function updateRunButtonState() {
   if (!runBtn) return;
+  
   const hasFile = currentFile !== null || (fileInput && fileInput.files && fileInput.files[0]);
   const isRunning = statusBox && statusBox.textContent === "运行中...";
-  runBtn.disabled = !hasFile || isRunning;
+  const hasWallet = currentWallet !== null;
+  
+  if (!hasWallet) {
+    runBtn.disabled = true;
+    runBtn.textContent = "请先连接钱包";
+  } else if (!hasFile) {
+    runBtn.disabled = true;
+    runBtn.textContent = "开始分析";
+  } else if (isRunning) {
+    runBtn.disabled = true;
+    runBtn.textContent = "分析中...";
+  } else {
+    runBtn.disabled = false;
+    runBtn.textContent = "开始分析";
+  }
+  
   runBtn.style.opacity = runBtn.disabled ? "0.5" : "1";
   runBtn.style.cursor = runBtn.disabled ? "not-allowed" : "pointer";
 }
@@ -304,6 +320,12 @@ function renderParamFields() {
 }
 
 async function runTask() {
+  // 检查是否已连接钱包
+  if (!currentWallet) {
+    alert("请先连接钱包后再进行分析");
+    return;
+  }
+  
   try {
     setStatus("运行中...", "running");
     setSummary("正在准备任务……");
