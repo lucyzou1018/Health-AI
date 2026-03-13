@@ -698,6 +698,7 @@ async function connectWallet() {
     currentWallet = walletAddress;
     
     updateWalletUI();
+    updateRunButtonState();
     loadWalletHistory();
     
   } catch (err) {
@@ -712,6 +713,7 @@ function disconnectWallet() {
   walletToken = null;
   currentWallet = null;
   updateWalletUI();
+  updateRunButtonState();
   
   // 清空历史列表
   if (historyList) {
@@ -815,6 +817,7 @@ function initWallet() {
     currentWallet = savedAddress;
     walletToken = savedToken;
     updateWalletUI();
+    updateRunButtonState();
     loadWalletHistory();
   }
 }
