@@ -643,17 +643,313 @@ function updateWalletUI() {
   }
 }
 
+// 检测可用的钱包提供者
+function detectWalletProviders() {
+  const providers = [];
+  
+  // 检测 OKX Wallet
+  if (window.okxwallet) {
+    providers.push({
+      name: "OKX Wallet",
+      icon: "🔵",
+      provider: window.okxwallet
+    });
+  }
+  
+  // 检测 MetaMask
+  if (window.ethereum) {
+    // 检查是否是 MetaMask
+    const isMetaMask = window.ethereum.isMetaMask || 
+                       (window.ethereum.providers && window.ethereum.providers.some(p => p.isMetaMask));
+    
+    if (isMetaMask && !window.ethereum.providers) {
+      // 单一 MetaMask
+      providers.push({
+        name: "MetaMask",
+        icon: "🦊",
+        provider: window.ethereum
+      });
+    } else if (window.ethereum.providers) {
+      // 多个钱包插件
+      window.ethereum.providers.forEach(provider => {
+        if (provider.isMetaMask && !providers.some(p => p.name === "MetaMask")) {
+          providers.push({
+            name: "MetaMask",
+            icon: "🦊",
+            provider: provider
+          });
+        }
+      });
+    }
+  }
+  
+  return providers;
+}
+
+// 显示钱包选择弹窗
+function showWalletSelector(providers) {
+  return new Promise((resolve, reject) => {
+    // 创建弹窗
+    const modal = document.createElement("div");
+    modal.className = "wallet-modal";
+    modal.innerHTML = `
+      <div class="wallet-modal-backdrop"></div>
+      <div class="wallet-modal-content">
+        <h3>选择钱包</h3>
+        <div class="wallet-list">
+          ${providers.map((p, i) => `
+            <button class="wallet-option" data-index="${i}">
+              <span class="wallet-option-icon">${p.icon}</span>
+              <span class="wallet-option-name">${p.name}</span>
+            </button>
+          `).join("")}
+        </div>
+        <button class="wallet-modal-close">取消</button>
+      </div>
+    `;
+    
+    // 添加样式
+    const style = document.createElement("style");
+    style.textContent = `
+      .wallet-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .wallet-modal-backdrop {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+      }
+      .wallet-modal-content {
+        position: relative;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        min-width: 280px;
+        max-width: 90vw;
+      }
+      .wallet-modal-content h3 {
+        margin: 0 0 16px 0;
+        font-size: 16px;
+        text-align: center;
+      }
+      .wallet-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .wallet-option {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius);
+        color: var(--text-primary);
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 150ms ease;
+      }
+      .wallet-option:hover {
+        border-color: var(--accent);
+        background: var(--accent-subtle);
+      }
+      .wallet-option-icon {
+        font-size: 20px;
+      }
+      .wallet-modal-close {
+        width: 100%;
+        padding: 10px;
+        background: transparent;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius);
+        color: var(--text-secondary);
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .wallet-modal-close:hover {
+        border-color: var(--border-default);
+        color: var(--text-primary);
+      }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(modal);
+    
+    // 处理选择
+    modal.querySelectorAll(".wallet-option").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const index = parseInt(btn.dataset.index);
+        document.body.removeChild(modal);
+        document.head.removeChild(style);
+        resolve(providers[index]);
+      });
+    });
+    
+    // 处理关闭
+    modal.querySelector(".wallet-modal-close").addEventListener("click", () => {
+      document.body.removeChild(modal);
+      document.head.removeChild(style);
+      reject(new Error("用户取消"));
+    });
+    
+    modal.querySelector(".wallet-modal-backdrop").addEventListener("click", () => {
+      document.body.removeChild(modal);
+      document.head.removeChild(style);
+      reject(new Error("用户取消"));
+    });
+  });
+}
+
 async function connectWallet() {
-  // 检查是否已安装 MetaMask
-  if (typeof window.ethereum === "undefined") {
-    alert("请先安装 MetaMask 钱包插件");
-    window.open("https://metamask.io/download/", "_blank");
+  // 检测可用的钱包
+  const providers = detectWalletProviders();
+  
+  if (providers.length === 0) {
+    // 没有安装任何钱包
+    const installModal = document.createElement("div");
+    installModal.className = "wallet-modal";
+    installModal.innerHTML = `
+      <div class="wallet-modal-backdrop"></div>
+      <div class="wallet-modal-content">
+        <h3>未检测到钱包</h3>
+        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
+          请安装以下钱包之一：
+        </p>
+        <div class="wallet-list">
+          <a href="https://www.okx.com/web3" target="_blank" class="wallet-option">
+            <span class="wallet-option-icon">🔵</span>
+            <span class="wallet-option-name">OKX Wallet</span>
+          </a>
+          <a href="https://metamask.io/download/" target="_blank" class="wallet-option">
+            <span class="wallet-option-icon">🦊</span>
+            <span class="wallet-option-name">MetaMask</span>
+          </a>
+        </div>
+        <button class="wallet-modal-close">关闭</button>
+      </div>
+    `;
+    
+    const style = document.createElement("style");
+    style.textContent = `
+      .wallet-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .wallet-modal-backdrop {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+      }
+      .wallet-modal-content {
+        position: relative;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        min-width: 280px;
+        max-width: 90vw;
+      }
+      .wallet-modal-content h3 {
+        margin: 0 0 16px 0;
+        font-size: 16px;
+        text-align: center;
+      }
+      .wallet-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .wallet-option {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius);
+        color: var(--text-primary);
+        font-size: 14px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: all 150ms ease;
+      }
+      .wallet-option:hover {
+        border-color: var(--accent);
+        background: var(--accent-subtle);
+      }
+      .wallet-option-icon {
+        font-size: 20px;
+      }
+      .wallet-modal-close {
+        width: 100%;
+        padding: 10px;
+        background: transparent;
+        border: 1px solid var(--border-subtle);
+        border-radius: var(--radius);
+        color: var(--text-secondary);
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .wallet-modal-close:hover {
+        border-color: var(--border-default);
+        color: var(--text-primary);
+      }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(installModal);
+    
+    installModal.querySelector(".wallet-modal-close").addEventListener("click", () => {
+      document.body.removeChild(installModal);
+      document.head.removeChild(style);
+    });
+    installModal.querySelector(".wallet-modal-backdrop").addEventListener("click", () => {
+      document.body.removeChild(installModal);
+      document.head.removeChild(style);
+    });
+    return;
+  }
+  
+  let selectedProvider;
+  
+  try {
+    // 如果有多个钱包，显示选择弹窗
+    if (providers.length > 1) {
+      selectedProvider = await showWalletSelector(providers);
+    } else {
+      selectedProvider = providers[0];
+    }
+  } catch (err) {
+    // 用户取消
     return;
   }
 
   try {
     // 请求连接钱包
-    const accounts = await window.ethereum.request({
+    const accounts = await selectedProvider.provider.request({
       method: "eth_requestAccounts"
     });
     
@@ -669,7 +965,7 @@ async function connectWallet() {
     const { message } = await nonceResp.json();
     
     // 请求签名
-    const signature = await window.ethereum.request({
+    const signature = await selectedProvider.provider.request({
       method: "personal_sign",
       params: [message, walletAddress]
     });
