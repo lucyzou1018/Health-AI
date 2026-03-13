@@ -824,3 +824,4 @@ function initWallet() {
 
 // 页面加载时初始化钱包
 initWallet();
+
