@@ -987,7 +987,8 @@ body.landing-only header h1 {
 .history-status {
   font-size: 12px;
   color: var(--text-secondary);
-  min-width: 120px;
+  width: 120px;
+  display: inline-block;
 }
 
 .history-report-row {
