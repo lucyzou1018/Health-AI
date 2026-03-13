@@ -1070,10 +1070,8 @@ function renderWalletHistory(tasks) {
     const skillLabel = SKILL_LABELS[task.skillType] || task.skillType;
     
     li.innerHTML = `
-      <div class="history-row">
-        <span class="history-skill">${skillLabel}</span>
-        <span class="history-time">${formatHistoryTime(task.createdAt)}</span>
-      </div>
+      <div class="history-skill">${skillLabel}</div>
+      <div class="history-time">${formatHistoryTime(task.createdAt)}</div>
       <div class="history-status">${statusIcon} ${task.status}</div>
       ${isCompleted ? `<a href="report.html?task=${task.taskId}" target="_blank" class="history-link">查看报告</a>` : ""}
     `;

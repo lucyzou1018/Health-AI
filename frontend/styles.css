@@ -956,22 +956,17 @@ body.landing-only header h1 {
   border-bottom: none;
 }
 
-.history-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
 .history-skill {
   font-weight: 500;
   font-size: 13px;
   color: var(--text-primary);
+  margin-bottom: 4px;
 }
 
 .history-time {
   font-size: 11px;
   color: var(--text-tertiary);
+  margin-bottom: 6px;
 }
 
 .history-status {
