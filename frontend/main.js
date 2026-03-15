@@ -1,5 +1,8 @@
 const PARAM_SCHEMA = {
-  "agent-audit": [],
+  "skill-security-audit": [
+    { id: "skillPath", label: "Skill 路径", type: "text", placeholder: "例如：skills/agent-audit" },
+    { id: "skillUrl", label: "Skill URL（可选）", type: "text", placeholder: "例如：https://github.com/..." }
+  ],
   "multichain-contract-vuln": [
     { id: "chain", label: "链类型", type: "select", options: ["evm", "solana"], placeholder: "evm" }
   ],
@@ -18,9 +21,9 @@ const PARAM_SCHEMA = {
 };
 
 const FEATURE_COPY = {
-  "agent-audit": {
-    title: "Agent Audit",
-    desc: "扫描 Skill/Agent 权限、敏感配置与日志，快速定位风险点。"
+  "skill-security-audit": {
+    title: "Skill Security Audit",
+    desc: "对指定 Skill 执行安全体检，检查权限、配置、日志并输出 0-100 评分报告。"
   },
   "multichain-contract-vuln": {
     title: "Multichain Contract Vuln",
@@ -35,14 +38,14 @@ const FEATURE_COPY = {
 const VALID_TABS = Object.keys(PARAM_SCHEMA);
 let activeTab = (function () {
   const hash = window.location.hash.replace("#", "");
-  return VALID_TABS.includes(hash) ? hash : "agent-audit";
+  return VALID_TABS.includes(hash) ? hash : "skill-security-audit";
 })();
 
 // Wallet State
 let currentWallet = null;
 let walletToken = localStorage.getItem("wallet_token");
 const SKILL_LABELS = {
-  "agent-audit": "Agent Audit",
+  "skill-security-audit": "Skill 安全审计",
   "multichain-contract-vuln": "合约审计",
   "skill-stress-lab": "压力测试"
 };
