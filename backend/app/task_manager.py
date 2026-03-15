@@ -317,7 +317,12 @@ class TaskManager:
         if params.get("skillDir"):
             cmd.extend(["--skill-dir", str(params["skillDir"])])
         elif code_dir.exists():
-            cmd.extend(["--skill-dir", str(code_dir)])
+            # Find the actual skill subdirectory (e.g., input/skill-name/)
+            skill_subdirs = [d for d in code_dir.iterdir() if d.is_dir()]
+            if skill_subdirs:
+                cmd.extend(["--skill-dir", str(skill_subdirs[0])])
+            else:
+                cmd.extend(["--skill-dir", str(code_dir)])
         if params.get("openaiUsageFile"):
             cmd.extend(["--openai-usage-file", str(params["openaiUsageFile"])])
         if params.get("apiCountFile"):
