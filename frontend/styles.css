@@ -1407,13 +1407,13 @@ body:not(.landing-only) .ambient-glow {
   font-size: 12px;
 }
 
-.brand-nav-links {
+.workspace-header .brand-stack {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 12px;
 }
 
-.brand-nav-links .brand-name {
+.workspace-header .brand-name {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
@@ -1426,6 +1426,7 @@ body:not(.landing-only) .ambient-glow {
   text-decoration: none;
   transition: color 0.2s ease;
   position: relative;
+  margin-left: 8px;
 }
 
 .nav-link:hover {
