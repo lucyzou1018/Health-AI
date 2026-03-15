@@ -793,6 +793,17 @@ button#run-task:active {
   background: var(--bg-hover);
 }
 
+.history-status-row {
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  height: 22px;
+}
+
+.history-report-row {
+  height: 18px;
+}
+
 .history-meta {
   display: flex;
   flex-direction: column;
@@ -812,7 +823,7 @@ button#run-task:active {
 }
 
 .history-status {
-  padding: 3px 8px;
+  padding: 2px 8px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
@@ -820,6 +831,11 @@ button#run-task:active {
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  line-height: 1;
+  box-sizing: border-box;
 }
 
 .history-status.success {
@@ -1033,23 +1049,6 @@ body.landing-only header h1 {
 .history-time {
   font-size: 11px;
   color: var(--text-tertiary);
-}
-
-.history-status-row {
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-}
-
-.history-status {
-  font-size: 12px;
-  color: var(--text-secondary);
-  width: 120px;
-  display: inline-block;
-}
-
-.history-report-row {
-  height: 18px;
 }
 
 .history-link {
