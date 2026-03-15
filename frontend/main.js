@@ -64,9 +64,19 @@ const historyCount = document.getElementById("history-count");
 const historyEmpty = document.getElementById("history-empty");
 const historyPanel = document.getElementById("history-panel");
 const reportPreviewBox = document.getElementById("report-preview");
+const paginationEl = document.getElementById("pagination");
+const pagePrevBtn = document.getElementById("page-prev");
+const pageNextBtn = document.getElementById("page-next");
+const pageInfoEl = document.getElementById("page-info");
 const recordedHistory = new Set();
 let previewTaskId = null;
 let currentFile = null;
+
+// Pagination state
+let allHistoryTasks = [];
+let currentPage = 1;
+const ITEMS_PER_PAGE = 10;
+
 historyPanel?.classList.add("is-empty");
 
 const FINAL_STATUSES = new Set(["completed", "failed"]);
@@ -1263,44 +1273,93 @@ async function loadWalletHistory(skillType = "all") {
 }
 
 function renderWalletHistory(tasks) {
+  // Store all tasks for pagination
+  allHistoryTasks = tasks;
+  recordedHistory.clear();
+  tasks.forEach(function(t) { recordedHistory.add(t.taskId); });
+  currentPage = 1;
+  renderHistoryPage();
+  if (historyCount) historyCount.textContent = tasks.length + " 条记录";
+}
+
+function renderHistoryPage() {
   if (!historyList) return;
   
-  if (tasks.length === 0) {
+  var activeFilterBtn = document.querySelector('.filter-btn.active');
+  var activeFilter = activeFilterBtn ? activeFilterBtn.dataset.filter : 'all';
+  
+  var filteredTasks = allHistoryTasks;
+  if (activeFilter !== 'all') {
+    filteredTasks = allHistoryTasks.filter(function(t) { return t.skillType === activeFilter; });
+  }
+  
+  var totalPages = Math.ceil(filteredTasks.length / ITEMS_PER_PAGE);
+  if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
+  
+  var startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  var endIndex = startIndex + ITEMS_PER_PAGE;
+  var pageTasks = filteredTasks.slice(startIndex, endIndex);
+  
+  historyList.innerHTML = '';
+  
+  if (pageTasks.length === 0) {
     historyList.innerHTML = '<li class="empty">暂无分析记录</li>';
-    if (historyCount) historyCount.textContent = "0 条记录";
+    if (paginationEl) paginationEl.style.display = 'none';
     return;
   }
   
-  historyList.innerHTML = "";
-  if (historyCount) historyCount.textContent = `${tasks.length} 条记录`;
+  if (historyPanel) historyPanel.classList.remove("is-empty");
+  if (paginationEl) paginationEl.style.display = 'flex';
   
-  for (const task of tasks) {
-    const li = document.createElement("li");
-    li.className = "history-item";
-    
-    const isCompleted = task.status === "completed";
-    const isFailed = task.status === "failed";
-    const statusIcon = isCompleted ? "✅" : isFailed ? "❌" : "⏳";
-    const skillLabel = SKILL_LABELS[task.skillType] || task.skillType;
-    
-    li.innerHTML = `
-      <div class="history-header">
-        <span class="history-skill">${skillLabel}</span>
-        <span class="history-time">${formatHistoryTime(task.createdAt)}</span>
-      </div>
-      <div class="history-status-row">
-        <span class="history-status">${statusIcon} ${task.status}</span>
-      </div>
-      ${isCompleted ? `<div class="history-report-row"><a href="report.html?task=${task.taskId}" target="_blank" class="history-link">查看报告</a></div>` : `<div class="history-report-row"><span class="history-link-placeholder"></span></div>`}
-    `;
-    
-    historyList.appendChild(li);
+  for (var i = 0; i < pageTasks.length; i++) {
+    var task = pageTasks[i];
+    var item = createHistoryItem(task);
+    historyList.appendChild(item);
   }
+  
+  updatePagination(totalPages);
+}
+
+function createHistoryItem(task) {
+  var li = document.createElement("li");
+  li.className = "history-item";
+  
+  var isCompleted = task.status === "completed";
+  var isFailed = task.status === "failed";
+  var statusIcon = isCompleted ? "✅" : isFailed ? "❌" : "⏳";
+  var skillLabel = SKILL_LABELS[task.skillType] || task.skillType;
+  
+  li.innerHTML = 
+    '<div class="history-header">' +
+      '<span class="history-skill">' + skillLabel + '</span>' +
+      '<span class="history-time">' + formatHistoryTime(task.createdAt) + '</span>' +
+    '</div>' +
+    '<div class="history-status-row">' +
+      '<span class="history-status">' + statusIcon + ' ' + task.status + '</span>' +
+    '</div>' +
+    (isCompleted ? 
+      '<div class="history-report-row"><a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">查看报告</a></div>' : 
+      '<div class="history-report-row"><span class="history-link-placeholder"></span></div>');
+  
+  return li;
+}
+
+function updatePagination(totalPages) {
+  if (!pagePrevBtn || !pageNextBtn || !pageInfoEl) return;
+  
+  pagePrevBtn.disabled = currentPage <= 1;
+  pageNextBtn.disabled = currentPage >= totalPages || totalPages === 0;
+  pageInfoEl.textContent = '第 ' + currentPage + ' 页 / 共 ' + totalPages + ' 页';
+}
+
+function goToPage(page) {
+  currentPage = page;
+  renderHistoryPage();
 }
 
 // 钱包按钮事件
 if (walletBtn) {
-  walletBtn.addEventListener("click", () => {
+  walletBtn.addEventListener("click", function() {
     if (currentWallet) {
       if (confirm("是否断开钱包连接？")) {
         disconnectWallet();
@@ -1312,14 +1371,39 @@ if (walletBtn) {
 }
 
 // 历史记录筛选按钮
-historyFilters.forEach(btn => {
-  btn.addEventListener("click", () => {
-    historyFilters.forEach(b => b.classList.remove("active"));
+historyFilters.forEach(function(btn) {
+  btn.addEventListener("click", function() {
+    historyFilters.forEach(function(b) { b.classList.remove("active"); });
     btn.classList.add("active");
-    const filter = btn.dataset.filter;
-    loadWalletHistory(filter);
+    currentPage = 1;
+    renderHistoryPage();
   });
 });
+
+// 分页按钮事件
+if (pagePrevBtn) {
+  pagePrevBtn.addEventListener("click", function() {
+    if (currentPage > 1) {
+      goToPage(currentPage - 1);
+    }
+  });
+}
+
+if (pageNextBtn) {
+  pageNextBtn.addEventListener("click", function() {
+    var activeFilterBtn = document.querySelector('.filter-btn.active');
+    var activeFilter = activeFilterBtn ? activeFilterBtn.dataset.filter : 'all';
+    
+    var filteredTasks = allHistoryTasks;
+    if (activeFilter !== 'all') {
+      filteredTasks = allHistoryTasks.filter(function(t) { return t.skillType === activeFilter; });
+    }
+    var totalPages = Math.ceil(filteredTasks.length / ITEMS_PER_PAGE);
+    if (currentPage < totalPages) {
+      goToPage(currentPage + 1);
+    }
+  });
+}
 
 // 检查本地存储的钱包登录状态
 function initWallet() {
