@@ -294,7 +294,10 @@ class TaskManager:
         summary_md = report_dir / "stress_summary.md"
         metrics_json = report_dir / "stress_metrics.json"
         logs_dir = report_dir / "runs"
-        command = params.get("command") or "python3 {skill}/scripts/security_preflight.py"
+        # Use provided command or default to security_preflight.py
+        command = params.get("command")
+        if not command:
+            command = "python3 {skill}/scripts/security_preflight.py"
         runs = int(params.get("runs", 10))
         concurrency = int(params.get("concurrency", 1))
         cmd = [
