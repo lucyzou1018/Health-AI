@@ -1288,16 +1288,18 @@ function renderHistoryPage() {
   var activeFilterBtn = document.querySelector('.filter-btn.active');
   var activeFilter = activeFilterBtn ? activeFilterBtn.dataset.filter : 'all';
   
-  var filteredTasks = allHistoryTasks;
+  // Create a copy of allHistoryTasks to avoid reference issues
+  var filteredTasks = allHistoryTasks.slice();
   if (activeFilter !== 'all') {
-    filteredTasks = allHistoryTasks.filter(function(t) { return t.skillType === activeFilter; });
+    filteredTasks = filteredTasks.filter(function(t) { return t.skillType === activeFilter; });
   }
   
-  var totalPages = Math.ceil(filteredTasks.length / ITEMS_PER_PAGE);
-  if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
+  var totalPages = Math.max(1, Math.ceil(filteredTasks.length / ITEMS_PER_PAGE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  if (currentPage < 1) currentPage = 1;
   
   var startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  var endIndex = startIndex + ITEMS_PER_PAGE;
+  var endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredTasks.length);
   var pageTasks = filteredTasks.slice(startIndex, endIndex);
   
   historyList.innerHTML = '';
@@ -1317,7 +1319,7 @@ function renderHistoryPage() {
     historyList.appendChild(item);
   }
   
-  updatePagination(totalPages);
+  updatePagination(totalPages, filteredTasks.length);
 }
 
 function createHistoryItem(task) {
@@ -1344,12 +1346,15 @@ function createHistoryItem(task) {
   return li;
 }
 
-function updatePagination(totalPages) {
+function updatePagination(totalPages, totalItems) {
   if (!pagePrevBtn || !pageNextBtn || !pageInfoEl) return;
   
   pagePrevBtn.disabled = currentPage <= 1;
-  pageNextBtn.disabled = currentPage >= totalPages || totalPages === 0;
-  pageInfoEl.textContent = '第 ' + currentPage + ' 页 / 共 ' + totalPages + ' 页';
+  pageNextBtn.disabled = currentPage >= totalPages || totalPages <= 1;
+  
+  var startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
+  var endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
+  pageInfoEl.textContent = '第 ' + currentPage + '/' + totalPages + ' 页 (' + startItem + '-' + endItem + '/' + totalItems + ')';
 }
 
 function goToPage(page) {
@@ -1394,9 +1399,9 @@ if (pageNextBtn) {
     var activeFilterBtn = document.querySelector('.filter-btn.active');
     var activeFilter = activeFilterBtn ? activeFilterBtn.dataset.filter : 'all';
     
-    var filteredTasks = allHistoryTasks;
+    var filteredTasks = allHistoryTasks.slice();
     if (activeFilter !== 'all') {
-      filteredTasks = allHistoryTasks.filter(function(t) { return t.skillType === activeFilter; });
+      filteredTasks = filteredTasks.filter(function(t) { return t.skillType === activeFilter; });
     }
     var totalPages = Math.ceil(filteredTasks.length / ITEMS_PER_PAGE);
     if (currentPage < totalPages) {
