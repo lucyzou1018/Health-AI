@@ -177,6 +177,7 @@ body {
 
 /* App Shell */
 #app-shell {
+  position: relative;
   max-width: 960px;
   margin: 0 auto;
   padding: 0 20px 48px;
@@ -1443,25 +1444,27 @@ body:not(.landing-only) .ambient-glow {
 
 /* Workspace Back Link - 工作区返回首页 */
 .workspace-back {
+  position: absolute;
+  top: 16px;
+  left: 24px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  margin: 16px 24px 0;
-  font-size: 13px;
+  padding: 6px 12px;
+  font-size: 12px;
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   text-decoration: none;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
   transition: all 0.3s ease;
-  width: fit-content;
+  z-index: 20;
 }
 
 .workspace-back:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(99, 102, 241, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(99, 102, 241, 0.4);
   color: var(--accent);
 }
 
@@ -1470,7 +1473,7 @@ body:not(.landing-only) .ambient-glow {
 }
 
 .workspace-back:hover .back-arrow {
-  transform: translateX(-4px);
+  transform: translateX(-3px);
 }
 
 /* Tab按钮未来感 */
