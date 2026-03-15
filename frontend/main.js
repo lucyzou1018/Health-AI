@@ -19,7 +19,7 @@ const FEATURE_COPY = {
   },
   "multichain-contract-vuln": {
     title: "合约审计",
-    desc: "一键执行多链合约源码分析，结合 Slither/Anchor 等输出漏洞报告。"
+    desc: "一键扫描多链合约源码，精准识别安全漏洞，生成专业审计报告。"
   },
   "skill-stress-lab": {
     title: "压力测试",
