@@ -6,17 +6,9 @@ const PARAM_SCHEMA = {
     { id: "chain", label: "链类型", type: "select", options: ["evm", "solana"], placeholder: "evm" }
   ],
   "skill-stress-lab": [
-    {
-      id: "command",
-      label: "命令模板",
-      type: "textarea",
-      placeholder: "python3 {skill}/scripts/security_preflight.py",
-      default: "python3 {skill}/scripts/security_preflight.py",
-    },
-    { id: "workdir", label: "工作目录", type: "text", placeholder: "例如：skills/skill-stress-lab", default: "" },
-    { id: "runs", label: "Runs", type: "number", placeholder: "10", default: "10" },
-    { id: "concurrency", label: "并发数", type: "number", placeholder: "3", default: "3" },
-    { id: "collectMetrics", label: "收集指标", type: "checkbox", default: true }
+    // 命令模板和工作目录使用默认值，不在界面显示
+    { id: "runs", label: "运行次数", type: "number", placeholder: "10", default: "10" },
+    { id: "concurrency", label: "并发数", type: "number", placeholder: "3", default: "3" }
   ]
 };
 
