@@ -797,6 +797,7 @@ button#run-task:active {
   margin-bottom: 4px;
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   height: 22px;
   position: relative;
 }
@@ -838,7 +839,7 @@ button#run-task:active {
   height: 20px;
   line-height: 20px;
   box-sizing: border-box;
-  min-width: 60px;
+  width: 60px;
   text-align: center;
 }
 
