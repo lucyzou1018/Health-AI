@@ -396,16 +396,19 @@
             }
           }
           
-          // Calculate overall score
-          const scoreValues = Object.values(scores);
-          const overallScore = scoreValues.length ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length) : 0;
+          // Calculate overall score if not already parsed
+          let overallScore = scores['Overall'] || scores['overallScore'] || 0;
+          if (!overallScore) {
+            const scoreValues = Object.values(scores).filter(s => s > 0);
+            overallScore = scoreValues.length ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length) : 0;
+          }
           
           // Render security audit dashboard
           document.title = 'Skill 安全审计报告 - Health AI';
           const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : '未知';
           
           // Get scores (0-100, higher = safer)
-          const overallScore = scores['Overall'] || scores['overallScore'] || 0;
+          overallScore = overallScore || 0;
           const privacyScore = scores['Privacy'] || scores['privacyScore'] || 0;
           const privilegeScore = scores['Privilege'] || scores['privilegeScore'] || 0;
           const memoryScore = scores['Memory'] || scores['memoryScore'] || 0;
