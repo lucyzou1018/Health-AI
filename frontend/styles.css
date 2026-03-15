@@ -778,14 +778,14 @@ button#run-task:active {
 
 .history-item {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
   padding: 10px 14px;
   border-radius: var(--radius);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-subtle);
   transition: all 150ms ease;
   animation: fadeInUp 0.25s ease-out;
+  box-sizing: border-box;
 }
 
 .history-item:hover {
@@ -800,6 +800,7 @@ button#run-task:active {
   justify-content: flex-start;
   height: 22px;
   position: relative;
+  padding-left: 0;
 }
 
 .history-report-row {
@@ -827,7 +828,7 @@ button#run-task:active {
 .history-status {
   padding: 0;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   text-transform: capitalize;
   background: var(--bg-secondary);
@@ -839,6 +840,8 @@ button#run-task:active {
   box-sizing: border-box;
   width: 48px;
   text-align: center;
+  margin: 0;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
 }
 
 .history-status.success {
@@ -850,6 +853,8 @@ button#run-task:active {
   line-height: 20px;
   width: 48px;
   text-align: center;
+  margin: 0;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
 }
 
 .history-status.error {
@@ -861,6 +866,8 @@ button#run-task:active {
   line-height: 20px;
   width: 48px;
   text-align: center;
+  margin: 0;
+  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
 }
 
 @keyframes fadeInUp {
