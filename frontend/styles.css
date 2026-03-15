@@ -1474,6 +1474,29 @@ body:not(.landing-only) .ambient-glow {
   transform: translateX(-3px);
 }
 
+/* Workspace Toolbar - 工具栏 */
+.workspace-toolbar {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 20px;
+  padding: 16px 24px 0;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+@media (max-width: 1100px) {
+  .workspace-toolbar {
+    grid-template-columns: 320px 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .workspace-toolbar {
+    grid-template-columns: 1fr;
+    padding: 16px 20px 0;
+  }
+}
+
 /* Tab按钮未来感 */
 .workspace-tabs {
   position: relative;
@@ -1545,7 +1568,7 @@ body:not(.landing-only) .ambient-glow {
   display: grid;
   grid-template-columns: 380px 1fr;
   gap: 20px;
-  padding: 24px;
+  padding: 8px 24px 24px;
   max-width: 1400px;
   margin: 0 auto;
 }
