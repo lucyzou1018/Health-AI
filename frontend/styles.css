@@ -1406,6 +1406,41 @@ body:not(.landing-only) .ambient-glow {
   font-size: 12px;
 }
 
+.brand-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-info .brand-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.back-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.back-home:hover {
+  color: var(--accent);
+}
+
+.back-arrow {
+  transition: transform 0.2s ease;
+}
+
+.back-home:hover .back-arrow {
+  transform: translateX(-3px);
+}
+
 /* Tab按钮未来感 */
 .workspace-tabs {
   position: relative;
