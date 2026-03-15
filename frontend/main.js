@@ -190,12 +190,34 @@ function updateRunButtonState() {
   const isRunning = statusBox && statusBox.textContent === "运行中...";
   const hasWallet = currentWallet !== null;
   
+  // Check Skill Stress Lab params
+  let hasValidParams = true;
+  if (activeTab === "skill-stress-lab") {
+    const runsInput = document.getElementById("param-runs");
+    const concurrencyInput = document.getElementById("param-concurrency");
+    
+    if (runsInput && concurrencyInput) {
+      const runs = parseInt(runsInput.value, 10);
+      const concurrency = parseInt(concurrencyInput.value, 10);
+      
+      // Validate: must be positive integers > 0
+      if (isNaN(runs) || runs <= 0 || isNaN(concurrency) || concurrency <= 0) {
+        hasValidParams = false;
+      }
+    } else {
+      hasValidParams = false;
+    }
+  }
+  
   if (!hasWallet) {
     runBtn.disabled = true;
     runBtn.textContent = "请先连接钱包";
   } else if (!hasFile) {
     runBtn.disabled = true;
     runBtn.textContent = "开始分析";
+  } else if (activeTab === "skill-stress-lab" && !hasValidParams) {
+    runBtn.disabled = true;
+    runBtn.textContent = "请输入运行次数和并发数";
   } else if (isRunning) {
     runBtn.disabled = true;
     runBtn.textContent = "分析中...";
@@ -317,9 +339,18 @@ function renderParamFields() {
         input.value = field.default;
       }
     }
+    
+    // Add event listener to update button state on value change
+    input.addEventListener("input", function() {
+      updateRunButtonState();
+    });
+    
     wrapper.appendChild(input);
     paramContainer.appendChild(wrapper);
   });
+  
+  // Update button state after rendering fields
+  updateRunButtonState();
 }
 
 async function runTask() {
