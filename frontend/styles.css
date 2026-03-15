@@ -1330,9 +1330,8 @@ body.landing-only header h1 {
 }
 
 .card-icon {
-  width: 28px;
-  height: 28px;
-  color: var(--accent);
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
