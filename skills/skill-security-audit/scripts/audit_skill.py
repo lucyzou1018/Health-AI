@@ -545,6 +545,8 @@ def collect_permissions(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     entries: List[Dict[str, Any]] = []
     agents = config.get("agents", {})
     for name, payload in agents.items():
+        if isinstance(payload, list):
+            continue
         payload = payload or {}
         tools = _normalize_tools(payload.get("tools", {}))
         skills = payload.get("skills") or []

@@ -1,7 +1,6 @@
 const PARAM_SCHEMA = {
   "skill-security-audit": [
-    { id: "skillPath", label: "Skill 路径", type: "text", placeholder: "例如：skills/agent-audit" },
-    { id: "skillUrl", label: "Skill URL（可选）", type: "text", placeholder: "例如：https://github.com/..." }
+    // Upload skill zip file instead of path/URL
   ],
   "multichain-contract-vuln": [
     { id: "chain", label: "链类型", type: "select", options: ["evm", "solana"], placeholder: "evm" }
