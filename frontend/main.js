@@ -329,6 +329,43 @@ function renderParamFields() {
       input = document.createElement("input");
       input.type = field.type || "text";
       input.placeholder = field.placeholder || "";
+      
+      // For number fields, restrict to positive integers only
+      if (field.type === "number") {
+        input.min = "1";
+        input.step = "1";
+        // Prevent non-numeric characters, decimal points, and minus sign
+        input.addEventListener("keydown", function(e) {
+          // Allow: backspace, delete, tab, escape, enter
+          if ([46, 8, 9, 27, 13].indexOf(e.keyCode) !== -1 ||
+              // Allow: Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+              (e.keyCode === 65 && e.ctrlKey === true) ||
+              (e.keyCode === 67 && e.ctrlKey === true) ||
+              (e.keyCode === 86 && e.ctrlKey === true) ||
+              (e.keyCode === 88 && e.ctrlKey === true) ||
+              // Allow: home, end, left, right
+              (e.keyCode >= 35 && e.keyCode <= 39)) {
+            return;
+          }
+          // Ensure that it is a number and stop the keypress if not
+          if ((e.shiftKey || (e.keyCode < 48 || e.keyCode > 57)) && (e.keyCode < 96 || e.keyCode > 105)) {
+            e.preventDefault();
+          }
+        });
+        // Clean up pasted content
+        input.addEventListener("paste", function(e) {
+          e.preventDefault();
+          const pastedText = (e.clipboardData || window.clipboardData).getData("text");
+          const cleanedText = pastedText.replace(/[^0-9]/g, "");
+          if (cleanedText) {
+            const num = parseInt(cleanedText, 10);
+            if (num > 0) {
+              input.value = num;
+              updateRunButtonState();
+            }
+          }
+        });
+      }
     }
     input.id = `param-${field.id}`;
     // Set default value if provided
