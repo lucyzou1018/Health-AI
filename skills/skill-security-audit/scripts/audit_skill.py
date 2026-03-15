@@ -790,7 +790,7 @@ def build_suggestions(report: Dict[str, Any]) -> List[Dict[str, Any]]:
             for item in memory_files[:3]
         ]
         suggestions.append({"type": "memory_sensitive", "files": focus})
-    elif report["privacyRisk"] > 0 and not memory_block.get("dataAvailable", True):
+    elif report["privacyScore"] < 60 and not memory_block.get("dataAvailable", True):
         suggestions.append({"type": "memory_missing"})
 
     permissions = report.get("permissions", [])
@@ -800,18 +800,18 @@ def build_suggestions(report: Dict[str, Any]) -> List[Dict[str, Any]]:
             suggestions.append({"type": "tool", "skill": entry["name"], "tool": tool})
 
     total_size = memory_block.get("totalSize", 0)
-    if report["memoryRisk"] > 0 and total_size:
+    if report["memoryScore"] < 60 and total_size:
         suggestions.append({"type": "memory_size", "size": total_size})
 
     token_block = report.get("tokens", {})
     models = token_block.get("byModel", [])
-    if report["tokenRisk"] > 0 and models:
+    if report["tokenScore"] < 60 and models:
         top = models[0]
         suggestions.append({"type": "token", "model": top["model"], "tokens": top["tokens"]})
 
     log_block = report.get("logs", {})
     logs = log_block.get("files", [])
-    if report["failureRisk"] > 0 and logs:
+    if report["failureScore"] < 60 and logs:
         worst = max(logs, key=lambda item: item.get("errors", 0))
         if worst.get("errors"):
             suggestions.append(
@@ -1114,11 +1114,22 @@ def generate_report(
     }
 
     # Calculate scores: use runtime data if available, otherwise use static analysis
-    report["privacyRisk"] = score_privacy(privacy_hits) if has_memory_data or privacy_hits > 0 else static_scores.get("privacy", 0)
-    report["privilegeRisk"] = score_privilege(permissions) if permissions else static_scores.get("privilege", 0)
-    report["memoryRisk"] = score_memory(memory_info.get("totalSize", 0)) if has_memory_data else static_scores.get("memory", 0)
-    report["tokenRisk"] = score_tokens(token_info.get("totalTokens", 0)) if has_token_data else static_scores.get("token", 0)
-    report["failureRisk"] = score_failures(log_info.get("errorRate", 0.0)) if has_log_data else static_scores.get("failure", 0)
+    # Calculate risk scores (0-100, higher = more risky)
+    risk_privacy = score_privacy(privacy_hits) if has_memory_data or privacy_hits > 0 else static_scores.get("privacy", 0)
+    risk_privilege = score_privilege(permissions) if permissions else static_scores.get("privilege", 0)
+    risk_memory = score_memory(memory_info.get("totalSize", 0)) if has_memory_data else static_scores.get("memory", 0)
+    risk_token = score_tokens(token_info.get("totalTokens", 0)) if has_token_data else static_scores.get("token", 0)
+    risk_failure = score_failures(log_info.get("errorRate", 0.0)) if has_log_data else static_scores.get("failure", 0)
+    
+    # Convert to safety scores (0-100, higher = safer)
+    report["privacyScore"] = max(0, 100 - risk_privacy)
+    report["privilegeScore"] = max(0, 100 - risk_privilege)
+    report["memoryScore"] = max(0, 100 - risk_memory)
+    report["tokenScore"] = max(0, 100 - risk_token)
+    report["failureScore"] = max(0, 100 - risk_failure)
+    
+    # Calculate overall safety score
+    report["overallScore"] = int((report["privacyScore"] + report["privilegeScore"] + report["memoryScore"] + report["tokenScore"] + report["failureScore"]) / 5)
 
     # Add static scores to report for reference
     report["staticScores"] = static_scores

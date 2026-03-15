@@ -349,11 +349,31 @@
           const lines = reportText.split('\n');
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            // Parse Risk Scores
-            if (line.match(/^- (Privacy|Privilege|Memory|Token|Failure)/)) {
-              const match = line.match(/- (\w+[^:]+):\s*(\d+)/);
-              if (match) scores[match[1]] = parseInt(match[2]);
+            // Parse Safety Scores (higher = safer)
+            const overallMatch = line.match(/综合安全评分[:：]\s*(\d+)/);
+            if (overallMatch) scores['Overall'] = parseInt(overallMatch[1]);
+            const privacyMatch = line.match(/隐私安全[:：]\s*(\d+)/);
+            if (privacyMatch) scores['Privacy'] = parseInt(privacyMatch[1]);
+            const privilegeMatch = line.match(/权限安全[:：]\s*(\d+)/);
+            if (privilegeMatch) scores['Privilege'] = parseInt(privilegeMatch[1]);
+            const memoryMatch = line.match(/内存安全[:：]\s*(\d+)/);
+            if (memoryMatch) scores['Memory'] = parseInt(memoryMatch[1]);
+            const tokenMatch = line.match(/Token 安全[:：]\s*(\d+)/);
+            if (tokenMatch) scores['Token'] = parseInt(tokenMatch[1]);
+            const failureMatch = line.match(/稳定性[:：]\s*(\d+)/);
+            if (failureMatch) scores['Failure'] = parseInt(failureMatch[1]);
+          }
+          
+          // If new format not found, fallback to old format
+          if (Object.keys(scores).length === 0) {
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i];
+              if (line.match(/^- (Privacy|Privilege|Memory|Token|Failure)/)) {
+                const match = line.match(/- (\w+[^:]+):\s*(\d+)/);
+                if (match) scores[match[1]] = parseInt(match[2]);
+              }
             }
+          }
             // Parse Recommendations
             if (line.match(/^## Recommendations/)) {
               let j = i + 1;
@@ -380,16 +400,32 @@
           document.title = 'Skill 安全审计报告 - Health AI';
           const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : '未知';
           
+          // Get scores (0-100, higher = safer)
+          const overallScore = scores['Overall'] || scores['overallScore'] || 0;
+          const privacyScore = scores['Privacy'] || scores['privacyScore'] || 0;
+          const privilegeScore = scores['Privilege'] || scores['privilegeScore'] || 0;
+          const memoryScore = scores['Memory'] || scores['memoryScore'] || 0;
+          const tokenScore = scores['Token'] || scores['tokenScore'] || 0;
+          const failureScore = scores['Failure'] || scores['failureScore'] || 0;
+          
           let html = '<div class="report-header"><h1>🔒 Skill 安全审计报告</h1><div class="report-meta">任务ID: ' + task.taskId + ' · 检测时间: ' + updatedAt + '</div></div>';
           
-          // Score dashboard - 显示所有5个维度
+          // Score dashboard - 显示所有6个维度 (higher = safer)
+          // 80-100=优秀(green/low), 60-79=良好, 40-59=一般(yellow/medium), <40=需改进(red/high)
+          function getScoreClass(score) {
+            if (score >= 80) return 'low';      // 优秀 - 绿色
+            if (score >= 60) return 'total';    // 良好 - 蓝色
+            if (score >= 40) return 'medium';   // 一般 - 黄色
+            return 'high';                      // 需改进 - 红色
+          }
+          
           html += '<div class="risk-dashboard" style="grid-template-columns: repeat(6, 1fr);">';
-          html += '<div class="risk-card ' + (overallScore > 60 ? 'low' : overallScore > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + overallScore + '</div><div class="risk-label">📊 综合</div></div>';
-          html += '<div class="risk-card ' + (scores.Privacy > 60 ? 'low' : scores.Privacy > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Privacy || 0) + '</div><div class="risk-label">🔒 隐私</div></div>';
-          html += '<div class="risk-card ' + (scores.Privilege > 60 ? 'low' : scores.Privilege > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Privilege || 0) + '</div><div class="risk-label">🔐 权限</div></div>';
-          html += '<div class="risk-card ' + (scores.Memory > 60 ? 'low' : scores.Memory > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Memory || 0) + '</div><div class="risk-label">💾 内存</div></div>';
-          html += '<div class="risk-card ' + (scores.Token > 60 ? 'low' : scores.Token > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Token || 0) + '</div><div class="risk-label">🪙 Token</div></div>';
-          html += '<div class="risk-card ' + (scores.Failure > 60 ? 'low' : scores.Failure > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Failure || 0) + '</div><div class="risk-label">❌ 失败率</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(overallScore) + '"><div class="risk-number">' + overallScore + '</div><div class="risk-label">📊 综合</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(privacyScore) + '"><div class="risk-number">' + privacyScore + '</div><div class="risk-label">🔒 隐私</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(privilegeScore) + '"><div class="risk-number">' + privilegeScore + '</div><div class="risk-label">🔐 权限</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(memoryScore) + '"><div class="risk-number">' + memoryScore + '</div><div class="risk-label">💾 内存</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(tokenScore) + '"><div class="risk-number">' + tokenScore + '</div><div class="risk-label">🪙 Token</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(failureScore) + '"><div class="risk-number">' + failureScore + '</div><div class="risk-label">✅ 稳定性</div></div>';
           html += '</div>';
           
           // Key findings
