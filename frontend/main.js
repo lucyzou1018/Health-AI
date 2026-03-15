@@ -15,7 +15,7 @@ const PARAM_SCHEMA = {
 const FEATURE_COPY = {
   "skill-security-audit": {
     title: "Skill 安全审计",
-    desc: "对指定 Skill 执行安全体检，检查权限、配置、日志并输出 0-100 评分报告。"
+    desc: "一键式全面扫描 Skill 安全风险，智能识别权限漏洞与配置隐患，输出多维度健康评分。"
   },
   "multichain-contract-vuln": {
     title: "合约审计",
