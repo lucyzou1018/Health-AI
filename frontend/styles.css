@@ -825,7 +825,7 @@ button#run-task:active {
 }
 
 .history-status {
-  padding: 0 8px;
+  padding: 0;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
@@ -833,13 +833,11 @@ button#run-task:active {
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
   height: 20px;
   line-height: 20px;
   box-sizing: border-box;
-  width: 60px;
+  width: 48px;
   text-align: center;
 }
 
@@ -847,12 +845,22 @@ button#run-task:active {
   background: rgba(34, 197, 94, 0.15);
   border-color: rgba(34, 197, 94, 0.5);
   color: #4ade80;
+  display: inline-block;
+  height: 20px;
+  line-height: 20px;
+  width: 48px;
+  text-align: center;
 }
 
 .history-status.error {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.5);
   color: #f87171;
+  display: inline-block;
+  height: 20px;
+  line-height: 20px;
+  width: 48px;
+  text-align: center;
 }
 
 @keyframes fadeInUp {
