@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>合约审计报告 - Health AI</title>
-  <link rel="stylesheet" href="styles.css?v=20260331" />
+  <link rel="stylesheet" href="styles.css?v=20260351" />
   <style>
     .report-container { max-width: 1000px; margin: 0 auto; padding: 24px; }
     .report-header { text-align: center; padding: 32px 24px; background: var(--bg-secondary); border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); margin-bottom: 24px; }
@@ -64,7 +64,7 @@
       <span class="brand-logo">AI</span>
       <h1 class="brand-name">Health AI</h1>
     </div>
-    <a class="ghost-btn" href="workspace.html#multichain-contract-vuln">返回控制台</a>
+    <a class="ghost-btn" href="workspace.html" id="back-link">返回控制台</a>
   </header>
 
   <div class="report-container" id="report-container">
@@ -242,6 +242,17 @@
       return html;
     }
     
+    // Simple markdown to HTML converter for security audit reports
+    function markdownToHtml(markdown) {
+      return markdown
+        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+        .replace(/^\* (.*$)/gim, '<li>$1</li>')
+        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
+        .replace(/\n/gim, '<br>');
+    }
+    
     async function loadReport() {
       const taskId = getTaskId();
       const container = document.getElementById('report-container');
@@ -261,10 +272,32 @@
           return;
         }
         
+        // Update back link based on skill type
+        const backLink = document.getElementById('back-link');
+        if (backLink) {
+          backLink.href = `workspace.html#${task.skillType}`;
+        }
+        
         const reportResp = await fetch(`${API_BASE}/api/tasks/${taskId}/report`);
         if (!reportResp.ok) throw new Error('获取报告失败: ' + reportResp.status);
         const reportText = await reportResp.text();
         
+        // Handle different report types
+        if (task.skillType === 'skill-security-audit') {
+          // Render security audit report
+          let html = `<div class="report-header"><h1>🔒 Skill 安全审计报告</h1><div class="report-meta">任务ID: ${task.taskId} · 类型: Skill Security Audit · 检测时间: ${new Date(task.updatedAt).toLocaleString('zh-CN')}</div></div>`;
+          html += `<div class="raw-report">${markdownToHtml(reportText)}</div>`;
+          container.innerHTML = html;
+          return;
+        } else if (task.skillType === 'skill-stress-lab') {
+          // Render stress test report
+          let html = `<div class="report-header"><h1>🧪 压力测试报告</h1><div class="report-meta">任务ID: ${task.taskId} · 类型: Skill Stress Lab · 检测时间: ${new Date(task.updatedAt).toLocaleString('zh-CN')}</div></div>`;
+          html += `<div class="raw-report">${markdownToHtml(reportText)}</div>`;
+          container.innerHTML = html;
+          return;
+        }
+        
+        // Default: contract audit report
         const detectors = parseReport(reportText);
         
         if (detectors.length === 0) {
