@@ -1333,17 +1333,17 @@ function createHistoryItem(task) {
   var skillLabel = SKILL_LABELS[task.skillType] || task.skillType;
   
   li.innerHTML = 
-    '<div class="history-header">' +
-      '<span class="history-skill">' + skillLabel + '</span>' +
-      '<span class="history-time">' + formatHistoryTime(task.createdAt) + '</span>' +
+    '<div class="history-col1">' +
+      '<div class="history-skill">' + skillLabel + '</div>' +
+      '<div class="history-time">' + formatHistoryTime(task.createdAt) + '</div>' +
     '</div>' +
-    '<div class="history-status-row">' +
+    '<div class="history-col2">' +
       '<span class="history-status ' + statusClass + '">' + statusText + '</span>' +
     '</div>' +
-    '<div class="history-report-row">' +
+    '<div class="history-col3">' +
       (isCompleted ? 
         '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">查看报告</a>' : 
-        '<span class="history-link-placeholder">-</span>') +
+        '<span class="history-no-report">-</span>') +
     '</div>';
   
   return li;
