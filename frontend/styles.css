@@ -523,24 +523,25 @@ button#run-task:active {
 
 /* Stats Cards */
 .report-stats-cards {
-  display: table;
-  table-layout: fixed;
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 6px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
   margin-bottom: 16px;
+  width: 100%;
 }
 
 .stat-card {
-  display: table-cell;
-  width: 16.666%;
-  padding: 10px 2px;
+  padding: 10px 4px;
   border-radius: var(--radius-sm);
   text-align: center;
   border: 1px solid var(--border-subtle);
   height: 70px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   box-sizing: border-box;
-  vertical-align: middle;
+  min-width: 0;
 }
 
 .stat-card .stat-label {
@@ -598,13 +599,12 @@ button#run-task:active {
 }
 
 .stat-card .stat-number {
-  display: inline-block;
   font-size: 22px;
   font-weight: 600;
   line-height: 1;
   margin-bottom: 4px;
-  min-width: 36px;
   text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-card.high {
