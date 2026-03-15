@@ -1227,14 +1227,16 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
             )
 
     lines = [title, f"{generated_label}：{report['generatedAt']}", "", risk_header]
+    overall = report.get('overallScore', 0)
     if lang == "zh":
         lines.extend([
-            f"- 隐私风险：{report['privacyRisk']}",
-            f"- 权限风险：{report['privilegeRisk']}",
-            f"- 记忆膨胀：{report['memoryRisk']}",
-            f"- Token 成本：{report['tokenRisk']}",
-            f"- 失败率：{report['failureRisk']}",
-            "> 评分说明：0-30=低，31-60=中，>60=高",
+            f"- 综合安全评分：{overall}/100",
+            f"- 隐私安全：{report.get('privacyScore', 0)}/100",
+            f"- 权限安全：{report.get('privilegeScore', 0)}/100",
+            f"- 内存安全：{report.get('memoryScore', 0)}/100",
+            f"- Token 安全：{report.get('tokenScore', 0)}/100",
+            f"- 稳定性：{report.get('failureScore', 0)}/100",
+            "> 评分说明：80-100=优秀，60-79=良好，40-59=一般，<40=需改进",
         ])
     else:
         lines.extend([
