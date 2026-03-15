@@ -524,10 +524,11 @@ button#run-task:active {
 /* Stats Cards */
 .report-stats-cards {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(6, 1fr);
   gap: 8px;
   margin-bottom: 16px;
   width: 100%;
+  table-layout: fixed;
 }
 
 .stat-card {
@@ -544,16 +545,19 @@ button#run-task:active {
   min-width: 0;
   box-sizing: border-box;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .stat-card .stat-label {
   display: block;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  width: 100%;
+  text-align: center;
 }
 
 .stat-card .stat-number {
