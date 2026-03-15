@@ -350,17 +350,17 @@
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             // Parse Safety Scores (higher = safer)
-            const overallMatch = line.match(/综合安全评分[:：]\s*(\d+)/);
+            const overallMatch = line.match(/Overall Safety[:：]\s*(\d+)/);
             if (overallMatch) scores['Overall'] = parseInt(overallMatch[1]);
-            const privacyMatch = line.match(/隐私安全[:：]\s*(\d+)/);
+            const privacyMatch = line.match(/Privacy[:：]\s*(\d+)/);
             if (privacyMatch) scores['Privacy'] = parseInt(privacyMatch[1]);
-            const privilegeMatch = line.match(/权限安全[:：]\s*(\d+)/);
+            const privilegeMatch = line.match(/Privilege[:：]\s*(\d+)/);
             if (privilegeMatch) scores['Privilege'] = parseInt(privilegeMatch[1]);
-            const memoryMatch = line.match(/内存安全[:：]\s*(\d+)/);
+            const memoryMatch = line.match(/Memory[:：]\s*(\d+)/);
             if (memoryMatch) scores['Memory'] = parseInt(memoryMatch[1]);
-            const tokenMatch = line.match(/Token 安全[:：]\s*(\d+)/);
+            const tokenMatch = line.match(/Token[:：]\s*(\d+)/);
             if (tokenMatch) scores['Token'] = parseInt(tokenMatch[1]);
-            const failureMatch = line.match(/稳定性[:：]\s*(\d+)/);
+            const failureMatch = line.match(/Stability[:：]\s*(\d+)/);
             if (failureMatch) scores['Failure'] = parseInt(failureMatch[1]);
           }
           
@@ -425,7 +425,7 @@
           html += '<div class="risk-card ' + getScoreClass(privilegeScore) + '"><div class="risk-number">' + privilegeScore + '</div><div class="risk-label">🔐 权限</div></div>';
           html += '<div class="risk-card ' + getScoreClass(memoryScore) + '"><div class="risk-number">' + memoryScore + '</div><div class="risk-label">💾 内存</div></div>';
           html += '<div class="risk-card ' + getScoreClass(tokenScore) + '"><div class="risk-number">' + tokenScore + '</div><div class="risk-label">🪙 Token</div></div>';
-          html += '<div class="risk-card ' + getScoreClass(failureScore) + '"><div class="risk-number">' + failureScore + '</div><div class="risk-label">✅ 稳定性</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(failureScore) + '"><div class="risk-number">' + failureScore + '</div><div class="risk-label">✅ Stability</div></div>';
           html += '</div>';
           
           // Key findings
