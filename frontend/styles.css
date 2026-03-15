@@ -1444,13 +1444,12 @@ body:not(.landing-only) .ambient-glow {
 
 /* Workspace Back Link - 工作区返回首页 */
 .workspace-back {
-  position: absolute;
-  top: 16px;
-  left: 24px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
+  margin-left: 24px;
+  margin-bottom: 8px;
   font-size: 12px;
   font-weight: 500;
   color: var(--text-tertiary);
@@ -1459,7 +1458,6 @@ body:not(.landing-only) .ambient-glow {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 6px;
   transition: all 0.3s ease;
-  z-index: 20;
 }
 
 .workspace-back:hover {
