@@ -72,13 +72,13 @@ body {
 .brand-stack {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .brand-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   background: linear-gradient(135deg, var(--accent), #8b5cf6);
   display: inline-flex;
   align-items: center;
@@ -1400,18 +1400,6 @@ body:not(.landing-only) .ambient-glow {
   background: rgba(10, 10, 15, 0.8);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.workspace-header .brand-logo {
-  width: 32px;
-  height: 32px;
-  font-size: 12px;
-}
-
-.workspace-header .brand-stack {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .workspace-header .brand-name {
