@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>审计报告 - Health AI</title>
-  <link rel="stylesheet" href="styles.css?v=20260354" />
+  <link rel="stylesheet" href="styles.css?v=20260355" />
   <style>
     .report-container { max-width: 1000px; margin: 0 auto; padding: 24px; }
     .report-header { text-align: center; padding: 32px 24px; background: var(--bg-secondary); border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); margin-bottom: 24px; }
@@ -339,11 +339,78 @@
         
         // Handle different report types
         if (task.skillType === 'skill-security-audit') {
-          // Render security audit report
+          // Parse security audit report
+          const scores = {};
+          const recs = [];
+          const warnings = [];
+          const permissions = [];
+          let inPermissions = false;
+          
+          const lines = reportText.split('\n');
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            // Parse Risk Scores
+            if (line.match(/^- (Privacy|Privilege|Memory|Token|Failure)/)) {
+              const match = line.match(/- (\w+[^:]+):\s*(\d+)/);
+              if (match) scores[match[1]] = parseInt(match[2]);
+            }
+            // Parse Recommendations
+            if (line.match(/^## Recommendations/)) {
+              let j = i + 1;
+              while (j < lines.length && !lines[j].match(/^## /)) {
+                if (lines[j].match(/^- /)) recs.push(lines[j].replace(/^- /, ''));
+                j++;
+              }
+            }
+            // Parse Warnings
+            if (line.match(/^## Warnings/)) {
+              let j = i + 1;
+              while (j < lines.length && !lines[j].match(/^## /)) {
+                if (lines[j].match(/^- /)) warnings.push(lines[j].replace(/^- /, ''));
+                j++;
+              }
+            }
+          }
+          
+          // Calculate overall score
+          const scoreValues = Object.values(scores);
+          const overallScore = scoreValues.length ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length) : 0;
+          
+          // Render security audit dashboard
           document.title = 'Skill 安全审计报告 - Health AI';
           const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : '未知';
-          let html = '<div class="report-header"><h1>🔒 Skill 安全审计报告</h1><div class="report-meta">任务ID: ' + task.taskId + ' · 类型: Skill Security Audit · 检测时间: ' + updatedAt + '</div></div>';
-          html += '<div class="raw-report">' + markdownToHtml(reportText) + '</div>';
+          
+          let html = '<div class="report-header"><h1>🔒 Skill 安全审计报告</h1><div class="report-meta">任务ID: ' + task.taskId + ' · 检测时间: ' + updatedAt + '</div></div>';
+          
+          // Score dashboard
+          html += '<div class="risk-dashboard">';
+          html += '<div class="risk-card ' + (overallScore > 60 ? 'low' : overallScore > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + overallScore + '</div><div class="risk-label">📊 综合评分</div></div>';
+          html += '<div class="risk-card ' + (scores.Privilege > 60 ? 'low' : scores.Privilege > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Privilege || 0) + '</div><div class="risk-label">🔐 权限风险</div></div>';
+          html += '<div class="risk-card ' + (scores.Privacy > 60 ? 'low' : scores.Privacy > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Privacy || 0) + '</div><div class="risk-label">🔒 隐私风险</div></div>';
+          html += '<div class="risk-card total"><div class="risk-number">' + (recs.length + warnings.length) + '</div><div class="risk-label">⚠️ 问题数量</div></div>';
+          html += '</div>';
+          
+          // Key findings
+          if (recs.length > 0) {
+            html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">🔴 关键建议</div><div style="padding:16px 20px;">';
+            recs.forEach(rec => {
+              html += '<div class="issue-item high" style="margin-bottom:8px;"><div class="issue-desc">' + rec + '</div></div>';
+            });
+            html += '</div></div>';
+          }
+          
+          // Warnings
+          if (warnings.length > 0) {
+            html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">⚠️ 警告信息</div><div style="padding:16px 20px;">';
+            warnings.forEach(warn => {
+              html += '<div class="issue-item medium" style="margin-bottom:8px;"><div class="issue-desc">' + warn + '</div></div>';
+            });
+            html += '</div></div>';
+          }
+          
+          // Full report
+          html += '<div class="issues-section"><div class="issues-header">📄 完整报告</div><div style="padding:16px 20px;"><div class="raw-report">' + markdownToHtml(reportText) + '</div></div></div>';
+          
           container.innerHTML = html;
           return;
         } else if (task.skillType === 'skill-stress-lab') {
