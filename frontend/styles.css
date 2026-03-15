@@ -798,6 +798,7 @@ button#run-task:active {
   display: flex;
   align-items: center;
   height: 22px;
+  position: relative;
 }
 
 .history-report-row {
@@ -823,7 +824,7 @@ button#run-task:active {
 }
 
 .history-status {
-  padding: 2px 8px;
+  padding: 0 8px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 500;
@@ -831,17 +832,14 @@ button#run-task:active {
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   color: var(--text-secondary);
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   height: 20px;
-  line-height: 1;
+  line-height: 20px;
   box-sizing: border-box;
   min-width: 60px;
   text-align: center;
-  vertical-align: middle;
-  position: relative;
-  top: 0;
 }
 
 .history-status.success {
