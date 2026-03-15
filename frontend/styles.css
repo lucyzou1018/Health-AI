@@ -789,14 +789,20 @@ button#run-task:active {
   grid-template-columns: 1fr 70px 80px;
   gap: 12px;
   align-items: center;
-  padding: 10px 14px;
+  padding: 8px 14px;
   background: transparent;
+  border: none;
+  border-bottom: none;
   transition: all 150ms ease;
   box-sizing: border-box;
 }
 
 .history-item:hover {
   background: var(--bg-hover);
+}
+
+.history-item + .history-item {
+  border-top: none;
 }
 
 
