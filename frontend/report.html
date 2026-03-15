@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>审计报告 - Health AI</title>
-  <link rel="stylesheet" href="styles.css?v=20260355" />
+  <link rel="stylesheet" href="styles.css?v=20260356" />
   <style>
     .report-container { max-width: 1000px; margin: 0 auto; padding: 24px; }
     .report-header { text-align: center; padding: 32px 24px; background: var(--bg-secondary); border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); margin-bottom: 24px; }
@@ -382,12 +382,14 @@
           
           let html = '<div class="report-header"><h1>🔒 Skill 安全审计报告</h1><div class="report-meta">任务ID: ' + task.taskId + ' · 检测时间: ' + updatedAt + '</div></div>';
           
-          // Score dashboard
-          html += '<div class="risk-dashboard">';
-          html += '<div class="risk-card ' + (overallScore > 60 ? 'low' : overallScore > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + overallScore + '</div><div class="risk-label">📊 综合评分</div></div>';
-          html += '<div class="risk-card ' + (scores.Privilege > 60 ? 'low' : scores.Privilege > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Privilege || 0) + '</div><div class="risk-label">🔐 权限风险</div></div>';
-          html += '<div class="risk-card ' + (scores.Privacy > 60 ? 'low' : scores.Privacy > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Privacy || 0) + '</div><div class="risk-label">🔒 隐私风险</div></div>';
-          html += '<div class="risk-card total"><div class="risk-number">' + (recs.length + warnings.length) + '</div><div class="risk-label">⚠️ 问题数量</div></div>';
+          // Score dashboard - 显示所有5个维度
+          html += '<div class="risk-dashboard" style="grid-template-columns: repeat(6, 1fr);">';
+          html += '<div class="risk-card ' + (overallScore > 60 ? 'low' : overallScore > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + overallScore + '</div><div class="risk-label">📊 综合</div></div>';
+          html += '<div class="risk-card ' + (scores.Privacy > 60 ? 'low' : scores.Privacy > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Privacy || 0) + '</div><div class="risk-label">🔒 隐私</div></div>';
+          html += '<div class="risk-card ' + (scores.Privilege > 60 ? 'low' : scores.Privilege > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Privilege || 0) + '</div><div class="risk-label">🔐 权限</div></div>';
+          html += '<div class="risk-card ' + (scores.Memory > 60 ? 'low' : scores.Memory > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Memory || 0) + '</div><div class="risk-label">💾 内存</div></div>';
+          html += '<div class="risk-card ' + (scores.Token > 60 ? 'low' : scores.Token > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Token || 0) + '</div><div class="risk-label">🪙 Token</div></div>';
+          html += '<div class="risk-card ' + (scores.Failure > 60 ? 'low' : scores.Failure > 30 ? 'medium' : 'high') + '"><div class="risk-number">' + (scores.Failure || 0) + '</div><div class="risk-label">❌ 失败率</div></div>';
           html += '</div>';
           
           // Key findings
