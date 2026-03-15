@@ -64,8 +64,17 @@ const historyCount = document.getElementById("history-count");
 const historyEmpty = document.getElementById("history-empty");
 const historyPanel = document.getElementById("history-panel");
 const reportPreviewBox = document.getElementById("report-preview");
+const paginationEl = document.getElementById("pagination");
+const pagePrevBtn = document.getElementById("page-prev");
+const pageNextBtn = document.getElementById("page-next");
+const pageInfoEl = document.getElementById("page-info");
 const recordedHistory = new Set();
 let previewTaskId = null;
+
+// Pagination state
+let allHistoryTasks = [];
+let currentPage = 1;
+const ITEMS_PER_PAGE = 10;
 let currentFile = null;
 historyPanel?.classList.add("is-empty");
 
@@ -480,37 +489,86 @@ function formatHistoryTime(value) {
   }
 }
 
-function appendHistoryEntry(task) {
-  if (!historyList || !FINAL_STATUSES.has(task.status)) return;
+function addHistoryTask(task) {
+  if (!FINAL_STATUSES.has(task.status)) return;
   if (recordedHistory.has(task.taskId)) return;
   recordedHistory.add(task.taskId);
-  const emptyRow = historyList.querySelector("li.empty");
-  if (emptyRow) emptyRow.remove();
+  allHistoryTasks.unshift(task);
+  renderHistoryPage();
+}
+
+function renderHistoryPage() {
+  if (!historyList) return;
+  
+  const activeFilter = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
+  let filteredTasks = allHistoryTasks;
+  if (activeFilter !== 'all') {
+    filteredTasks = allHistoryTasks.filter(t => t.skillType === activeFilter);
+  }
+  
+  const totalPages = Math.ceil(filteredTasks.length / ITEMS_PER_PAGE);
+  if (currentPage > totalPages) currentPage = Math.max(1, totalPages);
+  
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const pageTasks = filteredTasks.slice(startIndex, endIndex);
+  
+  historyList.innerHTML = '';
+  
+  if (pageTasks.length === 0) {
+    historyList.innerHTML = '<li class="empty">暂无历史记录</li>';
+    if (paginationEl) paginationEl.style.display = 'none';
+    return;
+  }
+  
   historyPanel?.classList.remove("is-empty");
+  if (paginationEl) paginationEl.style.display = 'flex';
+  
+  pageTasks.forEach(task => {
+    const item = createHistoryItem(task);
+    historyList.appendChild(item);
+  });
+  
+  updatePagination(totalPages);
+}
+
+function createHistoryItem(task) {
   const item = document.createElement("li");
   item.className = "history-item";
 
-  const meta = document.createElement("div");
-  meta.className = "history-meta";
-  const time = document.createElement("span");
-  time.className = "time";
-  time.textContent = formatHistoryTime(task.updatedAt || task.createdAt);
-  const taskId = document.createElement("span");
-  taskId.className = "task-id";
-  taskId.textContent = task.taskId;
-  meta.append(time, taskId);
+  const skillLabel = SKILL_LABELS[task.skillType] || task.skillType;
+  const isCompleted = task.status === 'completed';
+  const statusIcon = task.status === 'completed' ? '✅' : '❌';
+  
+  item.innerHTML = `
+    <div class="history-header">
+      <span class="history-skill">${skillLabel}</span>
+      <span class="history-time">${formatHistoryTime(task.createdAt)}</span>
+    </div>
+    <div class="history-status-row">
+      <span class="history-status">${statusIcon} ${task.status}</span>
+    </div>
+    ${isCompleted ? `<div class="history-report-row"><a href="report.html?task=${task.taskId}" target="_blank" class="history-link">查看报告</a></div>` : `<div class="history-report-row"><span class="history-link-placeholder"></span></div>`}
+  `;
+  
+  return item;
+}
 
-  const badge = document.createElement("span");
-  const statusClass = task.status === "failed" ? "error" : "success";
-  badge.className = `history-status ${statusClass}`;
-  badge.textContent = task.status;
+function updatePagination(totalPages) {
+  if (!pagePrevBtn || !pageNextBtn || !pageInfoEl) return;
+  
+  pagePrevBtn.disabled = currentPage <= 1;
+  pageNextBtn.disabled = currentPage >= totalPages || totalPages === 0;
+  pageInfoEl.textContent = `第 ${currentPage} 页 / 共 ${totalPages} 页`;
+}
 
-  item.append(meta, badge);
-  historyList.prepend(item);
+function goToPage(page) {
+  currentPage = page;
+  renderHistoryPage();
+}
 
-  while (historyList.children.length > 5) {
-    historyList.lastElementChild?.remove();
-  }
+function appendHistoryEntry(task) {
+  addHistoryTask(task);
 }
 
 function renderArtifacts(task) {
@@ -1236,10 +1294,8 @@ async function loadWalletHistory(skillType = "all") {
   
   try {
     const url = new URL(`${API_BASE}/api/wallet/history`);
-    if (skillType && skillType !== "all") {
-      url.searchParams.set("skill_type", skillType);
-    }
-    url.searchParams.set("limit", "20");
+    // Load all history for pagination (up to 100 records)
+    url.searchParams.set("limit", "100");
     
     const resp = await fetch(url, {
       headers: { "X-Wallet-Token": walletToken }
@@ -1255,7 +1311,14 @@ async function loadWalletHistory(skillType = "all") {
     }
     
     const tasks = await resp.json();
-    renderWalletHistory(tasks);
+    // Reset and populate all history
+    allHistoryTasks = tasks;
+    recordedHistory.clear();
+    tasks.forEach(t => recordedHistory.add(t.taskId));
+    currentPage = 1;
+    renderHistoryPage();
+    
+    if (historyCount) historyCount.textContent = `${tasks.length} 条记录`;
     
   } catch (err) {
     console.error("Failed to load history:", err);
@@ -1263,32 +1326,14 @@ async function loadWalletHistory(skillType = "all") {
 }
 
 function renderWalletHistory(tasks) {
-  if (!historyList) return;
-  
-  if (tasks.length === 0) {
-    historyList.innerHTML = '<li class="empty">暂无分析记录</li>';
-    if (historyCount) historyCount.textContent = "0 条记录";
-    return;
-  }
-  
-  historyList.innerHTML = "";
+  // Deprecated: use renderHistoryPage instead
+  allHistoryTasks = tasks;
+  recordedHistory.clear();
+  tasks.forEach(t => recordedHistory.add(t.taskId));
+  currentPage = 1;
+  renderHistoryPage();
   if (historyCount) historyCount.textContent = `${tasks.length} 条记录`;
-  
-  for (const task of tasks) {
-    const li = document.createElement("li");
-    li.className = "history-item";
-    
-    const isCompleted = task.status === "completed";
-    const isFailed = task.status === "failed";
-    const statusIcon = isCompleted ? "✅" : isFailed ? "❌" : "⏳";
-    const skillLabel = SKILL_LABELS[task.skillType] || task.skillType;
-    
-    li.innerHTML = `
-      <div class="history-header">
-        <span class="history-skill">${skillLabel}</span>
-        <span class="history-time">${formatHistoryTime(task.createdAt)}</span>
-      </div>
-      <div class="history-status-row">
+}
         <span class="history-status">${statusIcon} ${task.status}</span>
       </div>
       ${isCompleted ? `<div class="history-report-row"><a href="report.html?task=${task.taskId}" target="_blank" class="history-link">查看报告</a></div>` : `<div class="history-report-row"><span class="history-link-placeholder"></span></div>`}
@@ -1316,10 +1361,33 @@ historyFilters.forEach(btn => {
   btn.addEventListener("click", () => {
     historyFilters.forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
-    const filter = btn.dataset.filter;
-    loadWalletHistory(filter);
+    currentPage = 1;
+    renderHistoryPage();
   });
 });
+
+// 分页按钮事件
+if (pagePrevBtn) {
+  pagePrevBtn.addEventListener("click", () => {
+    if (currentPage > 1) {
+      goToPage(currentPage - 1);
+    }
+  });
+}
+
+if (pageNextBtn) {
+  pageNextBtn.addEventListener("click", () => {
+    const activeFilter = document.querySelector('.filter-btn.active')?.dataset.filter || 'all';
+    let filteredTasks = allHistoryTasks;
+    if (activeFilter !== 'all') {
+      filteredTasks = allHistoryTasks.filter(t => t.skillType === activeFilter);
+    }
+    const totalPages = Math.ceil(filteredTasks.length / ITEMS_PER_PAGE);
+    if (currentPage < totalPages) {
+      goToPage(currentPage + 1);
+    }
+  });
+}
 
 // 检查本地存储的钱包登录状态
 function initWallet() {
