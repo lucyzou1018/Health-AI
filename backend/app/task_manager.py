@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 SUPPORTED_SKILLS = {
-    "agent-audit",
+    "skill-security-audit",
     "multichain-contract-vuln",
     "skill-stress-lab",
 }
@@ -174,8 +174,8 @@ class TaskManager:
     def _run_skill(self, record: TaskRecord, workspace: Path, input_dir: Path) -> Dict[str, Any]:
         report_dir = workspace / "report"
         report_dir.mkdir(parents=True, exist_ok=True)
-        if record.skill_type == "agent-audit":
-            result = self._run_agent_audit(input_dir, report_dir)
+        if record.skill_type == "skill-security-audit":
+            result = self._run_security_audit(input_dir, report_dir, record.params or {})
         elif record.skill_type == "multichain-contract-vuln":
             result = self._run_contract_audit(input_dir, report_dir, record.params or {})
         else:
@@ -213,11 +213,11 @@ class TaskManager:
             raise RuntimeError(f"命令执行失败 (exit {proc.returncode}): {' '.join(cmd)}")
         return proc.stdout
 
-    def _run_agent_audit(self, code_dir: Path, report_dir: Path) -> Dict[str, Any]:
-        script = self.repo_root / "skills" / "agent-audit" / "scripts" / "audit_scan.py"
-        report_json = report_dir / "agent_audit.json"
-        report_md = report_dir / "agent_audit.md"
-        log_file = report_dir / "agent_audit.log"
+    def _run_security_audit(self, code_dir: Path, report_dir: Path, params: Dict[str, Any]) -> Dict[str, Any]:
+        script = self.repo_root / "skills" / "skill-security-audit" / "scripts" / "audit_skill.py"
+        report_json = report_dir / "security_audit.json"
+        report_md = report_dir / "security_audit.md"
+        log_file = report_dir / "security_audit.log"
         cmd = [
             "python3",
             str(script),
@@ -226,7 +226,12 @@ class TaskManager:
             "--markdown",
             str(report_md),
         ]
-        if code_dir.exists():
+        # 支持本地路径或远程 URL
+        skill_path = params.get("skillPath", "")
+        skill_url = params.get("skillUrl", "")
+        if skill_url:
+            cmd.extend(["--skill-url", skill_url])
+        elif code_dir.exists():
             skill_dirs = sorted({str(path.parent) for path in code_dir.rglob("SKILL.md")})
             targets = skill_dirs or [str(code_dir)]
             for target in targets:
@@ -237,7 +242,7 @@ class TaskManager:
             "report": str(report_md),
             "summary": str(report_json),
             "log": str(log_file),
-            "message": "Agent Audit 完成",
+            "message": "Skill Security Audit 完成",
             "details": summary_data,
         }
 

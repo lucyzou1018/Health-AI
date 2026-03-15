@@ -59,7 +59,7 @@ class UploadResponse(BaseModel):
 
 
 class TaskRequest(BaseModel):
-    skill_type: Literal["agent-audit", "multichain-contract-vuln", "skill-stress-lab"] = Field(alias="skillType")
+    skill_type: Literal["skill-security-audit", "multichain-contract-vuln", "skill-stress-lab"] = Field(alias="skillType")
     code_path: Optional[str] = Field(default=None, alias="codePath")
     upload_id: Optional[str] = Field(default=None, alias="uploadId")
     params: Dict[str, Any] = Field(default_factory=dict)
