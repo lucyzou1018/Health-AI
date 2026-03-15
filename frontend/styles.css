@@ -839,18 +839,31 @@ button#run-task:active {
   box-sizing: border-box;
   min-width: 60px;
   text-align: center;
+  vertical-align: middle;
+  position: relative;
+  top: 0;
 }
 
 .history-status.success {
   background: var(--success-subtle);
   border-color: var(--success);
   color: var(--success);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  vertical-align: middle;
 }
 
 .history-status.error {
   background: var(--error-subtle);
   border-color: var(--error);
   color: var(--error);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  vertical-align: middle;
 }
 
 @keyframes fadeInUp {
