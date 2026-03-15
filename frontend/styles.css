@@ -1441,6 +1441,38 @@ body:not(.landing-only) .ambient-glow {
   transform: translateX(-3px);
 }
 
+/* Workspace Back Link - 工作区返回首页 */
+.workspace-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  margin: 16px 24px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  width: fit-content;
+}
+
+.workspace-back:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: var(--accent);
+}
+
+.workspace-back .back-arrow {
+  transition: transform 0.3s ease;
+}
+
+.workspace-back:hover .back-arrow {
+  transform: translateX(-4px);
+}
+
 /* Tab按钮未来感 */
 .workspace-tabs {
   position: relative;
