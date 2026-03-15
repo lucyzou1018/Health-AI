@@ -1340,9 +1340,11 @@ function createHistoryItem(task) {
     '<div class="history-status-row">' +
       '<span class="history-status ' + statusClass + '">' + statusText + '</span>' +
     '</div>' +
-    (isCompleted ? 
-      '<div class="history-report-row"><a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">查看报告</a></div>' : 
-      '<div class="history-report-row"><span class="history-link-placeholder"></span></div>');
+    '<div class="history-report-row">' +
+      (isCompleted ? 
+        '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">查看报告</a>' : 
+        '<span class="history-link-placeholder">-</span>') +
+    '</div>';
   
   return li;
 }

@@ -1086,6 +1086,9 @@ body.landing-only header h1 {
 
 .history-link-placeholder {
   display: inline-block;
+  width: 48px;
+  text-align: center;
+  color: var(--text-tertiary);
 }
 
 /* Workspace Header specific */
