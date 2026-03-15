@@ -530,7 +530,7 @@ button#run-task:active {
 }
 
 .stat-card {
-  padding: 12px 8px;
+  padding: 12px 4px;
   border-radius: var(--radius-sm);
   text-align: center;
   border: 1px solid var(--border-subtle);
@@ -539,6 +539,18 @@ button#run-task:active {
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.stat-card .stat-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .stat-card .stat-number {
@@ -547,12 +559,6 @@ button#run-task:active {
   font-weight: 600;
   line-height: 1;
   margin-bottom: 4px;
-}
-
-.stat-card .stat-label {
-  display: block;
-  font-size: 11px;
-  color: var(--text-secondary);
 }
 
 .stat-card.high {
