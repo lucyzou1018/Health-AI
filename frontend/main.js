@@ -490,37 +490,17 @@ function formatHistoryTime(value) {
   }
 }
 
-function appendHistoryEntry(task) {
-  if (!historyList || !FINAL_STATUSES.has(task.status)) return;
+function addHistoryTask(task) {
+  if (!FINAL_STATUSES.has(task.status)) return;
   if (recordedHistory.has(task.taskId)) return;
   recordedHistory.add(task.taskId);
-  const emptyRow = historyList.querySelector("li.empty");
-  if (emptyRow) emptyRow.remove();
-  historyPanel?.classList.remove("is-empty");
-  const item = document.createElement("li");
-  item.className = "history-item";
+  allHistoryTasks.unshift(task);
+  renderHistoryPage();
+}
 
-  const meta = document.createElement("div");
-  meta.className = "history-meta";
-  const time = document.createElement("span");
-  time.className = "time";
-  time.textContent = formatHistoryTime(task.updatedAt || task.createdAt);
-  const taskId = document.createElement("span");
-  taskId.className = "task-id";
-  taskId.textContent = task.taskId;
-  meta.append(time, taskId);
-
-  const badge = document.createElement("span");
-  const statusClass = task.status === "failed" ? "error" : "success";
-  badge.className = `history-status ${statusClass}`;
-  badge.textContent = task.status;
-
-  item.append(meta, badge);
-  historyList.prepend(item);
-
-  while (historyList.children.length > 5) {
-    historyList.lastElementChild?.remove();
-  }
+function appendHistoryEntry(task) {
+  // Use the new addHistoryTask function instead
+  addHistoryTask(task);
 }
 
 function renderArtifacts(task) {
