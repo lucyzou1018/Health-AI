@@ -350,17 +350,18 @@
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             // Parse Safety Scores (higher = safer)
-            const overallMatch = line.match(/Overall Safety[:：]\s*(\d+)/);
+            // Match formats: "- Privacy: 35" or "隐私安全：35/100"
+            const overallMatch = line.match(/(?:Overall Safety|综合安全评分)[:：\/]?\s*(\d+)/i);
             if (overallMatch) scores['Overall'] = parseInt(overallMatch[1]);
-            const privacyMatch = line.match(/Privacy[:：]\s*(\d+)/);
+            const privacyMatch = line.match(/(?:^-\s*Privacy|隐私安全)[:：\/]?\s*(\d+)/i);
             if (privacyMatch) scores['Privacy'] = parseInt(privacyMatch[1]);
-            const privilegeMatch = line.match(/Privilege[:：]\s*(\d+)/);
+            const privilegeMatch = line.match(/(?:^-\s*Privilege|权限安全)[:：\/]?\s*(\d+)/i);
             if (privilegeMatch) scores['Privilege'] = parseInt(privilegeMatch[1]);
-            const memoryMatch = line.match(/Memory[:：]\s*(\d+)/);
+            const memoryMatch = line.match(/(?:^-\s*Memory(?: Footprint)?|内存安全)[:：\/]?\s*(\d+)/i);
             if (memoryMatch) scores['Memory'] = parseInt(memoryMatch[1]);
-            const tokenMatch = line.match(/Token[:：]\s*(\d+)/);
+            const tokenMatch = line.match(/(?:^-\s*Token(?: Cost)?|Token 安全)[:：\/]?\s*(\d+)/i);
             if (tokenMatch) scores['Token'] = parseInt(tokenMatch[1]);
-            const failureMatch = line.match(/Stability[:：]\s*(\d+)/);
+            const failureMatch = line.match(/(?:^-\s*(?:Failure Rate|Stability)|稳定性)[:：\/]?\s*(\d+)/i);
             if (failureMatch) scores['Failure'] = parseInt(failureMatch[1]);
           }
           
