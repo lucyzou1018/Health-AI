@@ -1426,27 +1426,11 @@ body:not(.landing-only) .ambient-glow {
   color: var(--text-primary);
   text-decoration: none;
   transition: all 0.2s ease;
-  position: relative;
   margin-left: 32px;
 }
 
 .nav-link:hover {
   color: var(--accent);
-}
-
-.nav-link::after {
-  content: '';
-  position: absolute;
-  bottom: -4px;
-  left: 0;
-  width: 0;
-  height: 2px;
-  background: var(--accent);
-  transition: width 0.3s ease;
-}
-
-.nav-link:hover::after {
-  width: 100%;
 }
 
 /* Tab按钮未来感 */
