@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>审计报告 - Health AI</title>
-  <link rel="stylesheet" href="styles.css?v=20260353" />
+  <link rel="stylesheet" href="styles.css?v=20260354" />
   <style>
     .report-container { max-width: 1000px; margin: 0 auto; padding: 24px; }
     .report-header { text-align: center; padding: 32px 24px; background: var(--bg-secondary); border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); margin-bottom: 24px; }
@@ -244,13 +244,68 @@
     
     // Simple markdown to HTML converter for security audit reports
     function markdownToHtml(markdown) {
-      return markdown
-        .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-        .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-        .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-        .replace(/^\* (.*$)/gim, '<li>$1</li>')
-        .replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-        .replace(/\n/gim, '<br>');
+      if (!markdown) return '';
+      let html = markdown
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      
+      // Headers
+      html = html.replace(/^# (.*)$/gm, '<h1 style="color:var(--text-primary);font-size:20px;margin:16px 0 8px;">$1</h1>');
+      html = html.replace(/^## (.*)$/gm, '<h2 style="color:var(--text-primary);font-size:16px;margin:14px 0 6px;">$1</h2>');
+      html = html.replace(/^### (.*)$/gm, '<h3 style="color:var(--text-primary);font-size:14px;margin:12px 0 4px;">$1</h3>');
+      
+      // Bold
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary);">$1</strong>');
+      
+      // List items (but not table separators)
+      html = html.replace(/^- (.*)$/gm, '<li style="margin:4px 0;color:var(--text-secondary);">$1</li>');
+      html = html.replace(/^> (.*)$/gm, '<blockquote style="border-left:3px solid var(--accent);padding-left:10px;margin:8px 0;color:var(--text-secondary);">$1</blockquote>');
+      
+      // Wrap lists
+      html = html.replace(/(<li.*<\/li>\n?)+/g, '<ul style="margin:8px 0;padding-left:20px;">$&</ul>');
+      
+      // Tables - simple handling
+      const lines = html.split('\n');
+      let inTable = false;
+      let tableHtml = '';
+      const result = [];
+      
+      for (const line of lines) {
+        if (line.includes('|')) {
+          if (!inTable) {
+            inTable = true;
+            tableHtml = '<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:12px;">';
+          }
+          const cells = line.split('|').filter(c => c.trim());
+          if (cells.length > 0 && !line.match(/^\s*[-:]+\s*$/)) {
+            const isHeader = result.length === 0 || (inTable && tableHtml.split('<tr>').length === 2);
+            const tag = isHeader ? 'th' : 'td';
+            const style = isHeader 
+              ? 'background:var(--bg-hover);padding:8px;border:1px solid var(--border-subtle);text-align:left;font-weight:600;' 
+              : 'padding:8px;border:1px solid var(--border-subtle);color:var(--text-secondary);';
+            tableHtml += '<tr>' + cells.map(c => `<${tag} style="${style}">${c.trim()}</${tag}>`).join('') + '</tr>';
+          }
+        } else {
+          if (inTable) {
+            tableHtml += '</table>';
+            result.push(tableHtml);
+            inTable = false;
+            tableHtml = '';
+          }
+          result.push(line);
+        }
+      }
+      if (inTable) {
+        tableHtml += '</table>';
+        result.push(tableHtml);
+      }
+      html = result.join('\n');
+      
+      // Line breaks
+      html = html.replace(/\n/g, '<br>');
+      
+      return html;
     }
     
     async function loadReport() {
