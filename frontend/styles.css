@@ -1421,12 +1421,13 @@ body:not(.landing-only) .ambient-glow {
 }
 
 .nav-link {
-  font-size: 14px;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--text-secondary);
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: all 0.2s ease;
   position: relative;
-  margin-left: 20px;
+  margin-left: 32px;
 }
 
 .nav-link:hover {
