@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>审计报告 - Health AI</title>
-  <link rel="stylesheet" href="styles.css?v=20260352" />
+  <link rel="stylesheet" href="styles.css?v=20260353" />
   <style>
     .report-container { max-width: 1000px; margin: 0 auto; padding: 24px; }
     .report-header { text-align: center; padding: 32px 24px; background: var(--bg-secondary); border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); margin-bottom: 24px; }
@@ -286,15 +286,17 @@
         if (task.skillType === 'skill-security-audit') {
           // Render security audit report
           document.title = 'Skill 安全审计报告 - Health AI';
-          let html = `<div class="report-header"><h1>🔒 Skill 安全审计报告</h1><div class="report-meta">任务ID: ${task.taskId} · 类型: Skill Security Audit · 检测时间: ${new Date(task.updatedAt).toLocaleString('zh-CN')}</div></div>`;
-          html += `<div class="raw-report">${markdownToHtml(reportText)}</div>`;
+          const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : '未知';
+          let html = '<div class="report-header"><h1>🔒 Skill 安全审计报告</h1><div class="report-meta">任务ID: ' + task.taskId + ' · 类型: Skill Security Audit · 检测时间: ' + updatedAt + '</div></div>';
+          html += '<div class="raw-report">' + markdownToHtml(reportText) + '</div>';
           container.innerHTML = html;
           return;
         } else if (task.skillType === 'skill-stress-lab') {
           // Render stress test report
           document.title = '压力测试报告 - Health AI';
-          let html = `<div class="report-header"><h1>🧪 压力测试报告</h1><div class="report-meta">任务ID: ${task.taskId} · 类型: Skill Stress Lab · 检测时间: ${new Date(task.updatedAt).toLocaleString('zh-CN')}</div></div>`;
-          html += `<div class="raw-report">${markdownToHtml(reportText)}</div>`;
+          const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : '未知';
+          let html = '<div class="report-header"><h1>🧪 压力测试报告</h1><div class="report-meta">任务ID: ' + task.taskId + ' · 类型: Skill Stress Lab · 检测时间: ' + updatedAt + '</div></div>';
+          html += '<div class="raw-report">' + markdownToHtml(reportText) + '</div>';
           container.innerHTML = html;
           return;
         }
@@ -302,9 +304,10 @@
         // Default: contract audit report
         document.title = '合约安全审计报告 - Health AI';
         const detectors = parseReport(reportText);
+        const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : '未知';
         
         if (detectors.length === 0) {
-          container.innerHTML = '<div class="error">⚠️ 未能从报告中提取问题数据，显示原始报告：<br><br><a href="' + `${API_BASE}/api/tasks/${taskId}/report` + '" target="_blank">查看原始报告</a></div>';
+          container.innerHTML = '<div class="error">⚠️ 未能从报告中提取问题数据，显示原始报告：<br><br><a href="' + API_BASE + '/api/tasks/' + taskId + '/report" target="_blank">查看原始报告</a></div>';
           return;
         }
         
@@ -313,7 +316,7 @@
         const low = detectors.filter(d => d.level === 'low');
         
         let html = '';
-        html += `<div class="report-header"><h1>📋 合约安全审计报告</h1><div class="report-meta">任务ID: ${task.taskId} · 链别: EVM · 检测时间: ${new Date(task.updatedAt).toLocaleString('zh-CN')}</div></div>`;
+        html += '<div class="report-header"><h1>📋 合约安全审计报告</h1><div class="report-meta">任务ID: ' + task.taskId + ' · 链别: EVM · 检测时间: ' + updatedAt + '</div></div>';
         
         html += `<div class="risk-dashboard"><div class="risk-card high"><div class="risk-number">${high.length}</div><div class="risk-label">🔴 高风险</div></div><div class="risk-card medium"><div class="risk-number">${medium.length}</div><div class="risk-label">🟡 中风险</div></div><div class="risk-card low"><div class="risk-number">${low.length}</div><div class="risk-label">🟢 低风险</div></div><div class="risk-card total"><div class="risk-number">${detectors.length}</div><div class="risk-label">📊 总计</div></div></div>`;
         
