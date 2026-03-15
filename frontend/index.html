@@ -15,30 +15,56 @@
         <span class="logo-pulse"></span>
         <svg class="lobster-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <linearGradient id="lobsterGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style="stop-color:#6366f1"/>
-              <stop offset="100%" style="stop-color:#8b5cf6"/>
+            <linearGradient id="lobsterBody" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#6366f1"/>
+              <stop offset="50%" stop-color="#7c3aed"/>
+              <stop offset="100%" stop-color="#8b5cf6"/>
             </linearGradient>
+            <linearGradient id="lobsterGlow" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.8"/>
+              <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+            </linearGradient>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
           </defs>
-          <!-- 龙虾身体 -->
-          <ellipse cx="16" cy="20" rx="6" ry="8" stroke="url(#lobsterGradient)" stroke-width="1.5" fill="rgba(99,102,241,0.1)"/>
+          <!-- 尾巴 -->
+          <path d="M16 28L13 30L16 31L19 30L16 28" fill="url(#lobsterBody)" opacity="0.9"/>
+          <path d="M16 24L14 27H18L16 24" fill="url(#lobsterBody)" opacity="0.8"/>
+          <!-- 身体 -->
+          <ellipse cx="16" cy="19" rx="5" ry="6" fill="url(#lobsterBody)"/>
+          <!-- 身体纹理 -->
+          <path d="M13 17H19M13 19H19M13 21H19" stroke="rgba(255,255,255,0.3)" stroke-width="0.5" stroke-linecap="round"/>
+          <!-- 胸部 -->
+          <ellipse cx="16" cy="12" rx="4" ry="3.5" fill="url(#lobsterBody)"/>
           <!-- 头部 -->
-          <circle cx="16" cy="12" r="4" stroke="url(#lobsterGradient)" stroke-width="1.5" fill="none"/>
-          <!-- 眼睛 -->
-          <circle cx="14.5" cy="11" r="1" fill="#22d3ee"/>
-          <circle cx="17.5" cy="11" r="1" fill="#22d3ee"/>
-          <!-- 触须 -->
-          <path d="M13 8C12 6 10 5 8 6" stroke="url(#lobsterGradient)" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M19 8C20 6 22 5 24 6" stroke="url(#lobsterGradient)" stroke-width="1.5" stroke-linecap="round"/>
+          <circle cx="16" cy="7" r="3" fill="url(#lobsterBody)"/>
+          <!-- 眼睛 - 发光 -->
+          <circle cx="14.5" cy="6.5" r="1" fill="#22d3ee" filter="url(#glow)"/>
+          <circle cx="17.5" cy="6.5" r="1" fill="#22d3ee" filter="url(#glow)"/>
+          <!-- 长触须 -->
+          <path d="M14 5C12 3 9 2 6 3" stroke="url(#lobsterBody)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+          <path d="M18 5C20 3 23 2 26 3" stroke="url(#lobsterBody)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+          <!-- 短触须 -->
+          <path d="M14 5C13 3 11 2 9 3" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" fill="none" opacity="0.7"/>
+          <path d="M18 5C19 3 21 2 23 3" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" fill="none" opacity="0.7"/>
           <!-- 左钳子 -->
-          <path d="M10 18C7 16 6 14 7 12" stroke="url(#lobsterGradient)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-          <!-- 右钳子（举起扫描） -->
-          <path d="M22 18C26 15 27 12 25 10" stroke="url(#lobsterGradient)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-          <circle cx="25" cy="9" r="1.5" fill="#22d3ee" opacity="0.8"/>
-          <!-- 数据流/心跳线 -->
-          <path d="M13 20L14 18L15 21L16 17L17 20L18 18L19 20" stroke="#22d3ee" stroke-width="0.8" stroke-linecap="round" fill="none" opacity="0.9"/>
-          <!-- 尾部 -->
-          <path d="M14 28L16 30L18 28" stroke="url(#lobsterGradient)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+          <path d="M12 13C8 12 6 10 7 8C8 6 10 7 11 9" stroke="url(#lobsterBody)" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <circle cx="7" cy="8" r="1.5" fill="url(#lobsterBody)"/>
+          <!-- 右钳子 - 举起扫描 -->
+          <path d="M20 13C24 10 26 7 24 5C22 3 20 5 21 7" stroke="url(#lobsterBody)" stroke-width="2" stroke-linecap="round" fill="none"/>
+          <circle cx="24" cy="5" r="1.5" fill="#22d3ee" filter="url(#glow)"/>
+          <!-- 扫描光束 -->
+          <path d="M24 5L28 3" stroke="#22d3ee" stroke-width="0.8" stroke-dasharray="2 1" opacity="0.6"/>
+          <!-- 腿 -->
+          <path d="M12 16L9 18M12 18L9 20" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+          <path d="M20 16L23 18M20 18L23 20" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+          <!-- 数据流 -->
+          <path d="M14 17L15 15L16 18L17 16L18 17" stroke="#22d3ee" stroke-width="0.6" stroke-linecap="round" fill="none" opacity="0.8"/>
         </svg>
       </span>
       <span class="brand-name">Health AI</span>

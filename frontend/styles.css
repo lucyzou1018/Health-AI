@@ -93,9 +93,10 @@ body {
 }
 
 .lobster-icon {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   z-index: 2;
+  filter: drop-shadow(0 0 4px rgba(99, 102, 241, 0.5));
 }
 
 .brand-name {
