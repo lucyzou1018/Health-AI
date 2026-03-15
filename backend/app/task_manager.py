@@ -313,8 +313,7 @@ class TaskManager:
             "--summary-report",
             str(summary_md),
         ]
-        if params.get("collectMetrics"):
-            cmd.append("--collect-metrics")
+        # Note: --collect-metrics is not supported by stress_runner.py, skip it
         if params.get("workdir"):
             cmd.extend(["--workdir", str(params["workdir"])])
         if params.get("skillDir"):
