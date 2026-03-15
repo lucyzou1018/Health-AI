@@ -1352,9 +1352,7 @@ function updatePagination(totalPages, totalItems) {
   pagePrevBtn.disabled = currentPage <= 1;
   pageNextBtn.disabled = currentPage >= totalPages || totalPages <= 1;
   
-  var startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
-  var endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalItems);
-  pageInfoEl.textContent = '第 ' + currentPage + '/' + totalPages + ' 页 (' + startItem + '-' + endItem + '/' + totalItems + ')';
+  pageInfoEl.textContent = '第 ' + currentPage + '/' + totalPages + ' 页';
 }
 
 function goToPage(page) {
