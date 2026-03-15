@@ -505,8 +505,9 @@ function renderTask(task) {
 
 function renderReportPreview(task) {
   if (!reportPreviewBox) return;
-  // Support both multichain-contract-vuln and skill-security-audit
-  if (!task || (task.skillType !== "multichain-contract-vuln" && task.skillType !== "skill-security-audit") || task.status !== "completed") {
+  // Support multichain-contract-vuln, skill-security-audit, and skill-stress-lab
+  const supportedTypes = ["multichain-contract-vuln", "skill-security-audit", "skill-stress-lab"];
+  if (!task || !supportedTypes.includes(task.skillType) || task.status !== "completed") {
     reportPreviewBox.classList.add("hidden");
     reportPreviewBox.innerHTML = "";
     previewTaskId = null;
@@ -527,6 +528,8 @@ function renderReportPreview(task) {
       let html = "";
       if (task.skillType === "skill-security-audit") {
         html = buildSecurityAuditSummary(text);
+      } else if (task.skillType === "skill-stress-lab") {
+        html = buildStressLabSummary(text);
       } else {
         html = buildReportSummary(text);
       }
@@ -628,6 +631,77 @@ function buildSecurityAuditSummary(text) {
   html += `<div class="stat-card ${getScoreClass(memoryScore)}"><span class="stat-number">${memoryScore}</span><span class="stat-label">💾 内存</span></div>`;
   html += `<div class="stat-card ${getScoreClass(tokenScore)}"><span class="stat-number">${tokenScore}</span><span class="stat-label">🪙 Token</span></div>`;
   html += `<div class="stat-card ${getScoreClass(failureScore)}"><span class="stat-number">${failureScore}</span><span class="stat-label">✅ 稳定</span></div>`;
+  html += `</div>`;
+  
+  // Add score legend
+  html += `<div style="margin-top: 8px; padding: 8px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #94a3b8;">`;
+  html += `评分说明：80-100=优秀 🟢 | 60-79=良好 🔵 | 40-59=一般 🟡 | <40=需改进 🔴`;
+  html += `</div>`;
+  
+  return html;
+}
+
+// Build Skill Stress Lab 5-dimension score cards
+function buildStressLabSummary(text) {
+  if (!text) return "";
+  
+  const scores = {};
+  const lines = text.split(/\r?\n/);
+  
+  // Parse 5-dimension scores from report
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Match patterns like "🛡️ **稳定性** | 100/100" or "稳定性 | 100/100"
+    const stabilityMatch = line.match(/(?:🛡️\s*)?(?:稳定性|Stability)[^\d]*(\d+)\/100/i);
+    if (stabilityMatch) scores['Stability'] = parseInt(stabilityMatch[1]);
+    
+    const performanceMatch = line.match(/(?:⚡\s*)?(?:性能|Performance)[^\d]*(\d+)\/100/i);
+    if (performanceMatch) scores['Performance'] = parseInt(performanceMatch[1]);
+    
+    const resourceMatch = line.match(/(?:💾\s*)?(?:资源|Resource)[^\d]*(\d+)\/100/i);
+    if (resourceMatch) scores['Resource'] = parseInt(resourceMatch[1]);
+    
+    const consistencyMatch = line.match(/(?:🔄\s*)?(?:一致性|Consistency)[^\d]*(\d+)\/100/i);
+    if (consistencyMatch) scores['Consistency'] = parseInt(consistencyMatch[1]);
+    
+    const recoveryMatch = line.match(/(?:🆘\s*)?(?:恢复|Recovery)[^\d]*(\d+)\/100/i);
+    if (recoveryMatch) scores['Recovery'] = parseInt(recoveryMatch[1]);
+    
+    // Match overall score like "综合评分：97/100" or "Overall: 97/100"
+    const overallMatch = line.match(/(?:🎯\s*|综合|Overall)[^\d]*(\d+)\/100/i);
+    if (overallMatch && !scores['Overall']) scores['Overall'] = parseInt(overallMatch[1]);
+  }
+  
+  // Get scores with defaults
+  let overallScore = scores['Overall'] || 0;
+  const stabilityScore = scores['Stability'] || 0;
+  const performanceScore = scores['Performance'] || 0;
+  const resourceScore = scores['Resource'] || 0;
+  const consistencyScore = scores['Consistency'] || 0;
+  const recoveryScore = scores['Recovery'] || 0;
+  
+  // Calculate overall if not parsed
+  if (!overallScore) {
+    const scoreValues = [stabilityScore, performanceScore, resourceScore, consistencyScore, recoveryScore].filter(s => s > 0);
+    overallScore = scoreValues.length ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length) : 0;
+  }
+  
+  // Determine score class (higher = better)
+  function getScoreClass(score) {
+    if (score >= 80) return 'low';      // 优秀 - 绿色
+    if (score >= 60) return 'total';    // 良好 - 蓝色
+    if (score >= 40) return 'medium';   // 一般 - 黄色
+    return 'high';                      // 需改进 - 红色
+  }
+  
+  // Build 6 score cards (overall + 5 dimensions)
+  let html = `<div class="report-stats-cards" style="grid-template-columns: repeat(6, 1fr);">`;
+  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label">🎯 综合</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(stabilityScore)}"><span class="stat-number">${stabilityScore}</span><span class="stat-label">🛡️ 稳定</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(performanceScore)}"><span class="stat-number">${performanceScore}</span><span class="stat-label">⚡ 性能</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(resourceScore)}"><span class="stat-number">${resourceScore}</span><span class="stat-label">💾 资源</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(consistencyScore)}"><span class="stat-number">${consistencyScore}</span><span class="stat-label">🔄 一致</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(recoveryScore)}"><span class="stat-number">${recoveryScore}</span><span class="stat-label">🆘 恢复</span></div>`;
   html += `</div>`;
   
   // Add score legend
