@@ -407,9 +407,7 @@ async function runTask() {
     if (!codePathValue && !uploadId) {
       throw new Error("请先上传 Skill/Agent 压缩包");
     }
-    if (activeTab === "skill-stress-lab" && !params.command) {
-      throw new Error("Stress Lab 需要命令模板");
-    }
+    // Note: command is set to default value in backend if not provided
     const body = {
       skillType: activeTab,
       codePath: codePathValue || null,
