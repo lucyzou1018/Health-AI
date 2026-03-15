@@ -1095,6 +1095,14 @@ def generate_report(
     log_sensitive_hits = log_info.get("sensitiveHits", 0) + len(skill_log_hits)
     privacy_hits = memory_info.get("sensitiveHits", 0) + log_sensitive_hits
 
+    # Check if we have runtime data
+    has_memory_data = memory_info.get("dataAvailable", True) and memory_info.get("totalSize", 0) > 0
+    has_log_data = log_info.get("dataAvailable", True) and log_info.get("files")
+    has_token_data = token_info.get("dataAvailable", True) and token_info.get("totalTokens", 0) > 0
+
+    # Use static analysis scores when runtime data is missing
+    static_scores = _aggregate_static_scores(skills)
+
     report = {
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "permissions": permissions,
@@ -1104,11 +1112,16 @@ def generate_report(
         "externalOnly": bool(combined),
         "skillLogHits": skill_log_hits,
     }
-    report["privacyRisk"] = score_privacy(privacy_hits)
-    report["privilegeRisk"] = score_privilege(permissions)
-    report["memoryRisk"] = score_memory(memory_info.get("totalSize", 0))
-    report["tokenRisk"] = score_tokens(token_info.get("totalTokens", 0))
-    report["failureRisk"] = score_failures(log_info.get("errorRate", 0.0))
+
+    # Calculate scores: use runtime data if available, otherwise use static analysis
+    report["privacyRisk"] = score_privacy(privacy_hits) if has_memory_data or privacy_hits > 0 else static_scores.get("privacy", 0)
+    report["privilegeRisk"] = score_privilege(permissions) if permissions else static_scores.get("privilege", 0)
+    report["memoryRisk"] = score_memory(memory_info.get("totalSize", 0)) if has_memory_data else static_scores.get("memory", 0)
+    report["tokenRisk"] = score_tokens(token_info.get("totalTokens", 0)) if has_token_data else static_scores.get("token", 0)
+    report["failureRisk"] = score_failures(log_info.get("errorRate", 0.0)) if has_log_data else static_scores.get("failure", 0)
+
+    # Add static scores to report for reference
+    report["staticScores"] = static_scores
 
     warnings: List[str] = []
     if not memory_info.get("dataAvailable", True):
@@ -1123,6 +1136,38 @@ def generate_report(
 
     report["suggestions"] = build_suggestions(report)
     return report
+
+
+def _aggregate_static_scores(skills: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Aggregate static analysis scores from external skills."""
+    if not skills:
+        return {"privacy": 0, "privilege": 0, "memory": 0, "token": 0, "failure": 0}
+
+    all_scores = {
+        "privacy": [],
+        "privilege": [],
+        "memory": [],
+        "token": [],
+        "failure": [],
+    }
+
+    for skill in skills:
+        ext_scores = skill.get("externalScores", {})
+        if ext_scores:
+            for key in all_scores:
+                if key in ext_scores and ext_scores[key] is not None:
+                    all_scores[key].append(ext_scores[key])
+
+    # Calculate average for each dimension, or use defaults if no scores
+    result = {}
+    for key, values in all_scores.items():
+        if values:
+            result[key] = int(sum(values) / len(values))
+        else:
+            # Default scores based on risk assessment
+            result[key] = 15 if key in ["privilege", "failure"] else 5
+
+    return result
 
 
 def _secure_write(path: Path, content: str) -> None:
