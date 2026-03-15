@@ -312,8 +312,6 @@ class TaskManager:
             str(logs_dir),
             "--summary-report",
             str(summary_md),
-            "--metrics-output",
-            str(metrics_json),
         ]
         if params.get("collectMetrics"):
             cmd.append("--collect-metrics")
@@ -331,7 +329,7 @@ class TaskManager:
         
         # Generate enhanced report with 5-dimension scores
         enhanced_md = report_dir / "stress_report.md"
-        self._generate_stress_lab_report(summary_md, metrics_json, enhanced_md, runs, concurrency)
+        self._generate_stress_lab_report(summary_md, enhanced_md, runs, concurrency)
         
         summary_payload = {
             "runs": runs,
@@ -350,21 +348,27 @@ class TaskManager:
             "message": "压力测试完成",
         }
 
-    def _generate_stress_lab_report(self, summary_md: Path, metrics_json: Path, output_md: Path, runs: int, concurrency: int) -> None:
+    def _generate_stress_lab_report(self, summary_md: Path, output_md: Path, runs: int, concurrency: int) -> None:
         """Generate enhanced stress lab report with 5-dimension scoring."""
         # Read original summary
         original_content = summary_md.read_text() if summary_md.exists() else ""
         
-        # Try to parse metrics
+        # Parse metrics from summary content
+        import re
         metrics = {}
-        if metrics_json.exists():
-            try:
-                metrics = json.loads(metrics_json.read_text())
-            except:
-                pass
+        
+        # Extract success rate
+        success_match = re.search(r'成功次数:\s*(\d+)\s*\(([^)]+)\)', original_content)
+        if success_match:
+            metrics['successes'] = int(success_match.group(1))
+            metrics['success_rate_str'] = success_match.group(2)
+        
+        # Extract avg duration
+        avg_match = re.search(r'平均耗时:\s*([\d.]+)s', original_content)
+        if avg_match:
+            metrics['avg_duration'] = float(avg_match.group(1))
         
         # Calculate 5-dimension scores based on metrics
-        # Default scores if no metrics available
         stability_score = 100
         performance_score = 95
         resource_score = 90
@@ -373,9 +377,10 @@ class TaskManager:
         
         # Extract actual metrics if available
         if metrics:
-            success_rate = metrics.get("success_rate", 1.0)
-            avg_duration = metrics.get("avg_duration", 0.05)
-            failures = metrics.get("failures", 0)
+            avg_duration = metrics.get('avg_duration', 0.05)
+            successes = metrics.get('successes', runs)
+            success_rate = successes / runs if runs > 0 else 1.0
+            failures = runs - successes
             
             # Stability: based on success rate
             stability_score = int(success_rate * 100)
