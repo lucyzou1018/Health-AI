@@ -778,7 +778,8 @@ button#run-task:active {
 
 .history-item {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   padding: 10px 14px;
   border-radius: var(--radius);
   background: var(--bg-tertiary);
@@ -794,7 +795,11 @@ button#run-task:active {
 }
 
 .history-status-row {
-  margin-bottom: 4px;
+  width: 70px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin: 0;
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -804,7 +809,11 @@ button#run-task:active {
 }
 
 .history-report-row {
-  height: 18px;
+  width: 80px;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin: 0;
 }
 
 .history-meta {
@@ -1041,14 +1050,17 @@ body.landing-only header h1 {
 
 /* History Item */
 .history-header {
+  flex: 1;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  min-width: 0;
+  margin-right: 16px;
 }
 
 .history-header .history-time {
-  margin-left: 32px;
+  margin-left: 16px;
+  flex-shrink: 0;
 }
 
 .history-skill {
