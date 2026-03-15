@@ -79,7 +79,8 @@ body {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent), #8b5cf6);
+  background: rgba(10, 10, 15, 0.6);
+  border: 1px solid rgba(99, 102, 241, 0.3);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -87,6 +88,14 @@ body {
   font-weight: 600;
   color: #fff;
   letter-spacing: 0.5px;
+  position: relative;
+  overflow: hidden;
+}
+
+.lobster-icon {
+  width: 24px;
+  height: 24px;
+  z-index: 2;
 }
 
 .brand-name {
