@@ -10,12 +10,13 @@ const PARAM_SCHEMA = {
       id: "command",
       label: "命令模板",
       type: "textarea",
-      placeholder: "python3 skills/skill-stress-lab/tests/helpers/run_http_load.py --url ...",
+      placeholder: "python3 {skill}/scripts/security_preflight.py",
+      default: "python3 {skill}/scripts/security_preflight.py",
     },
-    { id: "workdir", label: "工作目录", type: "text", placeholder: "例如：skills/skill-stress-lab" },
-    { id: "runs", label: "Runs", type: "number", placeholder: "10" },
-    { id: "concurrency", label: "Concurrency", type: "number", placeholder: "1" },
-    { id: "collectMetrics", label: "Collect Metrics", type: "checkbox" }
+    { id: "workdir", label: "工作目录", type: "text", placeholder: "例如：skills/skill-stress-lab", default: "" },
+    { id: "runs", label: "Runs", type: "number", placeholder: "10", default: "10" },
+    { id: "concurrency", label: "并发数", type: "number", placeholder: "3", default: "3" },
+    { id: "collectMetrics", label: "收集指标", type: "checkbox", default: true }
   ]
 };
 
@@ -316,6 +317,14 @@ function renderParamFields() {
       input.placeholder = field.placeholder || "";
     }
     input.id = `param-${field.id}`;
+    // Set default value if provided
+    if (field.default !== undefined) {
+      if (field.type === "checkbox") {
+        input.checked = field.default;
+      } else {
+        input.value = field.default;
+      }
+    }
     wrapper.appendChild(input);
     paramContainer.appendChild(wrapper);
   });
