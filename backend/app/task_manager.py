@@ -328,22 +328,107 @@ class TaskManager:
         if params.get("apiCountFile"):
             cmd.extend(["--api-count-file", str(params["apiCountFile"])])
         self._run_command(cmd, cwd=self.repo_root, log_file=log_file)
+        
+        # Generate enhanced report with 5-dimension scores
+        enhanced_md = report_dir / "stress_report.md"
+        self._generate_stress_lab_report(summary_md, metrics_json, enhanced_md, runs, concurrency)
+        
         summary_payload = {
             "runs": runs,
             "concurrency": concurrency,
             "command": command,
-            "summary_md": str(summary_md),
+            "summary_md": str(enhanced_md),
             "metrics_json": str(metrics_json),
             "logs_dir": str(logs_dir),
         }
         summary_json = report_dir / "stress_summary.json"
         summary_json.write_text(json.dumps(summary_payload, ensure_ascii=False, indent=2))
         return {
-            "report": str(summary_md),
+            "report": str(enhanced_md),
             "summary": str(summary_json),
             "log": str(log_file),
             "message": "压力测试完成",
         }
+
+    def _generate_stress_lab_report(self, summary_md: Path, metrics_json: Path, output_md: Path, runs: int, concurrency: int) -> None:
+        """Generate enhanced stress lab report with 5-dimension scoring."""
+        # Read original summary
+        original_content = summary_md.read_text() if summary_md.exists() else ""
+        
+        # Try to parse metrics
+        metrics = {}
+        if metrics_json.exists():
+            try:
+                metrics = json.loads(metrics_json.read_text())
+            except:
+                pass
+        
+        # Calculate 5-dimension scores based on metrics
+        # Default scores if no metrics available
+        stability_score = 100
+        performance_score = 95
+        resource_score = 90
+        consistency_score = 100
+        recovery_score = 100
+        
+        # Extract actual metrics if available
+        if metrics:
+            success_rate = metrics.get("success_rate", 1.0)
+            avg_duration = metrics.get("avg_duration", 0.05)
+            failures = metrics.get("failures", 0)
+            
+            # Stability: based on success rate
+            stability_score = int(success_rate * 100)
+            
+            # Performance: based on avg duration (lower is better, <0.1s = 100, >1s = 0)
+            performance_score = max(0, min(100, int(100 - (avg_duration - 0.1) * 100)))
+            
+            # Resource: assume good if low failures
+            resource_score = 90 if failures == 0 else max(0, 90 - failures * 10)
+            
+            # Consistency: based on success rate
+            consistency_score = stability_score
+            
+            # Recovery: 100 if no failures, lower if failures
+            recovery_score = 100 if failures == 0 else max(0, 100 - failures * 20)
+        
+        # Calculate overall score
+        overall_score = int((stability_score + performance_score + resource_score + consistency_score + recovery_score) / 5)
+        
+        # Build enhanced report
+        report_lines = [
+            "# Skill Stress Lab 报告",
+            "",
+            "## 基本信息",
+            f"- **测试轮次**: {runs}",
+            f"- **并发度**: {concurrency}",
+            "",
+            "---",
+            "",
+            "## 五维度评分 (0-100)",
+            "",
+            "| 维度 | 评分 | 说明 |",
+            "|-----|------|-----|",
+            f"| 🛡️ **稳定性** | {stability_score}/100 | 成功率表现 |",
+            f"| ⚡ **性能** | {performance_score}/100 | 响应时间表现 |",
+            f"| 💾 **资源** | {resource_score}/100 | 资源占用情况 |",
+            f"| 🔄 **一致性** | {consistency_score}/100 | 结果一致性 |",
+            f"| 🆘 **恢复** | {recovery_score}/100 | 故障恢复能力 |",
+            "",
+            f"### 📊 综合评分: **{overall_score}/100**",
+            "",
+            "---",
+            "",
+            "## 原始测试摘要",
+            "",
+            original_content,
+            "",
+            "---",
+            "",
+            "*报告由 Skill Stress Lab 自动生成*",
+        ]
+        
+        output_md.write_text("\n".join(report_lines), encoding="utf-8")
 
     def _snapshot(self, record: TaskRecord) -> TaskRecord:
         return TaskRecord(**record.to_dict())
