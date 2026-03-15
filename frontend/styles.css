@@ -790,16 +790,12 @@ button#run-task:active {
   gap: 12px;
   align-items: center;
   padding: 10px 14px;
-  border-radius: var(--radius);
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-subtle);
+  background: transparent;
   transition: all 150ms ease;
-  animation: fadeInUp 0.25s ease-out;
   box-sizing: border-box;
 }
 
 .history-item:hover {
-  border-color: var(--border-default);
   background: var(--bg-hover);
 }
 
