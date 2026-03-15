@@ -833,9 +833,12 @@ button#run-task:active {
   color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   height: 20px;
   line-height: 1;
   box-sizing: border-box;
+  min-width: 60px;
+  text-align: center;
 }
 
 .history-status.success {
@@ -1020,15 +1023,6 @@ body.landing-only header h1 {
 }
 
 /* History Item */
-.history-item {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.history-item:last-child {
-  border-bottom: none;
-}
-
 .history-header {
   display: flex;
   justify-content: space-between;
