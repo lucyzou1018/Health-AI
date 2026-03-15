@@ -538,6 +538,8 @@ button#run-task:active {
   text-align: center;
   border: 1px solid var(--border-subtle);
   height: 70px;
+  width: 100%;
+  max-width: 120px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -605,8 +607,9 @@ button#run-task:active {
   font-weight: 600;
   line-height: 1;
   margin-bottom: 4px;
-  width: 100%;
+  width: 40px;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .stat-card.high {
