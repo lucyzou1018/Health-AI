@@ -217,7 +217,7 @@ function updateRunButtonState() {
     runBtn.textContent = "开始分析";
   } else if (activeTab === "skill-stress-lab" && !hasValidParams) {
     runBtn.disabled = true;
-    runBtn.textContent = "请输入运行次数和并发数";
+    runBtn.textContent = "开始分析";
   } else if (isRunning) {
     runBtn.disabled = true;
     runBtn.textContent = "分析中...";
