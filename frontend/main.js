@@ -1328,7 +1328,8 @@ function createHistoryItem(task) {
   
   var isCompleted = task.status === "completed";
   var isFailed = task.status === "failed";
-  var statusIcon = isCompleted ? "✅" : isFailed ? "❌" : "⏳";
+  var statusText = isCompleted ? "完成" : isFailed ? "失败" : "进行中";
+  var statusClass = isCompleted ? "success" : isFailed ? "error" : "pending";
   var skillLabel = SKILL_LABELS[task.skillType] || task.skillType;
   
   li.innerHTML = 
@@ -1337,7 +1338,7 @@ function createHistoryItem(task) {
       '<span class="history-time">' + formatHistoryTime(task.createdAt) + '</span>' +
     '</div>' +
     '<div class="history-status-row">' +
-      '<span class="history-status">' + statusIcon + ' ' + task.status + '</span>' +
+      '<span class="history-status ' + statusClass + '">' + statusText + '</span>' +
     '</div>' +
     (isCompleted ? 
       '<div class="history-report-row"><a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">查看报告</a></div>' : 
