@@ -551,9 +551,18 @@ button#run-task:active {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 90%;
+  max-width: 95%;
   text-align: center;
   line-height: 1.2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.stat-card .stat-icon {
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .stat-card .stat-number {

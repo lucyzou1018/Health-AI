@@ -690,14 +690,14 @@ function buildSecurityAuditSummary(text) {
     return 'high';                      // 需改进 - 红色
   }
   
-  // Build 6 score cards
+  // Build 6 score cards - emoji and text on same line
   let html = `<div class="report-stats-cards" style="grid-template-columns: repeat(6, 1fr);">`;
-  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label">📊 综合</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(privacyScore)}"><span class="stat-number">${privacyScore}</span><span class="stat-label">🔒 隐私</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(privilegeScore)}"><span class="stat-number">${privilegeScore}</span><span class="stat-label">🔐 权限</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(memoryScore)}"><span class="stat-number">${memoryScore}</span><span class="stat-label">💾 内存</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(tokenScore)}"><span class="stat-number">${tokenScore}</span><span class="stat-label">🪙 Token</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(failureScore)}"><span class="stat-number">${failureScore}</span><span class="stat-label">✅ 稳定</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label"><span class="stat-icon">📊</span>综合</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(privacyScore)}"><span class="stat-number">${privacyScore}</span><span class="stat-label"><span class="stat-icon">🔒</span>隐私</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(privilegeScore)}"><span class="stat-number">${privilegeScore}</span><span class="stat-label"><span class="stat-icon">🔐</span>权限</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(memoryScore)}"><span class="stat-number">${memoryScore}</span><span class="stat-label"><span class="stat-icon">💾</span>内存</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(tokenScore)}"><span class="stat-number">${tokenScore}</span><span class="stat-label"><span class="stat-icon">🪙</span>Token</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(failureScore)}"><span class="stat-number">${failureScore}</span><span class="stat-label"><span class="stat-icon">✅</span>稳定</span></div>`;
   html += `</div>`;
   
   // Add score legend
@@ -761,14 +761,14 @@ function buildStressLabSummary(text) {
     return 'high';                      // 需改进 - 红色
   }
   
-  // Build 6 score cards (overall + 5 dimensions)
+  // Build 6 score cards (overall + 5 dimensions) - emoji and text on same line
   let html = `<div class="report-stats-cards" style="grid-template-columns: repeat(6, 1fr);">`;
-  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label">🎯 综合</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(stabilityScore)}"><span class="stat-number">${stabilityScore}</span><span class="stat-label">🛡️ 稳定</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(performanceScore)}"><span class="stat-number">${performanceScore}</span><span class="stat-label">⚡ 性能</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(resourceScore)}"><span class="stat-number">${resourceScore}</span><span class="stat-label">💾 资源</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(consistencyScore)}"><span class="stat-number">${consistencyScore}</span><span class="stat-label">🔄 一致</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(recoveryScore)}"><span class="stat-number">${recoveryScore}</span><span class="stat-label">🆘 恢复</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label"><span class="stat-icon">🎯</span>综合</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(stabilityScore)}"><span class="stat-number">${stabilityScore}</span><span class="stat-label"><span class="stat-icon">🛡️</span>稳定</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(performanceScore)}"><span class="stat-number">${performanceScore}</span><span class="stat-label"><span class="stat-icon">⚡</span>性能</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(resourceScore)}"><span class="stat-number">${resourceScore}</span><span class="stat-label"><span class="stat-icon">💾</span>资源</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(consistencyScore)}"><span class="stat-number">${consistencyScore}</span><span class="stat-label"><span class="stat-icon">🔄</span>一致</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(recoveryScore)}"><span class="stat-number">${recoveryScore}</span><span class="stat-label"><span class="stat-icon">🆘</span>恢复</span></div>`;
   html += `</div>`;
   
   // Add score legend
