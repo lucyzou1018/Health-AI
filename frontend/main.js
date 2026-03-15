@@ -14,15 +14,15 @@ const PARAM_SCHEMA = {
 
 const FEATURE_COPY = {
   "skill-security-audit": {
-    title: "Skill Security Audit",
+    title: "Skill 安全审计",
     desc: "对指定 Skill 执行安全体检，检查权限、配置、日志并输出 0-100 评分报告。"
   },
   "multichain-contract-vuln": {
-    title: "Multichain Contract Vuln",
+    title: "合约审计",
     desc: "一键执行多链合约源码分析，结合 Slither/Anchor 等输出漏洞报告。"
   },
   "skill-stress-lab": {
-    title: "Skill Stress Lab",
+    title: "压力测试",
     desc: "配置命令模板即可跑并发压测、采集 CPU/RSS 与 API 指标。"
   }
 };
