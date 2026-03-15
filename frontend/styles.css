@@ -523,35 +523,32 @@ button#run-task:active {
 
 /* Stats Cards */
 .report-stats-cards {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  display: flex;
+  flex-direction: row;
   gap: 6px;
   margin-bottom: 16px;
   width: 100%;
 }
 
 .stat-card {
-  padding: 10px 0;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 10px 2px;
   border-radius: var(--radius-sm);
   text-align: center;
   border: 1px solid var(--border-subtle);
   height: 70px;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   box-sizing: border-box;
-  overflow: hidden;
 }
 
 .stat-card .stat-label {
   font-size: 11px;
   color: var(--text-secondary);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 95%;
   text-align: center;
   line-height: 1.2;
   display: flex;
@@ -561,8 +558,7 @@ button#run-task:active {
 }
 
 .stat-card .stat-icon {
-  font-size: 11px;
-  flex-shrink: 0;
+  font-size: 10px;
 }
 
 .stat-card .stat-number {
