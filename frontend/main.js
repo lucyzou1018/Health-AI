@@ -23,7 +23,7 @@ const FEATURE_COPY = {
   },
   "skill-stress-lab": {
     title: "压力测试",
-    desc: "配置命令模板即可跑并发压测、采集 CPU/RSS 与 API 指标。"
+    desc: "一键启动并发压测，实时采集性能指标，全面评估系统承载能力。"
   }
 };
 
