@@ -506,7 +506,8 @@ function renderTask(task) {
 
 function renderReportPreview(task) {
   if (!reportPreviewBox) return;
-  if (!task || task.skillType !== "multichain-contract-vuln" || task.status !== "completed") {
+  // Support both multichain-contract-vuln and skill-security-audit
+  if (!task || (task.skillType !== "multichain-contract-vuln" && task.skillType !== "skill-security-audit") || task.status !== "completed") {
     reportPreviewBox.classList.add("hidden");
     reportPreviewBox.innerHTML = "";
     previewTaskId = null;
@@ -524,7 +525,12 @@ function renderReportPreview(task) {
     })
     .then((text) => {
       if (previewTaskId !== targetId) return;
-      const html = buildReportSummary(text);
+      let html = "";
+      if (task.skillType === "skill-security-audit") {
+        html = buildSecurityAuditSummary(text);
+      } else {
+        html = buildReportSummary(text);
+      }
       if (html) {
         reportPreviewBox.innerHTML = html;
         reportPreviewBox.classList.remove("hidden");
@@ -565,6 +571,71 @@ function buildReportSummary(text) {
   html += `<div class="stat-card total"><span class="stat-number">${detectorSummaries.length}</span><span class="stat-label">总计</span></div>`;
   html += `</div>`;
 
+  return html;
+}
+
+// Build security audit score cards (6 dimensions)
+function buildSecurityAuditSummary(text) {
+  if (!text) return "";
+  
+  const scores = {};
+  const lines = text.split(/\r?\n/);
+  
+  // Parse scores from report (support both Chinese and English formats)
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // Match formats: "- Privacy: 35" or "隐私安全：35/100"
+    const overallMatch = line.match(/(?:Overall Safety|综合安全评分)[:：\/]?\s*(\d+)/i);
+    if (overallMatch) scores['Overall'] = parseInt(overallMatch[1]);
+    const privacyMatch = line.match(/(?:^-\s*Privacy|隐私安全)[:：\/]?\s*(\d+)/i);
+    if (privacyMatch) scores['Privacy'] = parseInt(privacyMatch[1]);
+    const privilegeMatch = line.match(/(?:^-\s*Privilege|权限安全)[:：\/]?\s*(\d+)/i);
+    if (privilegeMatch) scores['Privilege'] = parseInt(privilegeMatch[1]);
+    const memoryMatch = line.match(/(?:^-\s*Memory(?: Footprint)?|内存安全)[:：\/]?\s*(\d+)/i);
+    if (memoryMatch) scores['Memory'] = parseInt(memoryMatch[1]);
+    const tokenMatch = line.match(/(?:^-\s*Token(?: Cost)?|Token 安全)[:：\/]?\s*(\d+)/i);
+    if (tokenMatch) scores['Token'] = parseInt(tokenMatch[1]);
+    const failureMatch = line.match(/(?:^-\s*(?:Failure Rate|Stability)|稳定性)[:：\/]?\s*(\d+)/i);
+    if (failureMatch) scores['Failure'] = parseInt(failureMatch[1]);
+  }
+  
+  // Fallback: calculate overall if not parsed
+  let overallScore = scores['Overall'] || 0;
+  if (!overallScore) {
+    const scoreValues = Object.values(scores).filter(s => s > 0);
+    overallScore = scoreValues.length ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length) : 0;
+  }
+  
+  // Get individual scores
+  const privacyScore = scores['Privacy'] || 0;
+  const privilegeScore = scores['Privilege'] || 0;
+  const memoryScore = scores['Memory'] || 0;
+  const tokenScore = scores['Token'] || 0;
+  const failureScore = scores['Failure'] || 0;
+  
+  // Determine score class based on value (higher = safer)
+  function getScoreClass(score) {
+    if (score >= 80) return 'low';      // 优秀 - 绿色
+    if (score >= 60) return 'total';    // 良好 - 蓝色  
+    if (score >= 40) return 'medium';   // 一般 - 黄色
+    return 'high';                      // 需改进 - 红色
+  }
+  
+  // Build 6 score cards
+  let html = `<div class="report-stats-cards" style="grid-template-columns: repeat(6, 1fr);">`;
+  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label">📊 综合</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(privacyScore)}"><span class="stat-number">${privacyScore}</span><span class="stat-label">🔒 隐私</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(privilegeScore)}"><span class="stat-number">${privilegeScore}</span><span class="stat-label">🔐 权限</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(memoryScore)}"><span class="stat-number">${memoryScore}</span><span class="stat-label">💾 内存</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(tokenScore)}"><span class="stat-number">${tokenScore}</span><span class="stat-label">🪙 Token</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(failureScore)}"><span class="stat-number">${failureScore}</span><span class="stat-label">✅ 稳定</span></div>`;
+  html += `</div>`;
+  
+  // Add score legend
+  html += `<div style="margin-top: 8px; padding: 8px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #94a3b8;">`;
+  html += `评分说明：80-100=优秀 🟢 | 60-79=良好 🔵 | 40-59=一般 🟡 | <40=需改进 🔴`;
+  html += `</div>`;
+  
   return html;
 }
 
