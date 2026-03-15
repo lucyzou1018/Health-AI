@@ -1423,7 +1423,7 @@ body:not(.landing-only) .ambient-glow {
 .nav-link {
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   text-decoration: none;
   transition: all 0.2s ease;
   position: relative;
