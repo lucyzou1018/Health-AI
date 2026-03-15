@@ -524,9 +524,10 @@ button#run-task:active {
 /* Stats Cards */
 .report-stats-cards {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 16px;
+  width: 100%;
 }
 
 .stat-card {
@@ -540,7 +541,9 @@ button#run-task:active {
   justify-content: center;
   align-items: center;
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .stat-card .stat-label {
