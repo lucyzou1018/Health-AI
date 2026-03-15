@@ -528,36 +528,32 @@ button#run-task:active {
   gap: 8px;
   margin-bottom: 16px;
   width: 100%;
-  table-layout: fixed;
 }
 
 .stat-card {
-  padding: 12px 4px;
+  padding: 12px 2px;
   border-radius: var(--radius-sm);
   text-align: center;
   border: 1px solid var(--border-subtle);
-  min-height: 70px;
+  height: 70px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 100%;
-  min-width: 0;
   box-sizing: border-box;
-  flex-shrink: 0;
   overflow: hidden;
+  flex: 1 1 0;
 }
 
 .stat-card .stat-label {
-  display: block;
   font-size: 11px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 100%;
-  width: 100%;
+  max-width: 90%;
   text-align: center;
+  line-height: 1.2;
 }
 
 .stat-card .stat-number {
