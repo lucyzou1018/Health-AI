@@ -6,7 +6,7 @@ Health AI = Agent Audit + Multichain Contract Scanner + Skill Stress Lab 的 Web
 - 🛡️ 调用 `skills/multichain-contract-vuln/scripts/run_cli.py` 的合约漏洞扫描
 - 🚀 调用 `skills/skill-stress-lab/scripts/stress_runner.py` 的压力测试（支持命令模板 + metrics）
 - 🧵 后台线程池异步执行任务 + 状态轮询 API + 日志/报告下载
-- 🐳 Docker 镜像 + `docker-compose` 快速部署（同时暴露 `/ui` 静态页面和 `/api/*`）
+- 🐳 Docker 镜像 + `docker-compose` 快速部署（ 同时暴露 `/ui` 静态页面和 `/api/*`）
 
 ## 目录结构
 ```
