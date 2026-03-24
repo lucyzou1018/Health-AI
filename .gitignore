@@ -26,3 +26,6 @@ npm-debug.log*
 # IDE
 .vscode/
 .idea/
+
+# 运行时数据（自动生成，不提交）
+backend/storage/

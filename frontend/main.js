@@ -469,7 +469,7 @@ async function runTask() {
 
   try {
     setStatus("Analyzing...", "running");
-    setSummary("Preparing task...");
+    setSummary("Uploading package and preparing scan…");
     artifactBox?.classList.add("hidden");
     const uploadId = await uploadFileIfNeeded();
     const params = collectParams();
@@ -503,11 +503,15 @@ async function runTask() {
     if (!FINAL_STATUSES.has(task.status)) {
       await pollTask(task.taskId);
     }
+    // 扫描完成后重置上传区，准备下一次扫描
+    clearCurrentFile();
   } catch (err) {
     setStatus("Failed", "error");
     const message = err instanceof Error ? err.message : String(err);
     setSummary(message);
     artifactBox?.classList.add("hidden");
+    // 失败后也重置，方便重新上传
+    clearCurrentFile();
   }
 }
 
@@ -524,14 +528,45 @@ function setSummary(text) {
 }
 
 function describeTask(task) {
-  if (!task) return "Upload a Skill package to view status and download reports here.";
+  if (!task) return "Upload a package and run an analysis to see results here.";
+
+  const SKILL_NAMES = {
+    "skill-security-audit":    "Security Audit",
+    "multichain-contract-vuln": "Contract Audit",
+    "skill-stress-lab":         "Stress Test"
+  };
+  const skillName = SKILL_NAMES[task.skillType] || "Analysis";
+
   if (task.status === "failed") {
-    return task.message ? `Task failed: ${task.message}` : "Task failed. Please check the logs.";
+    // 去掉技术性路径和 exit code，只保留核心错误描述
+    const raw = task.message || "";
+    const cleaned = raw
+      .replace(/\/[^\s:]+/g, "")      // 移除文件路径
+      .replace(/exit \d+[^.)]*/gi, "") // 移除 exit code
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    const snippet = cleaned.length > 0
+      ? cleaned.slice(0, 140) + (cleaned.length > 140 ? "…" : "")
+      : "Please check the logs for details.";
+    return `${skillName} encountered an error — ${snippet}`;
   }
+
   if (task.status === "completed") {
-    return `Task ${task.taskId} completed. You can download the report / summary / logs.`;
+    const msgs = {
+      "skill-security-audit":    "Security scan completed. Your health score report is ready.",
+      "multichain-contract-vuln": "Contract audit completed. Vulnerability report is ready.",
+      "skill-stress-lab":         "Stress test completed. Performance report is ready."
+    };
+    return msgs[task.skillType] || `${skillName} completed. Your report is ready to download.`;
   }
-  return `Task ${task.taskId} is running...`;
+
+  // running / pending
+  const runMsgs = {
+    "skill-security-audit":    "Scanning your Skill package for vulnerabilities…",
+    "multichain-contract-vuln": "Auditing smart contract across chains…",
+    "skill-stress-lab":         "Running load test, collecting performance metrics…"
+  };
+  return runMsgs[task.skillType] || "Analysis in progress, please wait…";
 }
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
@@ -614,7 +649,13 @@ async function pollTask(taskId) {
 function renderTask(task) {
   if (!task) return;
   const variant = task.status === "failed" ? "error" : task.status === "completed" ? "success" : "running";
-  setStatus(`Status: ${task.status}`, variant);
+  const statusLabel = {
+    completed: "Scan Complete",
+    failed:    "Scan Failed",
+    running:   "Analyzing…",
+    pending:   "Queued"
+  }[task.status] || task.status;
+  setStatus(statusLabel, variant);
   setSummary(describeTask(task));
   renderArtifacts(task);
   appendHistoryEntry(task);
@@ -741,8 +782,8 @@ function buildSecurityAuditSummary(text) {
     return 'high';                      // 需改进 - 红色
   }
   
-  // Build 6 score cards - emoji and text on same line
-  let html = `<div class="report-stats-cards" style="grid-template-columns: repeat(6, 1fr);">`;
+  // Build 6 score cards — 3-column grid (2 rows of 3)
+  let html = `<div class="report-stats-cards report-stats-cards--6">`;
   html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label"><span class="stat-icon">📊</span>Overall</span></div>`;
   html += `<div class="stat-card ${getScoreClass(privacyScore)}"><span class="stat-number">${privacyScore}</span><span class="stat-label"><span class="stat-icon">🔒</span>Privacy</span></div>`;
   html += `<div class="stat-card ${getScoreClass(privilegeScore)}"><span class="stat-number">${privilegeScore}</span><span class="stat-label"><span class="stat-icon">🔐</span>Privilege</span></div>`;
@@ -812,11 +853,11 @@ function buildStressLabSummary(text) {
     return 'high';                      // 需改进 - 红色
   }
   
-  // Build 6 score cards (overall + 5 dimensions) - emoji and text on same line
-  let html = `<div class="report-stats-cards" style="grid-template-columns: repeat(6, 1fr);">`;
+  // Build 6 score cards (overall + 5 dimensions) — 3-column grid (2 rows of 3)
+  let html = `<div class="report-stats-cards report-stats-cards--6">`;
   html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label"><span class="stat-icon">🎯</span>Overall</span></div>`;
   html += `<div class="stat-card ${getScoreClass(stabilityScore)}"><span class="stat-number">${stabilityScore}</span><span class="stat-label"><span class="stat-icon">🛡️</span>Stability</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(performanceScore)}"><span class="stat-number">${performanceScore}</span><span class="stat-label"><span class="stat-icon">⚡</span>Perf</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(performanceScore)}"><span class="stat-number">${performanceScore}</span><span class="stat-label"><span class="stat-icon">⚡</span>Performance</span></div>`;
   html += `<div class="stat-card ${getScoreClass(resourceScore)}"><span class="stat-number">${resourceScore}</span><span class="stat-label"><span class="stat-icon">💾</span>Resource</span></div>`;
   html += `<div class="stat-card ${getScoreClass(consistencyScore)}"><span class="stat-number">${consistencyScore}</span><span class="stat-label"><span class="stat-icon">🔄</span>Consistency</span></div>`;
   html += `<div class="stat-card ${getScoreClass(recoveryScore)}"><span class="stat-number">${recoveryScore}</span><span class="stat-label"><span class="stat-icon">🆘</span>Recovery</span></div>`;
@@ -1411,13 +1452,46 @@ function goToPage(page) {
   renderHistoryPage();
 }
 
+// 自定义断开钱包 Modal
+function showDisconnectModal() {
+  const overlay = document.getElementById("disconnect-modal");
+  const addrEl  = document.getElementById("modal-addr");
+  const cancelBtn  = document.getElementById("modal-cancel");
+  const confirmBtn = document.getElementById("modal-confirm");
+  if (!overlay) { if (confirm("Disconnect wallet?")) disconnectWallet(); return; }
+
+  // 显示截断地址
+  if (addrEl && currentWallet) {
+    addrEl.textContent = currentWallet.slice(0, 6) + "..." + currentWallet.slice(-4);
+  }
+
+  overlay.classList.add("is-open");
+  overlay.setAttribute("aria-hidden", "false");
+
+  function close() {
+    overlay.classList.remove("is-open");
+    overlay.setAttribute("aria-hidden", "true");
+    cancelBtn.removeEventListener("click", onCancel);
+    confirmBtn.removeEventListener("click", onConfirm);
+    overlay.removeEventListener("click", onBackdrop);
+    document.removeEventListener("keydown", onEsc);
+  }
+  function onCancel()  { close(); }
+  function onConfirm() { close(); disconnectWallet(); }
+  function onBackdrop(e) { if (e.target === overlay) close(); }
+  function onEsc(e)    { if (e.key === "Escape") close(); }
+
+  cancelBtn.addEventListener("click", onCancel);
+  confirmBtn.addEventListener("click", onConfirm);
+  overlay.addEventListener("click", onBackdrop);
+  document.addEventListener("keydown", onEsc);
+}
+
 // 钱包按钮事件
 if (walletBtn) {
   walletBtn.addEventListener("click", function() {
     if (currentWallet) {
-      if (confirm("Disconnect wallet?")) {
-        disconnectWallet();
-      }
+      showDisconnectModal();
     } else {
       connectWallet();
     }
