@@ -97,6 +97,44 @@ TOKEN_PATTERNS = [
 ]
 MNEMONIC_KEYWORDS = ("mnemonic", "seed phrase", "seed", "助记词")
 
+# ── 即时拒绝：发现任意一项则 verdict=REJECT ──────────────────────────────────
+INSTANT_REJECT_PATTERNS: Dict[str, Any] = {
+    "eval_obfuscation":     re.compile(r'eval\s*\(\s*base64\.b64decode\s*\(', re.IGNORECASE),
+    "exec_compile":         re.compile(r'exec\s*\(\s*compile\s*\(', re.IGNORECASE),
+    "dynamic_pip_install":  re.compile(r'(subprocess|os\.system|os\.popen|Popen)\s*[\.(].*?pip\s+install', re.IGNORECASE | re.DOTALL),
+    "dynamic_npm_install":  re.compile(r'(subprocess|os\.system|os\.popen|Popen)\s*[\.(].*?npm\s+(install|i\b)', re.IGNORECASE | re.DOTALL),
+    "ip_exfil":             re.compile(r'(requests|httpx|urlopen|aiohttp)\s*\.\s*(get|post|put)\s*\(\s*[\'"]https?://(\d{1,3}\.){3}\d{1,3}', re.IGNORECASE),
+    "credential_exfil":     re.compile(r'(requests|httpx|urlopen|aiohttp)\s*\.\s*(post|put)\s*\(.*?(password|api_key|secret|private_key)', re.IGNORECASE | re.DOTALL),
+    "soul_write":           re.compile(r'(open|write_text|Path)\s*\(.*?SOUL\.md.*?[,\s]+[\'"]w', re.IGNORECASE),
+    "openclaw_config_write":re.compile(r'(open|write_text|Path)\s*\(.*?openclaw\.json.*?[,\s]+[\'"]w', re.IGNORECASE),
+    "credential_request":   re.compile(r'input\s*\(\s*[\'"][^\'"]*?(api.?key|password|secret|token|private)', re.IGNORECASE),
+}
+
+INSTANT_REJECT_LABELS_ZH = {
+    "eval_obfuscation":      "eval(base64.decode) 混淆执行",
+    "exec_compile":          "exec(compile()) 动态编译执行",
+    "dynamic_pip_install":   "动态安装 Python 包（pip install）",
+    "dynamic_npm_install":   "动态安装 Node 包（npm install）",
+    "ip_exfil":              "向 IP 地址直连发送 HTTP 请求（可疑数据外泄）",
+    "credential_exfil":      "向外部接口 POST 凭证/密钥",
+    "soul_write":            "修改 SOUL.md（AI 代理身份文件）",
+    "openclaw_config_write": "修改 openclaw.json（配置文件）",
+    "credential_request":    "通过 input() 请求用户输入凭证",
+}
+
+# ── 混淆代码检测 ──────────────────────────────────────────────────────────────
+OBFUSCATION_PATTERNS: Dict[str, Any] = {
+    "base64_exec":  re.compile(r'base64\.b64decode\s*\(', re.IGNORECASE),
+    "hex_dense":    re.compile(r'(\\x[0-9a-fA-F]{2}){10,}'),
+    "chr_concat":   re.compile(r'(chr\s*\(\s*\d+\s*\)\s*\+\s*){5,}'),
+}
+
+OBFUSCATION_LABELS_ZH = {
+    "base64_exec": "Base64 解码执行代码",
+    "hex_dense":   "大量十六进制字节（可能混淆）",
+    "chr_concat":  "chr() 字符拼接（可能混淆）",
+}
+
 
 def _fallback_yaml(raw: str) -> Dict[str, Any]:
     data: Dict[str, Any] = {}
@@ -1058,6 +1096,43 @@ def _risk_label(score: int) -> str:
     return "Low"
 
 
+def detect_code_risks(base_path: Optional[Path]) -> Dict[str, Any]:
+    """检测即时拒绝标志、混淆代码、供应链攻击风险。"""
+    result: Dict[str, Any] = {"instantRejects": [], "obfuscation": []}
+    if base_path is None or not base_path.exists():
+        return result
+    base_dir = base_path if base_path.is_dir() else base_path.parent
+    for glob_pat in ("*.py", "*.ts", "*.js", "*.sh"):
+        for candidate in base_dir.rglob(glob_pat):
+            if candidate.is_dir() or candidate.stat().st_size > 500_000:
+                continue
+            try:
+                text = candidate.read_text(encoding="utf-8", errors="ignore")
+            except Exception:
+                continue
+            rel = str(candidate.relative_to(base_dir))
+            for label, pat in INSTANT_REJECT_PATTERNS.items():
+                if pat.search(text):
+                    result["instantRejects"].append({"label": label, "path": rel})
+            for label, pat in OBFUSCATION_PATTERNS.items():
+                if pat.search(text):
+                    result["obfuscation"].append({"label": label, "path": rel})
+    return result
+
+
+def compute_verdict(report: Dict[str, Any]) -> str:
+    """返回最终安全结论：SAFE / CAUTION / REJECT"""
+    code_risks = report.get("codeRisks", {})
+    if code_risks.get("instantRejects"):
+        return "REJECT"
+    overall = report.get("overallScore", 0)
+    if overall >= 70:
+        return "SAFE"
+    if overall >= 45:
+        return "CAUTION"
+    return "REJECT"
+
+
 def _select_logs(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     if not entries:
         return []
@@ -1087,12 +1162,16 @@ def generate_report(
     log_info, token_info = scan_logs_and_tokens(LOG_DIR)
 
     skill_log_hits: List[Dict[str, str]] = []
+    aggregate_code_risks: Dict[str, Any] = {"instantRejects": [], "obfuscation": []}
     for entry in skills:
         origin = entry.get("originPath")
         if origin:
             origin_path = Path(origin)
             if origin_path.exists():
                 skill_log_hits.extend(scan_skill_logs(origin_path))
+                risks = detect_code_risks(origin_path)
+                aggregate_code_risks["instantRejects"].extend(risks["instantRejects"])
+                aggregate_code_risks["obfuscation"].extend(risks["obfuscation"])
 
     log_sensitive_hits = log_info.get("sensitiveHits", 0) + len(skill_log_hits)
     privacy_hits = memory_info.get("sensitiveHits", 0) + log_sensitive_hits
@@ -1113,6 +1192,7 @@ def generate_report(
         "tokens": token_info,
         "externalOnly": bool(combined),
         "skillLogHits": skill_log_hits,
+        "codeRisks": aggregate_code_risks,
     }
 
     # Calculate scores: use runtime data if available, otherwise use static analysis
@@ -1148,6 +1228,7 @@ def generate_report(
     report["warnings"] = warnings
 
     report["suggestions"] = build_suggestions(report)
+    report["verdict"] = compute_verdict(report)
     return report
 
 
@@ -1228,7 +1309,44 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
                 )
             )
 
-    lines = [title, f"{generated_label}：{report['generatedAt']}", "", risk_header]
+    # ── Verdict 徽章 ─────────────────────────────────────────────────────────
+    verdict = report.get("verdict", "CAUTION")
+    verdict_map = {
+        "SAFE":    ("🟢", "安全可安装",   "Safe to Install"),
+        "CAUTION": ("⚠️", "谨慎安装",     "Install with Caution"),
+        "REJECT":  ("❌", "禁止安装",     "Do NOT Install"),
+    }
+    v_emoji, v_zh, v_en = verdict_map.get(verdict, ("⚠️", "谨慎安装", "Install with Caution"))
+    v_label = v_zh if lang == "zh" else v_en
+    verdict_header = "## 安全结论" if lang == "zh" else "## Security Verdict"
+    lines = [title, f"{generated_label}：{report['generatedAt']}", "", verdict_header,
+             f"### {v_emoji} {v_label}", ""]
+
+    # ── 即时拒绝风险章节 ────────────────────────────────────────────────────
+    code_risks = report.get("codeRisks", {})
+    instant_rejects = code_risks.get("instantRejects", [])
+    obfuscation = code_risks.get("obfuscation", [])
+    if instant_rejects:
+        ir_header = "## 即时拒绝风险 🚨" if lang == "zh" else "## Instant Reject Flags 🚨"
+        ir_note = ("> 以下风险项属于严重安全威胁，建议立即拒绝安装该 Skill。"
+                   if lang == "zh"
+                   else "> The following flags indicate critical security threats. Installation is strongly discouraged.")
+        lines.extend([ir_header, ir_note, ""])
+        for item in instant_rejects:
+            label = item["label"]
+            label_display = INSTANT_REJECT_LABELS_ZH.get(label, label) if lang == "zh" else label
+            lines.append(f"- ❌ **{label_display}** — `{item['path']}`")
+        lines.append("")
+    if obfuscation:
+        ob_header = "## 混淆代码检测 ⚠️" if lang == "zh" else "## Obfuscation Detected ⚠️"
+        lines.extend([ob_header, ""])
+        for item in obfuscation:
+            label = item["label"]
+            label_display = OBFUSCATION_LABELS_ZH.get(label, label) if lang == "zh" else label
+            lines.append(f"- ⚠️ **{label_display}** — `{item['path']}`")
+        lines.append("")
+
+    lines.append(risk_header)
     overall = report.get('overallScore', 0)
     if lang == "zh":
         lines.extend([
@@ -1242,12 +1360,13 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
         ])
     else:
         lines.extend([
-            f"- Privacy: {report['privacyRisk']}",
-            f"- Privilege: {report['privilegeRisk']}",
-            f"- Memory Footprint: {report['memoryRisk']}",
-            f"- Token Cost: {report['tokenRisk']}",
-            f"- Failure Rate: {report['failureRisk']}",
-            "> Score legend: 0-30 = Low, 31-60 = Medium, >60 = High",
+            f"- Overall Security Score: {overall}/100",
+            f"- Privacy: {report.get('privacyScore', 0)}/100",
+            f"- Privilege: {report.get('privilegeScore', 0)}/100",
+            f"- Memory Footprint: {report.get('memoryScore', 0)}/100",
+            f"- Token Cost: {report.get('tokenScore', 0)}/100",
+            f"- Stability: {report.get('failureScore', 0)}/100",
+            "> Score legend: 80-100=Excellent, 60-79=Good, 40-59=Fair, <40=Needs Improvement",
         ])
 
     lines.append("")
@@ -1293,8 +1412,8 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
                 level = level_map.get(level, level)
             lines.append(
                 "| {type} | {name} | {high} | {level} | {notes} |".format(
-                    type=entry["type"],
-                    name=entry["name"],
+                    type=entry.get("type", "-"),
+                    name=entry.get("name", "-"),
                     high=tool,
                     level=level,
                     notes=notes_text,

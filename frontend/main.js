@@ -3,27 +3,27 @@ const PARAM_SCHEMA = {
     // Upload skill zip file instead of path/URL
   ],
   "multichain-contract-vuln": [
-    { id: "chain", label: "链类型", type: "select", options: ["evm", "solana"], placeholder: "evm" }
+    { id: "chain", label: "Chain Type", type: "select", options: ["evm", "solana"], placeholder: "evm" }
   ],
   "skill-stress-lab": [
-    // 命令模板和工作目录使用默认值，不在界面显示
-    { id: "runs", label: "运行次数", type: "number", placeholder: "10", default: "10" },
-    { id: "concurrency", label: "并发数", type: "number", placeholder: "3", default: "3" }
+    // command template and workdir use default values, not shown in UI
+    { id: "runs", label: "Runs", type: "number", placeholder: "10", default: "10" },
+    { id: "concurrency", label: "Concurrency", type: "number", placeholder: "3", default: "3" }
   ]
 };
 
 const FEATURE_COPY = {
   "skill-security-audit": {
-    title: "Skill 安全审计",
-    desc: "一键式全面扫描 Skill 安全风险，智能识别权限漏洞与配置隐患，输出多维度健康评分。"
+    title: "Skill Security Audit",
+    desc: "One-click comprehensive scan for Skill security risks — intelligently detects permission vulnerabilities and configuration issues, outputs a multi-dimensional health score."
   },
   "multichain-contract-vuln": {
-    title: "合约审计",
-    desc: "一键扫描多链合约源码，精准识别安全漏洞，生成专业审计报告。"
+    title: "Contract Audit",
+    desc: "One-click scan of multi-chain contract source code, precise vulnerability detection, professional audit report generation."
   },
   "skill-stress-lab": {
-    title: "压力测试",
-    desc: "一键启动并发压测，实时采集性能指标，全面评估系统承载能力。"
+    title: "Stress Test",
+    desc: "One-click concurrent stress testing, real-time performance metrics collection, comprehensive system capacity evaluation."
   }
 };
 
@@ -37,9 +37,9 @@ let activeTab = (function () {
 let currentWallet = null;
 let walletToken = localStorage.getItem("wallet_token");
 const SKILL_LABELS = {
-  "skill-security-audit": "Skill 安全审计",
-  "multichain-contract-vuln": "合约审计",
-  "skill-stress-lab": "压力测试"
+  "skill-security-audit": "Skill Security Audit",
+  "multichain-contract-vuln": "Contract Audit",
+  "skill-stress-lab": "Stress Test"
 };
 
 const navButtons = document.querySelectorAll("#workspace-tabs button");
@@ -83,11 +83,11 @@ const FINAL_STATUSES = new Set(["completed", "failed"]);
 const DEFAULT_API = window.location.origin;
 const API_BASE = window.HEALTH_AI_API || DEFAULT_API;
 const DETECTOR_REMEDIATIONS = {
-  "arbitrary-send-eth": "将资金分发改为 pull/payment 模式，并结合 ReentrancyGuard 与 CEI 避免外部 call 风险。",
-  "divide-before-multiply": "避免先除后乘造成截断，可改为先乘再除或使用数学库确保精度。",
-  "incorrect-equality": "不要依赖严格等式判断用户状态，改用布尔标记或 <=、>= 范围比较。",
-  "timestamp": "不要用 block.timestamp 作为严格控制，需增加时间缓冲或改用区块高度/预言机。",
-  "low-level-calls": "统一改用 OpenZeppelin Address 库，或确保低级 call 有完整回退和重入防护。"
+  "arbitrary-send-eth": "Switch fund distribution to a pull/payment pattern and combine with ReentrancyGuard and CEI to avoid external call risks.",
+  "divide-before-multiply": "Avoid truncation from divide-before-multiply; reorder to multiply first, then divide, or use a math library for precision.",
+  "incorrect-equality": "Do not rely on strict equality to check user state; use boolean flags or range comparisons (<=, >=) instead.",
+  "timestamp": "Do not use block.timestamp as a strict control; add a time buffer or switch to block height / oracle-based timing.",
+  "low-level-calls": "Replace with OpenZeppelin's Address library, or ensure all low-level calls have complete fallback handling and reentrancy protection."
 };
 
 navButtons.forEach((btn) => btn.addEventListener("click", () => selectTab(btn.dataset.tab)));
@@ -143,8 +143,8 @@ if (uploadZone && fileInput) {
         fileInput.files = dt.files;
         setCurrentFile(file);
       } else {
-        setSummary("请上传 .zip 格式的压缩包");
-        setStatus("格式错误", "error");
+        setSummary("Please upload a .zip archive.");
+        setStatus("Invalid Format", "error");
       }
     }
   });
@@ -180,10 +180,10 @@ function clearCurrentFile() {
 function clearResults() {
   // 清除任务状态
   if (statusBox) {
-    statusBox.textContent = "未开始";
+    statusBox.textContent = "Not Started";
     statusBox.className = "status";
   }
-  if (summaryBox) summaryBox.textContent = "上传 Skill 包后，可在这里查看状态并下载报告。";
+  if (summaryBox) summaryBox.textContent = "Upload a Skill package to view status and download reports here.";
   if (artifactBox) artifactBox.classList.add("hidden");
   if (reportPreviewBox) {
     reportPreviewBox.classList.add("hidden");
@@ -197,7 +197,7 @@ function updateRunButtonState() {
   if (!runBtn) return;
   
   const hasFile = currentFile !== null || (fileInput && fileInput.files && fileInput.files[0]);
-  const isRunning = statusBox && statusBox.textContent === "运行中...";
+  const isRunning = statusBox && statusBox.textContent === "Analyzing...";
   const hasWallet = currentWallet !== null;
   
   // Check Skill Stress Lab params
@@ -221,19 +221,19 @@ function updateRunButtonState() {
   
   if (!hasWallet) {
     runBtn.disabled = true;
-    runBtn.textContent = "请先连接钱包";
+    runBtn.textContent = "Connect Wallet First";
   } else if (!hasFile) {
     runBtn.disabled = true;
-    runBtn.textContent = "开始分析";
+    runBtn.textContent = "Start Analysis";
   } else if (activeTab === "skill-stress-lab" && !hasValidParams) {
     runBtn.disabled = true;
-    runBtn.textContent = "开始分析";
+    runBtn.textContent = "Start Analysis";
   } else if (isRunning) {
     runBtn.disabled = true;
-    runBtn.textContent = "分析中...";
+    runBtn.textContent = "Analyzing...";
   } else {
     runBtn.disabled = false;
-    runBtn.textContent = "开始分析";
+    runBtn.textContent = "Start Analysis";
   }
   
   runBtn.style.opacity = runBtn.disabled ? "0.5" : "1";
@@ -281,7 +281,7 @@ async function uploadFileIfNeeded() {
   formData.append("file", file);
   const resp = await fetch(`${API_BASE}/api/uploads`, { method: "POST", body: formData });
   if (!resp.ok) {
-    throw new Error(`上传失败：${await resp.text()}`);
+    throw new Error(`Upload failed: ${await resp.text()}`);
   }
   // Don't clear file input here - we want to keep showing the selected file
   const data = await resp.json();
@@ -314,14 +314,17 @@ function renderParamFields() {
   paramContainer.innerHTML = "";
   const schema = PARAM_SCHEMA[activeTab] || [];
   schema.forEach((field) => {
-    const wrapper = document.createElement("label");
+    // Use div for select fields — label wrapping a hidden select triggers native dropdown on click
+    const wrapper = document.createElement(field.type === "select" ? "div" : "label");
     wrapper.className = "field";
     const span = document.createElement("span");
     span.textContent = field.label;
     wrapper.appendChild(span);
     let input;
     if (field.type === "select") {
+      // Build a hidden real select for value collection
       input = document.createElement("select");
+      input.style.display = "none";
       (field.options || []).forEach((opt) => {
         const option = document.createElement("option");
         option.value = opt;
@@ -392,7 +395,64 @@ function renderParamFields() {
       updateRunButtonState();
     });
     
-    wrapper.appendChild(input);
+    if (field.type === "select") {
+      const options = field.options || [];
+      const defaultVal = (field.default !== undefined ? field.default : options[0]) || "";
+
+      const customDrop = document.createElement("div");
+      customDrop.className = "custom-select";
+      customDrop.setAttribute("tabindex", "0");
+
+      customDrop.innerHTML = `
+        <div class="cs-trigger">
+          <span class="cs-value">${defaultVal}</span>
+          <svg class="cs-chevron" viewBox="0 0 16 16" fill="none">
+            <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="cs-dropdown">
+          ${options.map(opt => `<div class="cs-option${opt === defaultVal ? " cs-option--selected" : ""}" data-value="${opt}">${opt}</div>`).join("")}
+        </div>
+      `;
+
+      // sync hidden select default
+      input.value = defaultVal;
+
+      const trigger = customDrop.querySelector(".cs-trigger");
+      const dropdown = customDrop.querySelector(".cs-dropdown");
+      const valueEl = customDrop.querySelector(".cs-value");
+
+      trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isOpen = customDrop.classList.toggle("cs-open");
+        if (isOpen) {
+          // close others
+          document.querySelectorAll(".custom-select.cs-open").forEach(el => {
+            if (el !== customDrop) el.classList.remove("cs-open");
+          });
+        }
+      });
+
+      customDrop.querySelectorAll(".cs-option").forEach(optEl => {
+        optEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const val = optEl.dataset.value;
+          valueEl.textContent = val;
+          input.value = val;
+          customDrop.querySelectorAll(".cs-option").forEach(o => o.classList.remove("cs-option--selected"));
+          optEl.classList.add("cs-option--selected");
+          customDrop.classList.remove("cs-open");
+          input.dispatchEvent(new Event("input"));
+        });
+      });
+
+      document.addEventListener("click", () => customDrop.classList.remove("cs-open"), { capture: false });
+
+      wrapper.appendChild(input);       // hidden real select (for collectParams)
+      wrapper.appendChild(customDrop);
+    } else {
+      wrapper.appendChild(input);
+    }
     paramContainer.appendChild(wrapper);
   });
   
@@ -403,19 +463,19 @@ function renderParamFields() {
 async function runTask() {
   // 检查是否已连接钱包
   if (!currentWallet) {
-    alert("请先连接钱包后再进行分析");
+    alert("Please connect your wallet before running analysis.");
     return;
   }
-  
+
   try {
-    setStatus("运行中...", "running");
-    setSummary("正在准备任务……");
+    setStatus("Analyzing...", "running");
+    setSummary("Preparing task...");
     artifactBox?.classList.add("hidden");
     const uploadId = await uploadFileIfNeeded();
     const params = collectParams();
     const codePathValue = codePathInput?.value?.trim();
     if (!codePathValue && !uploadId) {
-      throw new Error("请先上传 Skill/Agent 压缩包");
+      throw new Error("Please upload a Skill/Agent archive first.");
     }
     // Note: command is set to default value in backend if not provided
     const body = {
@@ -424,6 +484,7 @@ async function runTask() {
       uploadId: uploadId,
       params,
       walletAddress: currentWallet,
+      fileName: currentFile ? currentFile.name : null,
     };
     const headers = { "Content-Type": "application/json" };
     if (walletToken) {
@@ -443,7 +504,7 @@ async function runTask() {
       await pollTask(task.taskId);
     }
   } catch (err) {
-    setStatus("失败", "error");
+    setStatus("Failed", "error");
     const message = err instanceof Error ? err.message : String(err);
     setSummary(message);
     artifactBox?.classList.add("hidden");
@@ -463,17 +524,17 @@ function setSummary(text) {
 }
 
 function describeTask(task) {
-  if (!task) return "上传 Skill 包后，可在这里查看状态并下载报告。";
+  if (!task) return "Upload a Skill package to view status and download reports here.";
   if (task.status === "failed") {
-    return task.message ? `任务失败：${task.message}` : "任务失败，请检查日志";
+    return task.message ? `Task failed: ${task.message}` : "Task failed. Please check the logs.";
   }
   if (task.status === "completed") {
-    return `任务 ${task.taskId} 已完成，可下载报告 / 摘要 / 日志。`;
+    return `Task ${task.taskId} completed. You can download the report / summary / logs.`;
   }
-  return `任务 ${task.taskId} 正在执行...`;
+  return `Task ${task.taskId} is running...`;
 }
 
-const timeFormatter = new Intl.DateTimeFormat("zh-CN", {
+const timeFormatter = new Intl.DateTimeFormat("en-US", {
   month: "2-digit",
   day: "2-digit",
   hour: "2-digit",
@@ -512,11 +573,11 @@ function renderArtifacts(task) {
   }
   const links = [];
   if (task.reportPath) {
-    links.push({ label: "📊 图文报告", href: `report.html?task=${task.taskId}` });
-    links.push({ label: "📄 下载报告", href: `${API_BASE}/api/tasks/${task.taskId}/report` });
+    links.push({ label: "📊 View Report", href: `report.html?task=${task.taskId}` });
+    links.push({ label: "📄 Download Report", href: `${API_BASE}/api/tasks/${task.taskId}/report` });
   }
-  if (task.summaryPath) links.push({ label: "📋 下载摘要", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=summary` });
-  if (task.logPath) links.push({ label: "📝 下载日志", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=log` });
+  if (task.summaryPath) links.push({ label: "📋 Download Summary", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=summary` });
+  if (task.logPath) links.push({ label: "📝 Download Logs", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=log` });
   if (!links.length) {
     artifactBox.classList.add("hidden");
     artifactBox.innerHTML = "";
@@ -547,13 +608,13 @@ async function pollTask(taskId) {
     await delay(1500);
     attempts += 1;
   }
-  throw new Error("轮询超时，请手动刷新状态");
+  throw new Error("Polling timed out. Please refresh manually.");
 }
 
 function renderTask(task) {
   if (!task) return;
   const variant = task.status === "failed" ? "error" : task.status === "completed" ? "success" : "running";
-  setStatus(`状态：${task.status}`, variant);
+  setStatus(`Status: ${task.status}`, variant);
   setSummary(describeTask(task));
   renderArtifacts(task);
   appendHistoryEntry(task);
@@ -624,10 +685,10 @@ function buildReportSummary(text) {
   
   // 统计卡片
   html += `<div class="report-stats-cards">`;
-  html += `<div class="stat-card high"><span class="stat-number">${highFindings.length}</span><span class="stat-label">高风险</span></div>`;
-  html += `<div class="stat-card medium"><span class="stat-number">${mediumFindings.length}</span><span class="stat-label">中风险</span></div>`;
-  html += `<div class="stat-card low"><span class="stat-number">${otherFindings.length}</span><span class="stat-label">低风险</span></div>`;
-  html += `<div class="stat-card total"><span class="stat-number">${detectorSummaries.length}</span><span class="stat-label">总计</span></div>`;
+  html += `<div class="stat-card high"><span class="stat-number">${highFindings.length}</span><span class="stat-label">High Risk</span></div>`;
+  html += `<div class="stat-card medium"><span class="stat-number">${mediumFindings.length}</span><span class="stat-label">Medium Risk</span></div>`;
+  html += `<div class="stat-card low"><span class="stat-number">${otherFindings.length}</span><span class="stat-label">Low Risk</span></div>`;
+  html += `<div class="stat-card total"><span class="stat-number">${detectorSummaries.length}</span><span class="stat-label">Total</span></div>`;
   html += `</div>`;
 
   return html;
@@ -682,17 +743,17 @@ function buildSecurityAuditSummary(text) {
   
   // Build 6 score cards - emoji and text on same line
   let html = `<div class="report-stats-cards" style="grid-template-columns: repeat(6, 1fr);">`;
-  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label"><span class="stat-icon">📊</span>综合</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(privacyScore)}"><span class="stat-number">${privacyScore}</span><span class="stat-label"><span class="stat-icon">🔒</span>隐私</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(privilegeScore)}"><span class="stat-number">${privilegeScore}</span><span class="stat-label"><span class="stat-icon">🔐</span>权限</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(memoryScore)}"><span class="stat-number">${memoryScore}</span><span class="stat-label"><span class="stat-icon">💾</span>内存</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label"><span class="stat-icon">📊</span>Overall</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(privacyScore)}"><span class="stat-number">${privacyScore}</span><span class="stat-label"><span class="stat-icon">🔒</span>Privacy</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(privilegeScore)}"><span class="stat-number">${privilegeScore}</span><span class="stat-label"><span class="stat-icon">🔐</span>Privilege</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(memoryScore)}"><span class="stat-number">${memoryScore}</span><span class="stat-label"><span class="stat-icon">💾</span>Memory</span></div>`;
   html += `<div class="stat-card ${getScoreClass(tokenScore)}"><span class="stat-number">${tokenScore}</span><span class="stat-label"><span class="stat-icon">🪙</span>Token</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(failureScore)}"><span class="stat-number">${failureScore}</span><span class="stat-label"><span class="stat-icon">✅</span>稳定</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(failureScore)}"><span class="stat-number">${failureScore}</span><span class="stat-label"><span class="stat-icon">✅</span>Stability</span></div>`;
   html += `</div>`;
-  
+
   // Add score legend
   html += `<div style="margin-top: 8px; padding: 8px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #94a3b8;">`;
-  html += `评分说明：80-100=优秀 🟢 | 60-79=良好 🔵 | 40-59=一般 🟡 | <40=需改进 🔴`;
+  html += `Score: 80-100 = Excellent 🟢 | 60-79 = Good 🔵 | 40-59 = Fair 🟡 | &lt;40 = Needs Work 🔴`;
   html += `</div>`;
   
   return html;
@@ -753,17 +814,17 @@ function buildStressLabSummary(text) {
   
   // Build 6 score cards (overall + 5 dimensions) - emoji and text on same line
   let html = `<div class="report-stats-cards" style="grid-template-columns: repeat(6, 1fr);">`;
-  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label"><span class="stat-icon">🎯</span>综合</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(stabilityScore)}"><span class="stat-number">${stabilityScore}</span><span class="stat-label"><span class="stat-icon">🛡️</span>稳定</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(performanceScore)}"><span class="stat-number">${performanceScore}</span><span class="stat-label"><span class="stat-icon">⚡</span>性能</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(resourceScore)}"><span class="stat-number">${resourceScore}</span><span class="stat-label"><span class="stat-icon">💾</span>资源</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(consistencyScore)}"><span class="stat-number">${consistencyScore}</span><span class="stat-label"><span class="stat-icon">🔄</span>一致</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(recoveryScore)}"><span class="stat-number">${recoveryScore}</span><span class="stat-label"><span class="stat-icon">🆘</span>恢复</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label"><span class="stat-icon">🎯</span>Overall</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(stabilityScore)}"><span class="stat-number">${stabilityScore}</span><span class="stat-label"><span class="stat-icon">🛡️</span>Stability</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(performanceScore)}"><span class="stat-number">${performanceScore}</span><span class="stat-label"><span class="stat-icon">⚡</span>Perf</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(resourceScore)}"><span class="stat-number">${resourceScore}</span><span class="stat-label"><span class="stat-icon">💾</span>Resource</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(consistencyScore)}"><span class="stat-number">${consistencyScore}</span><span class="stat-label"><span class="stat-icon">🔄</span>Consistency</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(recoveryScore)}"><span class="stat-number">${recoveryScore}</span><span class="stat-label"><span class="stat-icon">🆘</span>Recovery</span></div>`;
   html += `</div>`;
-  
+
   // Add score legend
   html += `<div style="margin-top: 8px; padding: 8px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #94a3b8;">`;
-  html += `评分说明：80-100=优秀 🟢 | 60-79=良好 🔵 | 40-59=一般 🟡 | <40=需改进 🔴`;
+  html += `Score: 80-100 = Excellent 🟢 | 60-79 = Good 🔵 | 40-59 = Fair 🟡 | &lt;40 = Needs Work 🔴`;
   html += `</div>`;
   
   return html;
@@ -791,8 +852,8 @@ function extractAllIssues(text) {
       currentDesc = line.trim().replace(/^[-•]\s*/, '');
       continue;
     }
-    
-    // 匹配位置 - 统一三种格式
+
+    // Match location - unified across three formats
     let location = null;
     const match1 = line.match(/(\w+\.sol#\d+(?:-\d+)?)/);
     const match2 = line.match(/in\s+\w+\([^)]*\)\s*\(([^)]+\.sol#\d+(?:-\d+)?)\)/);
@@ -802,7 +863,7 @@ function extractAllIssues(text) {
     if (location && currentDetector) {
       items.push({
         name: currentDetector,
-        desc: currentDesc || "详见报告",
+        desc: currentDesc || "See report for details",
         location: location
       });
     }
@@ -826,7 +887,7 @@ function extractDetectorSummaries(text) {
 function buildDetectorRecommendation(name) {
   return (
     DETECTOR_REMEDIATIONS[name] ||
-    `针对 ${name} 告警，请复核相应业务逻辑并按报告中的修复建议加固。`
+    `For the ${name} finding, review the related business logic and apply the remediation suggestions in the report.`
   );
 }
 
@@ -843,7 +904,7 @@ function updateWalletUI() {
     walletText.textContent = formatWalletAddress(currentWallet);
   } else if (walletBtn && walletText) {
     walletBtn.classList.remove("connected");
-    walletText.textContent = "连接钱包";
+    walletText.textContent = "Connect Wallet";
   }
 }
 
@@ -899,7 +960,7 @@ function showWalletSelector(providers) {
     modal.innerHTML = `
       <div class="wallet-modal-backdrop"></div>
       <div class="wallet-modal-content">
-        <h3>选择钱包</h3>
+        <h3>Select Wallet</h3>
         <div class="wallet-list">
           ${providers.map((p, i) => `
             <button class="wallet-option" data-index="${i}">
@@ -908,7 +969,7 @@ function showWalletSelector(providers) {
             </button>
           `).join("")}
         </div>
-        <button class="wallet-modal-close">取消</button>
+        <button class="wallet-modal-close">Cancel</button>
       </div>
     `;
     
@@ -1006,13 +1067,13 @@ function showWalletSelector(providers) {
     modal.querySelector(".wallet-modal-close").addEventListener("click", () => {
       document.body.removeChild(modal);
       document.head.removeChild(style);
-      reject(new Error("用户取消"));
+      reject(new Error("Cancelled by user"));
     });
-    
+
     modal.querySelector(".wallet-modal-backdrop").addEventListener("click", () => {
       document.body.removeChild(modal);
       document.head.removeChild(style);
-      reject(new Error("用户取消"));
+      reject(new Error("Cancelled by user"));
     });
   });
 }
@@ -1028,9 +1089,9 @@ async function connectWallet() {
     installModal.innerHTML = `
       <div class="wallet-modal-backdrop"></div>
       <div class="wallet-modal-content">
-        <h3>未检测到钱包</h3>
+        <h3>No Wallet Detected</h3>
         <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
-          请安装以下钱包之一：
+          Please install one of the following wallets:
         </p>
         <div class="wallet-list">
           <a href="https://www.okx.com/web3" target="_blank" class="wallet-option">
@@ -1042,7 +1103,7 @@ async function connectWallet() {
             <span class="wallet-option-name">MetaMask</span>
           </a>
         </div>
-        <button class="wallet-modal-close">关闭</button>
+        <button class="wallet-modal-close">Close</button>
       </div>
     `;
     
@@ -1158,7 +1219,7 @@ async function connectWallet() {
     });
     
     if (accounts.length === 0) {
-      alert("请授权连接钱包");
+      alert("Please authorize wallet access.");
       return;
     }
 
@@ -1186,7 +1247,7 @@ async function connectWallet() {
     });
     
     if (!verifyResp.ok) {
-      throw new Error("验证失败");
+      throw new Error("Verification failed");
     }
     
     const { token } = await verifyResp.json();
@@ -1203,7 +1264,7 @@ async function connectWallet() {
     
   } catch (err) {
     console.error("Wallet connection failed:", err);
-    alert("连接钱包失败: " + err.message);
+    alert("Failed to connect wallet: " + err.message);
   }
 }
 
@@ -1215,9 +1276,9 @@ function disconnectWallet() {
   updateWalletUI();
   updateRunButtonState();
   
-  // 清空历史列表
+  // Clear history list
   if (historyList) {
-    historyList.innerHTML = '<li class="empty" id="history-empty">请先连接钱包查看历史记录</li>';
+    historyList.innerHTML = '<li class="empty" id="history-empty">Connect wallet to view history</li>';
   }
 }
 
@@ -1241,7 +1302,7 @@ async function loadWalletHistory(skillType = "all") {
         disconnectWallet();
         return;
       }
-      throw new Error("获取历史记录失败");
+      throw new Error("Failed to load history");
     }
     
     const tasks = await resp.json();
@@ -1259,7 +1320,7 @@ function renderWalletHistory(tasks) {
   tasks.forEach(function(t) { recordedHistory.add(t.taskId); });
   currentPage = 1;
   renderHistoryPage();
-  if (historyCount) historyCount.textContent = tasks.length + " 条记录";
+  if (historyCount) historyCount.textContent = tasks.length + " records";
 }
 
 function renderHistoryPage() {
@@ -1285,7 +1346,7 @@ function renderHistoryPage() {
   historyList.innerHTML = '';
   
   if (pageTasks.length === 0) {
-    historyList.innerHTML = '<li class="empty">暂无分析记录</li>';
+    historyList.innerHTML = '<li class="empty">No analysis records found</li>';
     if (paginationEl) paginationEl.style.display = 'none';
     return;
   }
@@ -1308,21 +1369,28 @@ function createHistoryItem(task) {
   
   var isCompleted = task.status === "completed";
   var isFailed = task.status === "failed";
-  var statusText = isCompleted ? "完成" : isFailed ? "失败" : "进行中";
+  var statusText = isCompleted ? "Done" : isFailed ? "Failed" : "Running";
   var statusClass = isCompleted ? "success" : isFailed ? "error" : "pending";
   var skillLabel = SKILL_LABELS[task.skillType] || task.skillType;
-  
-  li.innerHTML = 
+  var fullName = task.fileName ? task.fileName + '-' + skillLabel : skillLabel;
+  var isTruncated = fullName.length > 20;
+  var displayName = isTruncated ? fullName.slice(0, 20) + '....' : fullName;
+  if (isTruncated) {
+    li.setAttribute('data-tooltip', fullName);
+    li.classList.add('has-tooltip');
+  }
+
+  li.innerHTML =
     '<div class="history-col1">' +
-      '<div class="history-skill">' + skillLabel + '</div>' +
+      '<div class="history-skill">' + displayName + '</div>' +
       '<div class="history-time">' + formatHistoryTime(task.createdAt) + '</div>' +
     '</div>' +
     '<div class="history-col2">' +
       '<span class="history-status ' + statusClass + '">' + statusText + '</span>' +
     '</div>' +
     '<div class="history-col3">' +
-      (isCompleted ? 
-        '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">查看报告</a>' : 
+      (isCompleted ?
+        '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">View Report</a>' :
         '<span class="history-no-report">-</span>') +
     '</div>';
   
@@ -1335,7 +1403,7 @@ function updatePagination(totalPages, totalItems) {
   pagePrevBtn.disabled = currentPage <= 1;
   pageNextBtn.disabled = currentPage >= totalPages || totalPages <= 1;
   
-  pageInfoEl.textContent = '第 ' + currentPage + '/' + totalPages + ' 页';
+  pageInfoEl.textContent = 'Page ' + currentPage + '/' + totalPages;
 }
 
 function goToPage(page) {
@@ -1347,7 +1415,7 @@ function goToPage(page) {
 if (walletBtn) {
   walletBtn.addEventListener("click", function() {
     if (currentWallet) {
-      if (confirm("是否断开钱包连接？")) {
+      if (confirm("Disconnect wallet?")) {
         disconnectWallet();
       }
     } else {

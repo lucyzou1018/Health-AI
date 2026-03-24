@@ -64,6 +64,7 @@ class TaskRequest(BaseModel):
     upload_id: Optional[str] = Field(default=None, alias="uploadId")
     params: Dict[str, Any] = Field(default_factory=dict)
     wallet_address: Optional[str] = Field(default=None, alias="walletAddress")
+    file_name: Optional[str] = Field(default=None, alias="fileName")
 
     class Config:
         allow_population_by_field_name = True
@@ -80,6 +81,7 @@ class TaskResponse(BaseModel):
     created_at: str = Field(alias="createdAt")
     updated_at: str = Field(alias="updatedAt")
     wallet_address: Optional[str] = Field(default=None, alias="walletAddress")
+    file_name: Optional[str] = Field(default=None, alias="fileName")
 
     class Config:
         allow_population_by_field_name = True
@@ -131,6 +133,7 @@ def create_task(
             upload_id=payload.upload_id,
             params=payload.params,
             wallet_address=effective_wallet,
+            file_name=payload.file_name,
         )
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -147,6 +150,7 @@ def create_task(
         createdAt=record.created_at,
         updatedAt=record.updated_at,
         walletAddress=record.wallet_address,
+        fileName=record.file_name,
     )
 
 
@@ -166,6 +170,7 @@ def get_task(task_id: str) -> TaskResponse:
         logPath=record.log_path,
         createdAt=record.created_at,
         updatedAt=record.updated_at,
+        fileName=record.file_name,
     )
 
 
@@ -266,6 +271,7 @@ def get_wallet_history(
             createdAt=r.created_at,
             updatedAt=r.updated_at,
             walletAddress=r.wallet_address,
+            fileName=r.file_name,
         )
         for r in records
     ]

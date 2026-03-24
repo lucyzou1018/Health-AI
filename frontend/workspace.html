@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Health AI 控制台</title>
-  <link rel="stylesheet" href="styles.css?v=20260352" />
+  <title>Health AI Console</title>
+  <link rel="stylesheet" href="styles.css?v=20260357" />
 </head>
 <body>
   <div class="ambient-glow"></div>
   <div class="grid-overlay"></div>
-  
+
   <header class="brand-nav workspace-header">
     <div class="brand-stack">
       <span class="brand-logo">
@@ -51,39 +51,39 @@
         </svg>
       </span>
       <h1 class="brand-name">Health AI</h1>
-      <a class="nav-link" href="index.html">首页</a>
+      <a class="nav-link" href="index.html">Home</a>
     </div>
     <div class="header-actions">
       <button id="wallet-connect" class="wallet-btn">
         <span class="wallet-icon">👛</span>
-        <span id="wallet-text">连接钱包</span>
+        <span id="wallet-text">Connect Wallet</span>
       </button>
     </div>
   </header>
 
   <div id="workspace-tabs" class="workspace-tabs">
-    <button data-tab="skill-security-audit">Skill 安全审计</button>
-    <button data-tab="multichain-contract-vuln">合约审计</button>
-    <button data-tab="skill-stress-lab">压力测试</button>
+    <button data-tab="skill-security-audit">Skill Security Audit</button>
+    <button data-tab="multichain-contract-vuln">Contract Audit</button>
+    <button data-tab="skill-stress-lab">Stress Test</button>
   </div>
 
   <section id="app-shell">
     <section id="context-banner">
-      <h3 id="current-skill-title">Skill 安全审计</h3>
-      <p id="current-skill-desc">一键式全面扫描 Skill 安全风险，智能识别权限漏洞与配置隐患，输出多维度健康评分。</p>
+      <h3 id="current-skill-title">Skill Security Audit</h3>
+      <p id="current-skill-desc">One-click comprehensive scan for Skill security risks — intelligently detects permission vulnerabilities and configuration issues, outputs a multi-dimensional health score.</p>
     </section>
 
     <main class="workspace-grid">
       <section class="panel" id="input-panel">
-        <h2>上传代码包</h2>
-        <p class="panel-desc">请选择 Skill/Agent 的压缩包，直接上传即可触发体检。</p>
+        <h2>Upload Code Package</h2>
+        <p class="panel-desc">Select the Skill/Agent archive to upload and instantly trigger a security check.</p>
 
         <div class="upload-zone" id="upload-zone">
           <input type="file" id="code-upload" accept=".zip" hidden />
           <div class="upload-hint" id="upload-hint">
             <span class="upload-icon">📦</span>
-            <p class="upload-title">点击或拖拽上传压缩包</p>
-            <p class="upload-subtitle">支持 .zip 格式，最大 50MB</p>
+            <p class="upload-title">Click or drag to upload archive</p>
+            <p class="upload-subtitle">Supports .zip format, max 50MB</p>
           </div>
           <div class="upload-file-info hidden" id="file-info">
             <span class="file-icon">📄</span>
@@ -91,18 +91,18 @@
               <span class="file-name" id="file-name"></span>
               <span class="file-size" id="file-size"></span>
             </div>
-            <button class="file-remove" id="file-remove" title="移除文件">✕</button>
+            <button class="file-remove" id="file-remove" title="Remove file">✕</button>
           </div>
         </div>
 
         <div id="param-fields"></div>
-        <button id="run-task">开始分析</button>
+        <button id="run-task">Start Analysis</button>
       </section>
 
       <section class="panel" id="result-panel">
-        <h2>任务结果</h2>
-        <div id="task-status" class="status">未开始</div>
-        <p id="task-summary" class="task-summary">上传 Skill 包后，可在这里查看状态并下载报告。</p>
+        <h2>Task Results</h2>
+        <div id="task-status" class="status">Not Started</div>
+        <p id="task-summary" class="task-summary">Upload a Skill package to view status and download reports here.</p>
         <div id="artifact-links" class="artifact-links hidden"></div>
         <div id="report-preview" class="report-preview hidden"></div>
       </section>
@@ -111,26 +111,26 @@
     <section class="panel history-panel" id="history-panel">
       <div class="history-head">
         <div>
-          <h2>分析历史</h2>
+          <h2>Analysis History</h2>
           <div class="history-filters" id="history-filters">
-            <button class="filter-btn active" data-filter="all">全部</button>
-            <button class="filter-btn" data-filter="skill-security-audit">Skill 安全审计</button>
-            <button class="filter-btn" data-filter="multichain-contract-vuln">合约审计</button>
-            <button class="filter-btn" data-filter="skill-stress-lab">压力测试</button>
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="skill-security-audit">Skill Security Audit</button>
+            <button class="filter-btn" data-filter="multichain-contract-vuln">Contract Audit</button>
+            <button class="filter-btn" data-filter="skill-stress-lab">Stress Test</button>
           </div>
         </div>
       </div>
       <ul id="history-list" class="history-list">
-        <li class="empty" id="history-empty">请先连接钱包查看历史记录</li>
+        <li class="empty" id="history-empty">Connect wallet to view history</li>
       </ul>
       <div class="pagination" id="pagination">
-        <button class="page-btn" id="page-prev" disabled>上一页</button>
-        <span class="page-info" id="page-info">第 1 页</span>
-        <button class="page-btn" id="page-next" disabled>下一页</button>
+        <button class="page-btn" id="page-prev" disabled>Prev</button>
+        <span class="page-info" id="page-info">Page 1</span>
+        <button class="page-btn" id="page-next" disabled>Next</button>
       </div>
     </section>
   </section>
 
-  <script src="main.js?v=20260352" type="module"></script>
+  <script src="main.js?v=20260356" type="module"></script>
 </body>
 </html>

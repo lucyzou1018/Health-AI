@@ -1,14 +1,16 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Health AI</title>
-  <link rel="stylesheet" href="styles.css?v=20260312" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Health AI — Intelligent Skill Security Platform</title>
+  <link rel="stylesheet" href="styles.css?v=20260358" />
 </head>
 <body class="landing-only">
   <div class="ambient-glow"></div>
   <div class="grid-overlay"></div>
-  
+
+  <!-- ── Nav ── -->
   <header class="brand-nav landing-header">
     <div class="brand-stack">
       <span class="brand-logo">
@@ -20,113 +22,536 @@
               <stop offset="50%" stop-color="#7c3aed"/>
               <stop offset="100%" stop-color="#8b5cf6"/>
             </linearGradient>
-            <linearGradient id="lobsterGlow" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.8"/>
-              <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
-            </linearGradient>
             <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
               <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
-              <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-              </feMerge>
+              <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
             </filter>
           </defs>
-          <!-- 尾巴 -->
           <path d="M16 28L13 30L16 31L19 30L16 28" fill="url(#lobsterBody)" opacity="0.9"/>
           <path d="M16 24L14 27H18L16 24" fill="url(#lobsterBody)" opacity="0.8"/>
-          <!-- 身体 -->
           <ellipse cx="16" cy="19" rx="5" ry="6" fill="url(#lobsterBody)"/>
-          <!-- 身体纹理 -->
           <path d="M13 17H19M13 19H19M13 21H19" stroke="rgba(255,255,255,0.3)" stroke-width="0.5" stroke-linecap="round"/>
-          <!-- 胸部 -->
           <ellipse cx="16" cy="12" rx="4" ry="3.5" fill="url(#lobsterBody)"/>
-          <!-- 头部 -->
           <circle cx="16" cy="7" r="3" fill="url(#lobsterBody)"/>
-          <!-- 眼睛 - 发光 -->
           <circle cx="14.5" cy="6.5" r="1" fill="#22d3ee" filter="url(#glow)"/>
           <circle cx="17.5" cy="6.5" r="1" fill="#22d3ee" filter="url(#glow)"/>
-          <!-- 长触须 -->
           <path d="M14 5C12 3 9 2 6 3" stroke="url(#lobsterBody)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
           <path d="M18 5C20 3 23 2 26 3" stroke="url(#lobsterBody)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-          <!-- 短触须 -->
-          <path d="M14 5C13 3 11 2 9 3" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" fill="none" opacity="0.7"/>
-          <path d="M18 5C19 3 21 2 23 3" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" fill="none" opacity="0.7"/>
-          <!-- 左钳子 -->
           <path d="M12 13C8 12 6 10 7 8C8 6 10 7 11 9" stroke="url(#lobsterBody)" stroke-width="2" stroke-linecap="round" fill="none"/>
           <circle cx="7" cy="8" r="1.5" fill="url(#lobsterBody)"/>
-          <!-- 右钳子 - 举起扫描 -->
           <path d="M20 13C24 10 26 7 24 5C22 3 20 5 21 7" stroke="url(#lobsterBody)" stroke-width="2" stroke-linecap="round" fill="none"/>
           <circle cx="24" cy="5" r="1.5" fill="#22d3ee" filter="url(#glow)"/>
-          <!-- 扫描光束 -->
           <path d="M24 5L28 3" stroke="#22d3ee" stroke-width="0.8" stroke-dasharray="2 1" opacity="0.6"/>
-          <!-- 腿 -->
           <path d="M12 16L9 18M12 18L9 20" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
           <path d="M20 16L23 18M20 18L23 20" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
-          <!-- 数据流 -->
           <path d="M14 17L15 15L16 18L17 16L18 17" stroke="#22d3ee" stroke-width="0.6" stroke-linecap="round" fill="none" opacity="0.8"/>
         </svg>
       </span>
       <span class="brand-name">Health AI</span>
-      <a class="nav-link" href="workspace.html">Work Space</a>
     </div>
+    <nav class="lp-nav-links">
+      <a href="#features" class="lp-nav-item">Features</a>
+      <a href="#how-it-works" class="lp-nav-item">How It Works</a>
+      <a href="#stats" class="lp-nav-item">Stats</a>
+      <a class="lp-nav-cta" href="workspace.html">Work Space →</a>
+    </nav>
   </header>
 
+  <!-- ── Hero ── -->
   <section id="landing">
     <div class="hero-content">
       <div class="hero-badge">
         <span class="badge-dot"></span>
-        智能风控 · 审计 · 压测
+        Smart Risk Control · Audit · Stress Test · Full-Stack Protection
       </div>
       <h1 class="hero-title">
         <span class="title-gradient">Health AI</span>
       </h1>
-      <p class="hero-subtitle">全方位守护您的 Skill 与合约安全</p>
-      <p class="hero-desc">代码即传即检，智能完成权限审计、漏洞检测与压力测试，全方位掌控 Skill 健康状态。</p>
+      <p class="hero-subtitle">Comprehensive Security for Your Skills &amp; Contracts</p>
+      <p class="hero-desc">
+        Upload code and get instant results — automated permission audits, vulnerability detection,
+        and stress testing to keep every line of code production-ready.
+      </p>
       <div class="hero-buttons">
         <a class="hero-btn hero-btn--primary" href="workspace.html#agent-audit">
-          <span class="btn-text">开始体验</span>
+          <span class="btn-text">Get Started</span>
           <span class="btn-arrow">→</span>
         </a>
+        <a class="hero-btn hero-btn--ghost" href="#how-it-works">
+          <span>Learn More</span>
+        </a>
+      </div>
+      <div class="hero-trust">
+        <span class="trust-item"><span class="trust-dot green"></span>Real-time Detection</span>
+        <span class="trust-sep">·</span>
+        <span class="trust-item"><span class="trust-dot blue"></span>Multi-chain Support</span>
+        <span class="trust-sep">·</span>
+        <span class="trust-item"><span class="trust-dot purple"></span>AI-Powered</span>
       </div>
     </div>
-    
-    <div class="floating-elements">
-      <svg width="0" height="0" style="position:absolute">
+
+    <!-- ── Animated dashboard visual ── -->
+    <div class="hero-visual" id="hero-visual">
+      <svg width="0" height="0" style="position:absolute;pointer-events:none">
         <defs>
-          <linearGradient id="icon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" style="stop-color:#6366f1"/>
-            <stop offset="100%" style="stop-color:#8b5cf6"/>
+          <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#6366f1"/>
+            <stop offset="55%" stop-color="#8b5cf6"/>
+            <stop offset="100%" stop-color="#22d3ee"/>
+          </linearGradient>
+          <linearGradient id="lcAreaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#6366f1" stop-opacity="0.30"/>
+            <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
           </linearGradient>
         </defs>
       </svg>
-      <div class="float-card card-1">
-        <div class="card-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="url(#icon-gradient)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <path d="M9 12l2 2 4-4"/>
-          </svg>
+
+      <!-- Security dashboard card -->
+      <div class="dash-card main-dash">
+        <div class="dash-hd">
+          <span class="dash-htitle">Security Analysis</span>
+          <span class="dash-live"><span class="live-dot"></span>Scanning</span>
         </div>
-        <div class="card-label">安全审计</div>
+
+        <!-- Gauge -->
+        <div class="gauge-row">
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" viewBox="0 0 160 90" fill="none">
+              <path d="M 12 78 A 68 68 0 0 1 148 78" stroke="#1e1e32" stroke-width="10" stroke-linecap="round"/>
+              <path class="gauge-fill" d="M 12 78 A 68 68 0 0 1 148 78" stroke="url(#gaugeGrad)" stroke-width="10" stroke-linecap="round"/>
+            </svg>
+            <div class="gauge-overlay">
+              <span class="gauge-num">87</span><span class="gauge-sub">%</span>
+            </div>
+          </div>
+          <div class="gauge-meta">
+            <span class="gauge-grade">Good</span>
+            <span class="gauge-label">Security Score</span>
+            <span class="gauge-change">↑ vs last scan</span>
+          </div>
+        </div>
+
+        <!-- Donut chart + legend -->
+        <div class="vuln-row">
+          <div class="donut-wrap">
+            <svg class="donut-svg" viewBox="0 0 100 100" fill="none">
+              <circle class="donut-track" cx="50" cy="50" r="38" stroke-width="12"/>
+              <circle class="donut-seg seg-low"      cx="50" cy="50" r="38" stroke-width="12" transform="rotate(-90 50 50)"/>
+              <circle class="donut-seg seg-medium"   cx="50" cy="50" r="38" stroke-width="12" transform="rotate(-90 50 50)"/>
+              <circle class="donut-seg seg-high"     cx="50" cy="50" r="38" stroke-width="12" transform="rotate(-90 50 50)"/>
+              <circle class="donut-seg seg-critical" cx="50" cy="50" r="38" stroke-width="12" transform="rotate(-90 50 50)"/>
+            </svg>
+            <div class="donut-center">
+              <span class="dc-lbl">Vulns</span>
+            </div>
+          </div>
+          <div class="vuln-legend">
+            <div class="vl-item"><span class="vl-dot" style="background:#ef4444"></span>Critical<span class="vl-cnt">~10%</span></div>
+            <div class="vl-item"><span class="vl-dot" style="background:#f97316"></span>High<span class="vl-cnt">~20%</span></div>
+            <div class="vl-item"><span class="vl-dot" style="background:#f59e0b"></span>Medium<span class="vl-cnt">~40%</span></div>
+            <div class="vl-item"><span class="vl-dot" style="background:#22c55e"></span>Low<span class="vl-cnt">~30%</span></div>
+          </div>
+        </div>
+
+        <!-- Scan progress bars -->
+        <div class="scan-bars">
+          <div class="sb-row"><span class="sb-lbl">Permissions</span><div class="sb-track"><div class="sb-fill" style="--tc:#22c55e" data-w="92"></div></div><span class="sb-pct">~90%</span></div>
+          <div class="sb-row"><span class="sb-lbl">API Security</span><div class="sb-track"><div class="sb-fill" style="--tc:#f59e0b" data-w="75"></div></div><span class="sb-pct">~75%</span></div>
+          <div class="sb-row"><span class="sb-lbl">Data Safety</span><div class="sb-track"><div class="sb-fill"  style="--tc:#6366f1" data-w="88"></div></div><span class="sb-pct">~88%</span></div>
+        </div>
       </div>
-      <div class="float-card card-2">
-        <div class="card-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="url(#icon-gradient)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+
+      <!-- Stress test latency line chart card -->
+      <div class="dash-card perf-dash">
+        <div class="dash-hd">
+          <span class="dash-htitle">Stress Test · Latency</span>
+          <span class="perf-tag">P95 Latency</span>
+        </div>
+        <div class="lc-wrap">
+          <svg class="lc-svg" viewBox="0 0 260 68" fill="none" preserveAspectRatio="none">
+            <path class="lc-area" d="M0 52 C25 48 45 38 75 33 C105 28 125 44 155 30 C180 18 200 40 220 26 C238 15 250 20 260 15 L260 68 L0 68 Z" fill="url(#lcAreaGrad)"/>
+            <path class="lc-line" d="M0 52 C25 48 45 38 75 33 C105 28 125 44 155 30 C180 18 200 40 220 26 C238 15 250 20 260 15"/>
+            <circle cx="75"  cy="33" r="2.5" fill="#818cf8"/>
+            <circle cx="155" cy="30" r="2.5" fill="#818cf8"/>
+            <circle cx="260" cy="15" r="2.5" fill="#818cf8"/>
           </svg>
         </div>
-        <div class="card-label">压力测试</div>
-      </div>
-      <div class="float-card card-3">
-        <div class="card-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="url(#icon-gradient)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="16 18 22 12 16 6"/>
-            <polyline points="8 6 2 12 8 18"/>
-          </svg>
+        <div class="lc-footer">
+          <span>Requests: <b>1K+</b></span>
+          <span>Success: <b>~99%</b></span>
+          <span>Avg: <b>&lt;100ms</b></span>
         </div>
-        <div class="card-label">合约检测</div>
       </div>
     </div>
   </section>
+
+  <!-- ── Stats ── -->
+  <section id="stats" class="lp-section lp-stats-section">
+    <div class="lp-container">
+      <div class="stats-grid fade-up">
+        <div class="stat-block">
+          <div class="stat-num">200<span class="stat-pct">%</span></div>
+          <div class="stat-label">Audit Growth Rate</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-block">
+          <div class="stat-num">&gt;95<span class="stat-pct">%</span></div>
+          <div class="stat-label">Vulnerability Detection Rate</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-block">
+          <div class="stat-num">&lt;30<span class="stat-unit">s</span></div>
+          <div class="stat-label">Average Scan Time</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-block">
+          <div class="stat-num">3<span class="stat-plus">+</span></div>
+          <div class="stat-label">Supported Chain Types</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Features ── -->
+  <section id="features" class="lp-section">
+    <div class="lp-container">
+      <div class="section-header fade-up">
+        <div class="section-eyebrow">Core Features</div>
+        <h2 class="section-title">All-in-One Security Detection Platform</h2>
+        <p class="section-desc">Full-lifecycle security coverage for Skills — making security a natural part of every development workflow.</p>
+      </div>
+
+      <div class="features-grid">
+        <!-- Feature 1 -->
+        <div class="feature-card feature-card--large fade-up">
+          <div class="feature-card-inner">
+            <div class="feature-icon-wrap feature-icon--indigo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                <path d="M9 12l2 2 4-4"/>
+              </svg>
+            </div>
+            <div class="feature-tag">Most Popular</div>
+            <h3 class="feature-title">Skill Security Audit</h3>
+            <p class="feature-desc">One-click comprehensive scan for Skill security risks — intelligently detects permission vulnerabilities, configuration issues, and injection threats with a multi-dimensional health score.</p>
+            <ul class="feature-list">
+              <li>Smart permission boundary analysis</li>
+              <li>API call chain security tracing</li>
+              <li>Sensitive data leakage detection</li>
+              <li>Composite security score (0–100)</li>
+            </ul>
+            <a href="workspace.html#skill-security-audit" class="feature-cta">Audit Now →</a>
+          </div>
+          <div class="feature-card-glow feature-glow--indigo"></div>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="feature-card fade-up">
+          <div class="feature-card-inner">
+            <div class="feature-icon-wrap feature-icon--violet">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="16 18 22 12 16 6"/>
+                <polyline points="8 6 2 12 8 18"/>
+              </svg>
+            </div>
+            <h3 class="feature-title">Contract Vulnerability Scan</h3>
+            <p class="feature-desc">Precise scanning of EVM / Solana contract source code — detects reentrancy attacks, integer overflows, access control issues, and other high-severity vulnerabilities.</p>
+            <ul class="feature-list">
+              <li>Reentrancy attack detection</li>
+              <li>Integer overflow / underflow analysis</li>
+              <li>Access control vulnerabilities</li>
+              <li>Gas optimization suggestions</li>
+            </ul>
+            <a href="workspace.html#multichain-contract-vuln" class="feature-cta">Scan Now →</a>
+          </div>
+          <div class="feature-card-glow feature-glow--violet"></div>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="feature-card fade-up">
+          <div class="feature-card-inner">
+            <div class="feature-icon-wrap feature-icon--cyan">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+              </svg>
+            </div>
+            <h3 class="feature-title">Stress Test</h3>
+            <p class="feature-desc">Simulate real high-concurrency scenarios, collect P50/P95/P99 latency and throughput metrics, and fully evaluate system capacity limits.</p>
+            <ul class="feature-list">
+              <li>Configurable concurrency &amp; run count</li>
+              <li>Real-time performance metrics</li>
+              <li>Latency percentile analysis</li>
+              <li>Success rate &amp; error attribution</li>
+            </ul>
+            <a href="workspace.html#skill-stress-lab" class="feature-cta">Run Test →</a>
+          </div>
+          <div class="feature-card-glow feature-glow--cyan"></div>
+        </div>
+
+        <!-- Feature 4 — Report -->
+        <div class="feature-card feature-card--wide fade-up">
+          <div class="feature-card-inner">
+            <div class="feature-icon-wrap feature-icon--emerald">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+                <polyline points="10 9 9 9 8 9"/>
+              </svg>
+            </div>
+            <h3 class="feature-title">Professional Report Export</h3>
+            <p class="feature-desc">Automatically generates structured HTML reports covering risk summaries, detailed vulnerability lists, and remediation suggestions — ready to share with your team or clients.</p>
+          </div>
+          <div class="feature-report-preview">
+            <div class="report-mock-header">
+              <span class="mock-dot red"></span>
+              <span class="mock-dot yellow"></span>
+              <span class="mock-dot green"></span>
+              <span class="mock-title">audit_report.html</span>
+            </div>
+            <div class="report-mock-body">
+              <div class="mock-line mock-line--title"></div>
+              <div class="mock-badges">
+                <span class="mock-badge red">High 2</span>
+                <span class="mock-badge yellow">Medium 5</span>
+                <span class="mock-badge green">Low 3</span>
+              </div>
+              <div class="mock-line w70"></div>
+              <div class="mock-line w50"></div>
+              <div class="mock-line w80"></div>
+              <div class="mock-line w60"></div>
+            </div>
+          </div>
+          <div class="feature-card-glow feature-glow--emerald"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── How It Works ── -->
+  <section id="how-it-works" class="lp-section lp-section--alt">
+    <div class="lp-container">
+      <div class="section-header fade-up">
+        <div class="section-eyebrow">How It Works</div>
+        <h2 class="section-title">Three Steps to Complete Security</h2>
+        <p class="section-desc">From code upload to report generation — fully automated, zero manual configuration.</p>
+      </div>
+
+      <div class="steps-row">
+        <div class="step-card fade-up">
+          <div class="step-num">01</div>
+          <div class="step-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <h3 class="step-title">Upload Code</h3>
+          <p class="step-desc">Drag and drop your Skill zip or contract source files. Supports multiple formats with instant parsing.</p>
+        </div>
+        <div class="step-connector">
+          <div class="connector-line"></div>
+          <svg class="connector-arrow" viewBox="0 0 16 16" fill="none">
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="step-card fade-up">
+          <div class="step-num">02</div>
+          <div class="step-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </div>
+          <h3 class="step-title">AI Analysis</h3>
+          <p class="step-desc">Large models deeply parse code logic and combine with rule libraries to identify security risks — covering OWASP TOP 10 and on-chain-specific vulnerabilities.</p>
+        </div>
+        <div class="step-connector">
+          <div class="connector-line"></div>
+          <svg class="connector-arrow" viewBox="0 0 16 16" fill="none">
+            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="step-card fade-up">
+          <div class="step-num">03</div>
+          <div class="step-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+          </div>
+          <h3 class="step-title">Get Your Report</h3>
+          <p class="step-desc">Professional report generated in seconds — includes risk ratings, vulnerability details, and remediation guidance. One-click download.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Tech Stack / Trust ── -->
+  <section class="lp-section lp-tech-section">
+    <div class="lp-container">
+      <div class="section-header fade-up">
+        <div class="section-eyebrow">Technology</div>
+        <h2 class="section-title">Enterprise-Grade Security Detection Engine</h2>
+      </div>
+      <div class="tech-cards fade-up">
+        <div class="tech-card">
+          <div class="tech-icon">🔍</div>
+          <div class="tech-name">Static Analysis</div>
+          <div class="tech-desc">AST-level code parsing for precise risk localization</div>
+        </div>
+        <div class="tech-card">
+          <div class="tech-icon">🤖</div>
+          <div class="tech-name">AI Reasoning</div>
+          <div class="tech-desc">LLMs understand code semantics to uncover hidden logic flaws</div>
+        </div>
+        <div class="tech-card">
+          <div class="tech-icon">⚡</div>
+          <div class="tech-name">Live Execution</div>
+          <div class="tech-desc">Dynamic stress-test engine simulating real production load</div>
+        </div>
+        <div class="tech-card">
+          <div class="tech-icon">🔗</div>
+          <div class="tech-name">Multi-chain</div>
+          <div class="tech-desc">EVM-compatible chains + Solana, with more on the way</div>
+        </div>
+        <div class="tech-card">
+          <div class="tech-icon">📊</div>
+          <div class="tech-name">Quantified Scoring</div>
+          <div class="tech-desc">CVSS-based risk scoring for objective security measurement</div>
+        </div>
+        <div class="tech-card">
+          <div class="tech-icon">🛡️</div>
+          <div class="tech-name">Rule Library</div>
+          <div class="tech-desc">Continuously updated rules covering the latest attack vectors</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA Banner ── -->
+  <section class="lp-cta-section">
+    <div class="lp-container">
+      <div class="cta-banner">
+        <div class="cta-glow"></div>
+        <div class="cta-content">
+          <h2 class="cta-title">Ready to Secure Your Skills?</h2>
+          <p class="cta-desc">Free to start, no registration required — upload your code and get a security report instantly.</p>
+          <a class="hero-btn hero-btn--primary cta-btn" href="workspace.html#agent-audit">
+            <span>Start Scanning Now</span>
+            <span class="btn-arrow">→</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ── -->
+  <footer class="lp-footer">
+    <div class="lp-container">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <span class="brand-name">Health AI</span>
+          <p class="footer-tagline">Intelligent Skill Security Platform</p>
+        </div>
+        <div class="footer-links">
+          <a href="#features">Features</a>
+          <a href="#how-it-works">How It Works</a>
+          <a href="workspace.html">Work Space</a>
+        </div>
+        <div class="footer-copy">© 2026 Health AI · All rights reserved</div>
+      </div>
+    </div>
+  </footer>
+
+<script>
+(function () {
+  /* ── Scroll fade-up ─────────────────────────── */
+  var fadeObs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add('is-visible'); fadeObs.unobserve(e.target); }
+    });
+  }, { threshold: 0.10 });
+  document.querySelectorAll('.fade-up').forEach(function (el) { fadeObs.observe(el); });
+
+
+  /* ── Dashboard charts ───────────────────────── */
+  var heroVis = document.getElementById('hero-visual');
+  if (!heroVis) return;
+
+  var C = 2 * Math.PI * 38;          // donut circumference ≈ 238.76
+  var GL = Math.PI * 68;             // gauge arc length   ≈ 213.63
+
+  // Segment order in HTML: seg-low, seg-medium, seg-high, seg-critical
+  // Each: { da (visible length), off (dashoffset = -cumulative start) }
+  var segConfig = [
+    { da: 0.30 * C, off: -0.70 * C },  // low      starts at 70%
+    { da: 0.40 * C, off: -0.30 * C },  // medium   starts at 30%
+    { da: 0.20 * C, off: -0.10 * C },  // high     starts at 10%
+    { da: 0.10 * C, off:  0           } // critical starts at  0%
+  ];
+
+  // Animate critical first (top), then high, medium, low
+  var animOrder = [3, 2, 1, 0]; // indices into segConfig / DOM
+
+  var animated = false;
+  var dashObs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting || animated) return;
+      animated = true;
+      dashObs.unobserve(e.target);
+
+      /* Gauge */
+      var gf = heroVis.querySelector('.gauge-fill');
+      if (gf) {
+        gf.style.strokeDasharray  = GL + ' ' + (GL + 10);
+        gf.style.strokeDashoffset = GL;
+        requestAnimationFrame(function () {
+          gf.style.transition      = 'stroke-dashoffset 1.8s cubic-bezier(0.25,1,0.5,1)';
+          gf.style.strokeDashoffset = (GL - 0.87 * GL).toFixed(2); // score 87
+        });
+      }
+
+      /* Donut segments */
+      var domSegs = heroVis.querySelectorAll('.donut-seg');
+      animOrder.forEach(function (si, order) {
+        var seg = domSegs[si];
+        var cfg = segConfig[si];
+        seg.style.strokeDasharray  = '0 ' + C;
+        seg.style.strokeDashoffset = cfg.off;
+        var delay = 350 + order * 160;
+        setTimeout(function () {
+          seg.style.transition    = 'stroke-dasharray 0.9s cubic-bezier(0.25,1,0.5,1)';
+          seg.style.strokeDasharray = cfg.da + ' ' + C;
+        }, delay);
+      });
+
+      /* Scan bars */
+      heroVis.querySelectorAll('.sb-fill').forEach(function (bar) {
+        bar.style.width = '0%';
+        setTimeout(function () {
+          bar.style.transition = 'width 1.2s cubic-bezier(0.25,1,0.5,1)';
+          bar.style.width      = bar.dataset.w + '%';
+        }, 500);
+      });
+
+      /* Line chart */
+      var lcLine = heroVis.querySelector('.lc-line');
+      if (lcLine) {
+        var len = lcLine.getTotalLength();
+        lcLine.style.strokeDasharray  = len;
+        lcLine.style.strokeDashoffset = len;
+        setTimeout(function () {
+          lcLine.style.transition      = 'stroke-dashoffset 1.8s ease';
+          lcLine.style.strokeDashoffset = '0';
+        }, 150);
+      }
+    });
+  }, { threshold: 0.15 });
+  dashObs.observe(heroVis);
+})();
+</script>
 </body>
 </html>

@@ -38,6 +38,7 @@ class TaskRecord:
     log_path: Optional[str] = None
     params: Dict[str, Any] = field(default_factory=dict)
     wallet_address: Optional[str] = None  # 关联的钱包地址
+    file_name: Optional[str] = None  # 上传文件的原始文件名
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
@@ -105,6 +106,7 @@ class TaskManager:
         upload_id: Optional[str],
         params: Optional[Dict[str, Any]] = None,
         wallet_address: Optional[str] = None,
+        file_name: Optional[str] = None,
     ) -> TaskRecord:
         if skill_type not in SUPPORTED_SKILLS:
             raise ValueError(f"unsupported skill_type: {skill_type}")
@@ -119,6 +121,7 @@ class TaskManager:
             updated_at=_now(),
             params=params or {},
             wallet_address=wallet_address,
+            file_name=file_name,
         )
         with self._lock:
             self.tasks[task_id] = record
