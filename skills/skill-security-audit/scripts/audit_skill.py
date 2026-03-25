@@ -1137,8 +1137,8 @@ def _risk_label(score: int) -> str:
 
 
 def detect_code_risks(base_path: Optional[Path]) -> Dict[str, Any]:
-    """检测即时拒绝标志、混淆代码、供应链攻击风险。"""
-    result: Dict[str, Any] = {"instantRejects": [], "obfuscation": []}
+    """检测即时拒绝标志、混淆代码、供应链攻击风险，以及源码中的硬编码敏感数据。"""
+    result: Dict[str, Any] = {"instantRejects": [], "obfuscation": [], "sensitiveData": []}
     if base_path is None or not base_path.exists():
         return result
     base_dir = base_path if base_path.is_dir() else base_path.parent
@@ -1157,6 +1157,12 @@ def detect_code_risks(base_path: Optional[Path]) -> Dict[str, Any]:
             for label, pat in OBFUSCATION_PATTERNS.items():
                 if pat.search(text):
                     result["obfuscation"].append({"label": label, "path": rel})
+            # 4D: 源码中的硬编码敏感数据（API Key / 私钥 / JWT 等）
+            for label, pat in SENSITIVE_PATTERNS.items():
+                if pat.search(text):
+                    result["sensitiveData"].append({"label": label, "path": rel})
+    # 去重（同一 label 只记录一次）
+    result["sensitiveData"] = list({item["label"]: item for item in result["sensitiveData"]}.values())
     return result
 
 
@@ -1185,7 +1191,13 @@ def _select_logs(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def generate_report(
     extra_skills: Optional[List[Dict[str, Any]]] = None,
     extra_agents: Optional[List[Dict[str, Any]]] = None,
+    scan_paths: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
+    """
+    scan_paths: 原始输入目录列表（始终执行代码扫描，无论 SKILL.md 是否存在）。
+    当上传的 ZIP 不含 SKILL.md 时，load_external_skills() 返回空列表，代码扫描
+    会被跳过。通过 scan_paths 把原始目录直接传入，确保扫描不被绕过。
+    """
     skills = extra_skills or []
     agents = extra_agents or []
     # Only analyse the uploaded skill/agent package.
@@ -1204,16 +1216,42 @@ def generate_report(
     token_info: Dict[str, Any] = {"totalTokens": 0, "byModel": [], "dataAvailable": False}
 
     skill_log_hits: List[Dict[str, str]] = []
-    aggregate_code_risks: Dict[str, Any] = {"instantRejects": [], "obfuscation": []}
+    aggregate_code_risks: Dict[str, Any] = {"instantRejects": [], "obfuscation": [], "sensitiveData": []}
+
+    # 已扫描路径集合，避免重复扫描同一目录
+    _scanned: set = set()
+
     for entry in skills:
         origin = entry.get("originPath")
         if origin:
-            origin_path = Path(origin)
+            origin_path = Path(origin).resolve()
             if origin_path.exists():
+                _scanned.add(str(origin_path))
                 skill_log_hits.extend(scan_skill_logs(origin_path))
                 risks = detect_code_risks(origin_path)
                 aggregate_code_risks["instantRejects"].extend(risks["instantRejects"])
                 aggregate_code_risks["obfuscation"].extend(risks["obfuscation"])
+                aggregate_code_risks["sensitiveData"].extend(risks.get("sensitiveData", []))
+
+    # 对所有 scan_paths 执行代码扫描（即使 SKILL.md 缺失也不跳过）
+    for raw in scan_paths or []:
+        try:
+            p = Path(raw).expanduser().resolve()
+        except Exception:
+            continue
+        if not p.exists() or str(p) in _scanned:
+            continue
+        _scanned.add(str(p))
+        skill_log_hits.extend(scan_skill_logs(p))
+        risks = detect_code_risks(p)
+        aggregate_code_risks["instantRejects"].extend(risks["instantRejects"])
+        aggregate_code_risks["obfuscation"].extend(risks["obfuscation"])
+        aggregate_code_risks["sensitiveData"].extend(risks.get("sensitiveData", []))
+
+    # sensitiveData 全局去重（同 label 只保留一条）
+    aggregate_code_risks["sensitiveData"] = list(
+        {item["label"]: item for item in aggregate_code_risks["sensitiveData"]}.values()
+    )
 
     log_sensitive_hits = log_info.get("sensitiveHits", 0) + len(skill_log_hits)
     privacy_hits = memory_info.get("sensitiveHits", 0) + log_sensitive_hits
@@ -1303,8 +1341,13 @@ def _compute_checklist_scores(report: Dict[str, Any]) -> Dict[str, int]:
     skill_name = skill_entries[0].get("name", "") if skill_entries else ""
 
     # 4D: Sensitive data patterns found in source code (❌)
+    # 优先从 skill_entries 的 notes 中提取（SKILL.md body 扫描结果）
     body_hits: set = {n.replace("Body matches ", "").strip()
                       for n in all_notes if n.startswith("Body matches ")}
+    # 补充：从 codeRisks.sensitiveData 中合并（无 SKILL.md 时由 scan_paths 扫描所得）
+    for item in code_risks.get("sensitiveData", []):
+        body_hits.add(item.get("label", "").strip())
+    body_hits.discard("")
 
     # 4E: Log hygiene issues (⚠️)
     skill_log_hits = report.get("skillLogHits", [])
@@ -1904,7 +1947,12 @@ def main() -> None:
 
     extra_skills = load_external_skills(args.skill_path, args.skill_url)
     extra_agents = load_external_agents(args.agent_path, args.agent_url)
-    report = generate_report(extra_skills=extra_skills, extra_agents=extra_agents)
+    # 始终把原始路径传入，确保即使没有 SKILL.md 也能完整扫描代码风险
+    report = generate_report(
+        extra_skills=extra_skills,
+        extra_agents=extra_agents,
+        scan_paths=args.skill_path,
+    )
     if args.ai_review:
         report["aiReview"] = run_ai_review(extra_skills, args.ai_model, args.lang)
     if args.output:
