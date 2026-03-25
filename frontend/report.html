@@ -529,12 +529,12 @@
           }
 
           // --- Parse key metrics from original summary section ---
-          const successRateM = reportText.match(/成功次数:\s*(\d+)\s*\(([^)]+)\)/);
-          const totalRunsM   = reportText.match(/总次数:\s*(\d+)/);
-          const avgDurM      = reportText.match(/平均耗时:\s*([\d.]+)s/);
-          const p95DurM      = reportText.match(/P95\s*耗时:\s*([\d.]+)s/);
-          const testRunsM    = reportText.match(/测试轮次\*?\*?:\s*(\d+)/);
-          const concurrencyM = reportText.match(/并发度\*?\*?:\s*(\d+)/);
+          const successRateM = reportText.match(/(?:Successes|成功次数):\s*(\d+)\s*\(([^)]+)\)/);
+          const totalRunsM   = reportText.match(/(?:Total Runs|总次数):\s*(\d+)/);
+          const avgDurM      = reportText.match(/(?:Avg Duration|平均耗时):\s*([\d.]+)s/);
+          const p95DurM      = reportText.match(/(?:P95 Duration|P95\s*耗时):\s*([\d.]+)s/);
+          const testRunsM    = reportText.match(/(?:Test Runs|测试轮次)\*?\*?:\s*(\d+)/);
+          const concurrencyM = reportText.match(/(?:Concurrency|并发度)\*?\*?:\s*(\d+)/);
           const commandM     = reportText.match(/Command:\s*`([^`]+)`/);
 
           const totalRuns   = totalRunsM ? parseInt(totalRunsM[1]) : (testRunsM ? parseInt(testRunsM[1]) : 0);

@@ -1046,10 +1046,10 @@ function buildStressLabSummary(text) {
   
   // Determine score class (higher = better)
   function getScoreClass(score) {
-    if (score >= 80) return 'low';      // 优秀 - 绿色
-    if (score >= 60) return 'total';    // 良好 - 蓝色
-    if (score >= 40) return 'medium';   // 一般 - 黄色
-    return 'high';                      // 需改进 - 红色
+    if (score >= 80) return 'low';      // Excellent - green
+    if (score >= 60) return 'total';    // Good - blue
+    if (score >= 40) return 'medium';   // Fair - yellow
+    return 'high';                      // Needs Work - red
   }
   
   // Build 6 score cards (overall + 5 dimensions) — 3-column grid (2 rows of 3)
