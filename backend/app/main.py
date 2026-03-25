@@ -353,4 +353,4 @@ def get_wallet_info(wallet_address: str = Depends(verify_wallet_token)):
 
 FRONTEND_DIR = REPO_ROOT / "frontend"
 if FRONTEND_DIR.exists():
-    app.mount("/ui", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

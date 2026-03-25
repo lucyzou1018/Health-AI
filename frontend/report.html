@@ -570,13 +570,13 @@
           // Score legend
           html += '<div style="margin-bottom:24px;padding:10px 16px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);font-size:12px;color:var(--text-tertiary);text-align:center;">Score: 80-100 = Excellent 🟢 &nbsp;|&nbsp; 60-79 = Good 🔵 &nbsp;|&nbsp; 40-59 = Fair 🟡 &nbsp;|&nbsp; &lt;40 = Needs Work 🔴</div>';
 
-          // Test configuration section
-          html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">⚙️ Test Configuration</div><div style="padding:16px 20px;">';
-          html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">';
-          html += '<div class="issue-item low" style="margin:0;"><div class="issue-title">Test Runs</div><div class="issue-desc" style="font-size:18px;font-weight:600;">' + testRuns + '</div></div>';
-          html += '<div class="issue-item low" style="margin:0;"><div class="issue-title">Concurrency</div><div class="issue-desc" style="font-size:18px;font-weight:600;">' + concurrency + '</div></div>';
+          // Test configuration section — compact single-row layout
+          html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">⚙️ Test Configuration</div><div style="padding:12px 20px;">';
+          html += '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:0;border:1px solid var(--border-subtle);border-radius:var(--radius-sm);overflow:hidden;">';
+          html += '<div style="padding:10px 20px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--border-subtle);"><span style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em;">Test Runs</span><span style="font-size:20px;font-weight:700;color:var(--text-primary);">' + testRuns + '</span></div>';
+          html += '<div style="padding:10px 20px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--border-subtle);"><span style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em;">Concurrency</span><span style="font-size:20px;font-weight:700;color:var(--text-primary);">' + concurrency + '</span></div>';
           if (commandM) {
-            html += '<div class="issue-item low" style="margin:0;grid-column:span 2;"><div class="issue-title">Command</div><div class="issue-desc"><code style="font-size:12px;background:var(--bg-hover);padding:4px 8px;border-radius:4px;">' + commandM[1] + '</code></div></div>';
+            html += '<div style="padding:10px 20px;display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;"><span style="font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em;">Command</span><code style="font-size:12px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + commandM[1] + '</code></div>';
           }
           html += '</div></div></div>';
 
@@ -589,12 +589,17 @@
           html += '<div style="text-align:center;padding:16px;background:var(--bg-hover);border-radius:var(--radius-sm);"><div style="font-size:24px;font-weight:700;color:' + (failures > 0 ? '#ef4444' : '#22c55e') + ';">' + failures + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Failures</div></div>';
           html += '</div></div></div>';
 
-          // Failure details (if any)
+          // Failure details (if any) — compact table
           if (failureSamples.length > 0) {
-            html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">🔴 Failure Details</div><div style="padding:16px 20px;">';
-            failureSamples.forEach(function(f) {
-              html += '<div class="issue-item high" style="margin-bottom:8px;"><div class="issue-title">Run #' + f.run + '</div><div class="issue-desc">Exit code: ' + f.exitCode + ' · Duration: ' + f.duration + 's</div></div>';
+            html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">🔴 Failure Details</div><div style="padding:12px 20px;">';
+            html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+            html += '<thead><tr style="border-bottom:1px solid var(--border-subtle);"><th style="text-align:left;padding:6px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-tertiary);font-weight:500;">Run</th><th style="text-align:left;padding:6px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-tertiary);font-weight:500;">Exit Code</th><th style="text-align:left;padding:6px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-tertiary);font-weight:500;">Duration</th></tr></thead>';
+            html += '<tbody>';
+            failureSamples.forEach(function(f, i) {
+              var rowBg = i % 2 === 0 ? 'transparent' : 'var(--bg-hover)';
+              html += '<tr style="border-bottom:1px solid var(--border-subtle);background:' + rowBg + ';"><td style="padding:7px 12px;color:var(--text-secondary);">#' + f.run + '</td><td style="padding:7px 12px;"><span style="color:#ef4444;font-weight:600;">' + f.exitCode + '</span></td><td style="padding:7px 12px;color:var(--text-secondary);">' + f.duration + 's</td></tr>';
             });
+            html += '</tbody></table>';
             html += '</div></div>';
           }
 
