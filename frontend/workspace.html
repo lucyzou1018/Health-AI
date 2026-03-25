@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Health AI Console</title>
-  <link rel="stylesheet" href="styles.css?v=20260359" />
+  <link rel="stylesheet" href="styles.css?v=20260364" />
 </head>
 <body>
   <div class="ambient-glow"></div>
@@ -145,7 +145,7 @@
       <section class="panel ws-panel" id="input-panel">
         <div class="panel-header">
           <h2 id="input-panel-title">Upload Code Package</h2>
-          <span class="panel-badge">ZIP · 50 MB</span>
+          <span class="panel-badge" id="panel-size-badge">ZIP · 10 MB</span>
         </div>
         <p class="panel-desc" id="upload-panel-desc">Upload your Skill or Agent zip package to run a full permission, API exposure and configuration security scan.</p>
 
@@ -183,7 +183,7 @@
               </svg>
             </div>
             <p class="upload-title">Drop archive here or click to browse</p>
-            <p class="upload-subtitle">Supports .zip format · Max 50 MB</p>
+            <p class="upload-subtitle" id="upload-subtitle">Supports .zip format · Max 10 MB</p>
           </div>
           <div class="upload-file-info hidden" id="file-info">
             <div class="file-icon-box">
@@ -203,6 +203,9 @@
             </button>
           </div>
         </div>
+
+        <!-- Inline upload error — sits tight below the drop zone -->
+        <div class="upload-error hidden" id="upload-error"></div>
 
         <!-- Scan feature checklist -->
         <div class="scan-checklist">
@@ -290,14 +293,14 @@
         </div>
       </div>
 
-      <!-- Column headers -->
-      <div class="history-thead" aria-hidden="true">
-        <span>Task / Time</span>
-        <span>Status</span>
-        <span>Report</span>
-      </div>
-
-      <ul id="history-list" class="history-list">
+      <!-- History table: header + rows share one grid -->
+      <div class="history-table">
+        <div class="history-thead" aria-hidden="true">
+          <span>Task / Time</span>
+          <span>Status</span>
+          <span>Report</span>
+        </div>
+        <ul id="history-list" class="history-list">
         <li class="empty" id="history-empty">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
             <rect x="3" y="3" width="18" height="18" rx="3"/>
@@ -305,7 +308,8 @@
           </svg>
           Connect wallet to view history
         </li>
-      </ul>
+        </ul>
+      </div><!-- /.history-table -->
       <div class="pagination" id="pagination">
         <button class="page-btn" id="page-prev" disabled>
           <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
@@ -360,8 +364,10 @@
       // ── Per-tab data ──────────────────────────────────────────
       var TAB_DATA = {
         "skill-security-audit": {
-          badge:     "Security Audit",
-          panelTitle: "Upload Code Package",
+          badge:        "Security Audit",
+          badgeText:    "ZIP · 10 MB",
+          subtitleText: "Supports .zip format · Max 10 MB",
+          panelTitle:   "Upload Code Package",
           panelDesc: "Upload your Skill or Agent zip package to run a full permission, API exposure and configuration security scan.",
           checks: [
             "Permission & config vulnerability scan",
@@ -375,8 +381,10 @@
           ]
         },
         "multichain-contract-vuln": {
-          badge:     "Contract Audit",
-          panelTitle: "Upload Contract Package",
+          badge:        "Contract Audit",
+          badgeText:    "ZIP · 50 MB",
+          subtitleText: "Supports .zip format · Max 50 MB",
+          panelTitle:   "Upload Contract Package",
           panelDesc: "Upload your smart contract source code zip to detect vulnerabilities across EVM and Solana chains.",
           checks: [
             "Reentrancy & integer overflow detection",
@@ -390,8 +398,10 @@
           ]
         },
         "skill-stress-lab": {
-          badge:     "Stress Test",
-          panelTitle: "Upload & Configure",
+          badge:        "Stress Test",
+          badgeText:    "ZIP · 50 MB",
+          subtitleText: "Supports .zip format · Max 50 MB",
+          panelTitle:   "Upload & Configure",
           panelDesc: "Upload your Skill package and set concurrency parameters to benchmark real-world performance under load.",
           checks: [
             "Concurrent load simulation & queue pressure",
@@ -411,9 +421,13 @@
         var d = TAB_DATA[tab];
         if (!d) return;
 
-        // Badge
+        // Tab badge (cb-badge) + panel size badge + upload subtitle
         var badge = document.getElementById('cb-badge');
         if (badge) badge.textContent = d.badge;
+        var sizeBadge = document.getElementById('panel-size-badge');
+        if (sizeBadge) sizeBadge.textContent = d.badgeText;
+        var subtitle = document.getElementById('upload-subtitle');
+        if (subtitle) subtitle.textContent = d.subtitleText;
 
         // Panel title & desc
         var pt = document.getElementById('input-panel-title');

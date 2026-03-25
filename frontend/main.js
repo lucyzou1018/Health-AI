@@ -71,6 +71,12 @@ const pageInfoEl = document.getElementById("page-info");
 const recordedHistory = new Set();
 let previewTaskId = null;
 let currentFile = null;
+// 每个 skill 类型是否有任务正在运行
+const runningTabs = {
+  "skill-security-audit": false,
+  "multichain-contract-vuln": false,
+  "skill-stress-lab": false,
+};
 
 // Pagination state
 let allHistoryTasks = [];
@@ -80,6 +86,30 @@ const ITEMS_PER_PAGE = 10;
 historyPanel?.classList.add("is-empty");
 
 const FINAL_STATUSES = new Set(["completed", "failed"]);
+
+// 各 tab 的文件大小上限 (MB)
+const MAX_FILE_SIZES = {
+  "skill-security-audit":    10,
+  "multichain-contract-vuln": 50,
+  "skill-stress-lab":         50,
+};
+
+function showUploadError(msg) {
+  const el = document.getElementById("upload-error");
+  if (!el) return;
+  el.innerHTML =
+    `<svg class="ue-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="6"/><path d="M7 4.5v2.8M7 9.5h.01"/></svg>` +
+    `<span class="ue-text">${msg}</span>`;
+  el.classList.remove("hidden");
+  uploadZone?.classList.add("has-error");
+}
+
+function clearUploadError() {
+  const el = document.getElementById("upload-error");
+  if (!el) return;
+  el.classList.add("hidden");
+  uploadZone?.classList.remove("has-error");
+}
 const DEFAULT_API = window.location.origin;
 const API_BASE = window.HEALTH_AI_API || DEFAULT_API;
 const DETECTOR_REMEDIATIONS = {
@@ -111,6 +141,15 @@ if (uploadZone && fileInput) {
   fileInput.addEventListener("change", () => {
     const file = fileInput.files?.[0];
     if (file) {
+      const maxMB = MAX_FILE_SIZES[activeTab] ?? 50;
+      if (file.size > maxMB * 1024 * 1024) {
+        fileInput.value = "";
+        showUploadError(
+          `File is too large (${formatFileSize(file.size)}). Maximum size for ${SKILL_LABELS[activeTab]} is ${maxMB} MB.`
+        );
+        return;
+      }
+      clearUploadError();
       setCurrentFile(file);
     }
   });
@@ -136,16 +175,23 @@ if (uploadZone && fileInput) {
     const files = e.dataTransfer?.files;
     if (files?.length > 0) {
       const file = files[0];
-      if (file.name.endsWith(".zip")) {
-        // Set the file to the input for form submission
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        fileInput.files = dt.files;
-        setCurrentFile(file);
-      } else {
-        setSummary("Please upload a .zip archive.");
-        setStatus("Invalid Format", "error");
+      if (!file.name.endsWith(".zip")) {
+        showUploadError("Invalid format. Please upload a .zip archive.");
+        return;
       }
+      const maxMB = MAX_FILE_SIZES[activeTab] ?? 50;
+      if (file.size > maxMB * 1024 * 1024) {
+        showUploadError(
+          `File is too large (${formatFileSize(file.size)}). Maximum size for ${SKILL_LABELS[activeTab]} is ${maxMB} MB.`
+        );
+        return;
+      }
+      clearUploadError();
+      // Set the file to the input for form submission
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      fileInput.files = dt.files;
+      setCurrentFile(file);
     }
   });
 }
@@ -174,6 +220,7 @@ function clearCurrentFile() {
   if (fileInfo) fileInfo.classList.add("hidden");
   if (fileName) fileName.textContent = "";
   if (fileSize) fileSize.textContent = "";
+  clearUploadError();
   updateRunButtonState();
 }
 
@@ -197,7 +244,7 @@ function updateRunButtonState() {
   if (!runBtn) return;
   
   const hasFile = currentFile !== null || (fileInput && fileInput.files && fileInput.files[0]);
-  const isRunning = statusBox && statusBox.textContent === "Analyzing...";
+  const isRunning = !!runningTabs[activeTab];
   const hasWallet = currentWallet !== null;
   
   // Check Skill Stress Lab params
@@ -467,6 +514,13 @@ async function runTask() {
     return;
   }
 
+  // 同一类型任务同时只允许一个
+  if (runningTabs[activeTab]) return;
+
+  const taskTab = activeTab; // 闭包保存，防止中途切 tab 影响状态恢复
+  runningTabs[taskTab] = true;
+  updateRunButtonState();
+
   try {
     setStatus("Analyzing...", "running");
     setSummary("Uploading package and preparing scan…");
@@ -496,22 +550,53 @@ async function runTask() {
       body: JSON.stringify(body),
     });
     if (!resp.ok) {
-      throw new Error(await resp.text());
+      let errMsg;
+      try {
+        const errJson = await resp.json();
+        errMsg = errJson.detail || JSON.stringify(errJson);
+      } catch (_) {
+        errMsg = await resp.text();
+      }
+      if (resp.status === 409) {
+        // 同类型任务已在运行中，提示等待，不展示 Failed
+        setStatus("In Queue", "running");
+        setSummary("A task of this type is already running. Please wait for it to complete before submitting a new one.");
+        runningTabs[taskTab] = false;
+        updateRunButtonState();
+        return;
+      }
+      throw new Error(errMsg);
     }
     const task = await resp.json();
     renderTask(task);
+    // 立刻在历史列表中插入 Processing 记录
+    upsertHistoryTask(task);
+    let finalTask = task;
     if (!FINAL_STATUSES.has(task.status)) {
-      await pollTask(task.taskId);
+      finalTask = await pollTask(task.taskId);
+      // pollTask 超时时返回 null，不重置上传区（让用户直接 retry）
+      if (finalTask === null) {
+        runningTabs[taskTab] = false;
+        updateRunButtonState();
+        return;
+      }
     }
-    // 扫描完成后重置上传区，准备下一次扫描
-    clearCurrentFile();
+    // 任务结束：原地更新历史记录状态
+    if (finalTask) upsertHistoryTask(finalTask);
+    if (finalTask?.status === "completed") {
+      // 扫描成功：重置上传区，准备下一次扫描
+      clearCurrentFile();
+    }
+    // 失败时保留文件，用户可直接点 Start Analysis 重试
   } catch (err) {
     setStatus("Failed", "error");
     const message = err instanceof Error ? err.message : String(err);
     setSummary(message);
     artifactBox?.classList.add("hidden");
-    // 失败后也重置，方便重新上传
-    clearCurrentFile();
+    // 网络/上传阶段失败才清空，扫描本身失败保留文件方便重试
+  } finally {
+    runningTabs[taskTab] = false;
+    updateRunButtonState();
   }
 }
 
@@ -586,17 +671,46 @@ function formatHistoryTime(value) {
   }
 }
 
-function addHistoryTask(task) {
-  if (!FINAL_STATUSES.has(task.status)) return;
-  if (recordedHistory.has(task.taskId)) return;
-  recordedHistory.add(task.taskId);
-  allHistoryTasks.unshift(task);
+// 立刻插入或原地更新历史记录（支持 Processing → Done/Failed 过渡）
+function upsertHistoryTask(task) {
+  var idx = allHistoryTasks.findIndex(function(t) { return t.taskId === task.taskId; });
+  if (idx >= 0) {
+    allHistoryTasks[idx] = task;
+  } else {
+    recordedHistory.add(task.taskId);
+    allHistoryTasks.unshift(task);
+  }
   renderHistoryPage();
 }
 
+function addHistoryTask(task) {
+  upsertHistoryTask(task);
+}
+
 function appendHistoryEntry(task) {
-  // Use the new addHistoryTask function instead
-  addHistoryTask(task);
+  upsertHistoryTask(task);
+}
+
+/**
+ * 通过 fetch + Blob URL 强制触发浏览器下载，绕开跨域时 <a download> 失效的问题。
+ */
+async function triggerDownload(url, filename) {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    // 短暂延迟后释放 Blob 内存
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
+  } catch (err) {
+    alert(`Download failed: ${err.message}`);
+  }
 }
 
 function renderArtifacts(task) {
@@ -606,22 +720,33 @@ function renderArtifacts(task) {
     artifactBox.innerHTML = "";
     return;
   }
-  const links = [];
+
+  const tid = task.taskId;
+  const skillSlug = (task.skillType || "report").replace(/[^a-z0-9-]/gi, "-");
+  const items = [];
+
   if (task.reportPath) {
-    links.push({ label: "📊 View Report", href: `report.html?task=${task.taskId}` });
-    links.push({ label: "📄 Download Report", href: `${API_BASE}/api/tasks/${task.taskId}/report` });
+    // View Report — 正常跳转页面
+    items.push(`<a href="report.html?task=${tid}" target="_blank" rel="noopener">📊 View Report</a>`);
+    // Download Report — 下载 PDF
+    items.push(`<button class="artifact-dl-btn" data-url="${API_BASE}/api/tasks/${tid}/report/pdf" data-filename="${skillSlug}-report.pdf">📄 Download Report</button>`);
   }
-  if (task.summaryPath) links.push({ label: "📋 Download Summary", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=summary` });
-  if (task.logPath) links.push({ label: "📝 Download Logs", href: `${API_BASE}/api/tasks/${task.taskId}/artifact?kind=log` });
-  if (!links.length) {
+
+  if (!items.length) {
     artifactBox.classList.add("hidden");
     artifactBox.innerHTML = "";
     return;
   }
+
   artifactBox.classList.remove("hidden");
-  artifactBox.innerHTML = links
-    .map((link) => `<a href="${link.href}" target="_blank" rel="noopener">${link.label}</a>`)
-    .join("");
+  artifactBox.innerHTML = items.join("");
+
+  // 绑定下载按钮事件
+  artifactBox.querySelectorAll(".artifact-dl-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      triggerDownload(btn.dataset.url, btn.dataset.filename);
+    });
+  });
 }
 
 async function fetchTask(taskId) {
@@ -635,15 +760,50 @@ function delay(ms) {
 }
 
 async function pollTask(taskId) {
+  // 每 2s 轮询一次，最多 150 次（5 分钟），足以覆盖大文件分析
+  const MAX_ATTEMPTS  = 150;
+  const POLL_INTERVAL = 2000;
   let attempts = 0;
-  while (attempts < 120) {
-    const task = await fetchTask(taskId);
+  let consecutiveErrors = 0;
+
+  while (attempts < MAX_ATTEMPTS) {
+    let task;
+    try {
+      task = await fetchTask(taskId);
+      consecutiveErrors = 0;
+    } catch (fetchErr) {
+      consecutiveErrors += 1;
+      // 允许网络短暂抖动：连续 5 次失败才放弃
+      if (consecutiveErrors >= 5) {
+        throw new Error("网络连接中断，无法获取分析状态。请检查网络后刷新页面。");
+      }
+      await delay(POLL_INTERVAL);
+      attempts += 1;
+      continue;
+    }
+
     renderTask(task);
     if (FINAL_STATUSES.has(task.status)) return task;
-    await delay(1500);
+
+    // 显示进度提示，让用户知道系统还在工作
+    const elapsed = Math.round((attempts * POLL_INTERVAL) / 1000);
+    setSummary(
+      `Analyzing… (${elapsed}s elapsed — large packages may take several minutes)`
+    );
+
+    await delay(POLL_INTERVAL);
     attempts += 1;
   }
-  throw new Error("Polling timed out. Please refresh manually.");
+
+  // 超时：服务可能在处理中，给出明确指引
+  setStatus("Timeout", "error");
+  setSummary(
+    "Analysis is taking longer than expected. " +
+    "The server may have restarted — please re-upload your file and try again. " +
+    "If this keeps happening, check the server logs."
+  );
+  // 不 throw，避免触发 catch 再次 clearCurrentFile，让用户可以直接 retry
+  return null;
 }
 
 function renderTask(task) {
@@ -1410,8 +1570,9 @@ function createHistoryItem(task) {
   
   var isCompleted = task.status === "completed";
   var isFailed = task.status === "failed";
-  var statusText = isCompleted ? "Done" : isFailed ? "Failed" : "Running";
-  var statusClass = isCompleted ? "success" : isFailed ? "error" : "pending";
+  var isProcessing = !isCompleted && !isFailed;
+  var statusText = isCompleted ? "Done" : isFailed ? "Failed" : "Processing";
+  var statusClass = isCompleted ? "success" : isFailed ? "error" : "processing";
   var skillLabel = SKILL_LABELS[task.skillType] || task.skillType;
   var fullName = task.fileName ? task.fileName + '-' + skillLabel : skillLabel;
   var isTruncated = fullName.length > 20;
@@ -1431,7 +1592,8 @@ function createHistoryItem(task) {
     '</div>' +
     '<div class="history-col3">' +
       (isCompleted ?
-        '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">View Report</a>' :
+        '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">View Report</a>' +
+        '<button class="history-dl-btn" data-task-id="' + task.taskId + '" data-skill="' + (task.skillType || 'audit') + '" title="Download PDF">↓ PDF</button>' :
         '<span class="history-no-report">-</span>') +
     '</div>';
   
@@ -1507,6 +1669,22 @@ historyFilters.forEach(function(btn) {
     renderHistoryPage();
   });
 });
+
+// History list — PDF download via event delegation
+if (historyList) {
+  historyList.addEventListener("click", function(e) {
+    var btn = e.target.closest(".history-dl-btn");
+    if (!btn) return;
+    var taskId = btn.dataset.taskId;
+    var skill  = btn.dataset.skill || "audit";
+    var slug   = skill.replace(/^skill-/, "");
+    btn.textContent = "…";
+    btn.disabled = true;
+    triggerDownload(API_BASE + "/api/tasks/" + taskId + "/report/pdf", slug + "-report.pdf")
+      .then(function() { btn.textContent = "↓ PDF"; btn.disabled = false; })
+      .catch(function() { btn.textContent = "↓ PDF"; btn.disabled = false; });
+  });
+}
 
 // 分页按钮事件
 if (pagePrevBtn) {

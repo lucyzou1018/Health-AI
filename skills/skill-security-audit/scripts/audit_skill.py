@@ -372,9 +372,9 @@ def _analyze_external_skill(name_hint: str, text: str, origin: str) -> Dict[str,
         origin_path = None
         origin_path_str = None
     detected_high_risk, high_risk_details = detect_high_risk_tools_from_path(origin_path)
-    if origin_path_str:
-        notes.append(f"Local skill path: {origin_path_str}")
-    else:
+    # Do NOT expose server-side absolute paths in the report.
+    # Show only the skill name (already available as `name`).
+    if not origin_path_str:
         notes.append(f"External skill source: {origin}")
     if detected_high_risk:
         risk_score = max(risk_score, 40 + 15 * (len(detected_high_risk) - 1))
@@ -732,41 +732,63 @@ def scan_logs_and_tokens(directory: Path) -> Tuple[Dict[str, Any], Dict[str, Any
             {"totalTokens": 0, "byModel": [], "dataAvailable": False},
         )
 
+    # 超过此阈值的文件只采样末尾，避免扫描巨型日志卡住整个审计
+    MAX_SCAN_BYTES = 512_000   # 512 KB
+    TAIL_LINES     = 1_000     # 超限时只扫最后 1000 行
+
     keywords = ("error", "exception", "traceback", "failed")
     for path in directory.glob("*.log"):
         errors = 0
         lines = 0
         try:
             stat_info = path.stat()
-            with path.open("r", encoding="utf-8", errors="ignore") as fh:
-                for line in fh:
-                    lines += 1
-                    lower = line.lower()
-                    if any(k in lower for k in keywords):
-                        errors += 1
-                    if "model" in lower:
-                        for pattern in TOKEN_PATTERNS:
-                            match = pattern.search(line)
-                            if match:
-                                model = match.group("model")
-                                tokens = int(match.group("tokens"))
-                                token_totals[model] = token_totals.get(model, 0) + tokens
-                                break
-                    _scan_patterns_in_line(line, path, pattern_hits)
+            file_size = stat_info.st_size
+
+            if file_size > MAX_SCAN_BYTES:
+                # 大文件：只读末尾 TAIL_LINES 行，元数据正常记录
+                from collections import deque
+                with path.open("r", encoding="utf-8", errors="ignore") as fh:
+                    tail = list(deque(fh, maxlen=TAIL_LINES))
+                scan_lines = tail
+                # 行数/错误数基于采样，标注为估算
+                lines = TAIL_LINES  # 用采样行数代表（已标注）
+                skipped = True
+            else:
+                with path.open("r", encoding="utf-8", errors="ignore") as fh:
+                    scan_lines = fh.readlines()
+                lines = len(scan_lines)
+                skipped = False
+
+            for line in scan_lines:
+                lower = line.lower()
+                if any(k in lower for k in keywords):
+                    errors += 1
+                if "model" in lower:
+                    for pattern in TOKEN_PATTERNS:
+                        match = pattern.search(line)
+                        if match:
+                            model = match.group("model")
+                            tokens = int(match.group("tokens"))
+                            token_totals[model] = token_totals.get(model, 0) + tokens
+                            break
+                _scan_patterns_in_line(line, path, pattern_hits)
         except Exception:
             continue
+
         total_errors += errors
         total_lines += lines
-        log_entries.append(
-            {
-                "path": str(path),
-                "size": human_size(stat_info.st_size),
-                "sizeBytes": stat_info.st_size,
-                "errors": errors,
-                "lines": lines,
-                "updatedAt": datetime.fromtimestamp(stat_info.st_mtime).isoformat(),
-            }
-        )
+        entry: Dict[str, Any] = {
+            "path": str(path),
+            "size": human_size(stat_info.st_size),
+            "sizeBytes": stat_info.st_size,
+            "errors": errors,
+            "lines": lines,
+            "updatedAt": datetime.fromtimestamp(stat_info.st_mtime).isoformat(),
+        }
+        if skipped:
+            entry["note"] = f"Large file — scanned last {TAIL_LINES} lines only"
+        log_entries.append(entry)
+
     rate = total_errors / total_lines if total_lines else 0.0
     total_tokens = sum(token_totals.values())
     per_model = [
@@ -1148,18 +1170,20 @@ def generate_report(
 ) -> Dict[str, Any]:
     skills = extra_skills or []
     agents = extra_agents or []
-    config = load_config()
-    permissions = collect_permissions(config)
-    combined = []
-    if skills:
-        combined.extend(skills)
-    if agents:
-        combined.extend(agents)
-    if combined:
-        permissions.extend(combined)
+    # Only analyse the uploaded skill/agent package.
+    # Never read server-side OpenClaw config, workspace memory or gateway logs.
+    combined = list(skills) + list(agents)
+    permissions = combined
 
-    memory_info = scan_memory(MEMORY_DIR)
-    log_info, token_info = scan_logs_and_tokens(LOG_DIR)
+    memory_info: Dict[str, Any] = {
+        "totalSize": 0, "files": [], "sensitiveHits": 0,
+        "dataAvailable": False, "patternHits": [],
+    }
+    log_info: Dict[str, Any] = {
+        "files": [], "errorRate": 0.0, "dataAvailable": False,
+        "patternHits": [], "sensitiveHits": 0,
+    }
+    token_info: Dict[str, Any] = {"totalTokens": 0, "byModel": [], "dataAvailable": False}
 
     skill_log_hits: List[Dict[str, str]] = []
     aggregate_code_risks: Dict[str, Any] = {"instantRejects": [], "obfuscation": []}
@@ -1216,16 +1240,9 @@ def generate_report(
     # Add static scores to report for reference
     report["staticScores"] = static_scores
 
-    warnings: List[str] = []
-    if not memory_info.get("dataAvailable", True):
-        warnings.append("memory/ directory not found; skipped memory scan")
-    if not log_info.get("dataAvailable", True):
-        warnings.append("logs/ directory not found; failure rate assumed 0")
-    elif not log_info.get("files"):
-        warnings.append("logs/ directory is empty; failure rate assumed 0")
-    if not token_info.get("dataAvailable", True):
-        warnings.append("Log files missing tokenUsage metadata; token cost set to 0")
-    report["warnings"] = warnings
+    # Warnings are suppressed — runtime data (memory/logs) is intentionally not
+    # collected from the server; scores fall back to static analysis only.
+    report["warnings"] = []
 
     report["suggestions"] = build_suggestions(report)
     report["verdict"] = compute_verdict(report)
@@ -1279,204 +1296,379 @@ def save_report(report: Dict[str, Any], output: Path) -> None:
 
 
 def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
-    lang = lang if lang == "zh" else "en"
-    title = "# 技能安全体检报告" if lang == "zh" else "# Skill Security Audit Report"
-    generated_label = "生成时间" if lang == "zh" else "Generated"
-    risk_header = "## 风险评分" if lang == "zh" else "## Risk Scores"
-    rec_header = "## 修复建议" if lang == "zh" else "## Recommendations"
-    warn_header = "## 告警" if lang == "zh" else "## Warnings"
-    perm_header = "## 权限概览" if lang == "zh" else "## Permission Overview"
-    memory_header = "## 记忆问题" if lang == "zh" else "## Memory Findings"
-    token_header = "## Token 使用" if lang == "zh" else "## Token Usage"
-    log_header = "## 日志摘要" if lang == "zh" else "## Log Summary"
+    """Render the audit report as a professional, checklist-driven Markdown document.
 
-    def add_pattern_section(hits: Optional[List[Dict[str, str]]], title_zh: str, title_en: str) -> None:
-        if not hits:
-            return
-        header = title_zh if lang == "zh" else title_en
-        lines.extend([
-            "",
-            header,
-            "| Pattern | File | Snippet |" if lang != "zh" else "| 类型 | 文件 | 片段 |",
-            "| --- | --- | --- |",
-        ])
-        for hit in hits[:50]:
-            lines.append(
-                "| {label} | {path} | {line} |".format(
-                    label=hit.get("label", "-"),
-                    path=hit.get("path", "-"),
-                    line=hit.get("line", "-"),
-                )
-            )
+    Each security check is listed individually with a ✅ / ❌ / ⚠️ status so
+    the reader can see at a glance what was verified and why anything failed.
+    """
 
-    # ── Verdict 徽章 ─────────────────────────────────────────────────────────
-    verdict = report.get("verdict", "CAUTION")
-    verdict_map = {
-        "SAFE":    ("🟢", "安全可安装",   "Safe to Install"),
-        "CAUTION": ("⚠️", "谨慎安装",     "Install with Caution"),
-        "REJECT":  ("❌", "禁止安装",     "Do NOT Install"),
+    # ── helpers ───────────────────────────────────────────────────────────────
+    def _c(s: str) -> str:
+        """Escape pipe so it doesn't break Markdown tables."""
+        return str(s).replace("|", "｜")
+
+    def _badge(score: int) -> str:
+        if score >= 80: return "🟢 Excellent"
+        if score >= 60: return "🟡 Good"
+        if score >= 40: return "🟠 Fair"
+        return "🔴 Needs Improvement"
+
+    lines: List[str] = []
+    check_num = [0]  # mutable counter so nested helper can increment it
+
+    def _section(header: str, items: List[tuple]) -> None:
+        """
+        Append a checklist section.
+        items: list of (description, status, detail)
+          status True  → ✅ Pass
+          status False → ❌ Fail
+          status None  → ⚠️ Warning
+        """
+        lines.append(f"### {header}")
+        lines.append("")
+        lines.append("| # | Check Item | Status | Details |")
+        lines.append("| :---: | --- | :---: | --- |")
+        for desc, passed, detail in items:
+            check_num[0] += 1
+            if passed is True:
+                status_str = "✅ Pass"
+            elif passed is False:
+                status_str = "❌ Fail"
+            else:
+                status_str = "⚠️ Warning"
+            detail_str = _c(detail) if detail else "—"
+            lines.append(f"| {check_num[0]} | {_c(desc)} | {status_str} | {detail_str} |")
+        lines.append("")
+
+    # ── pre-compute lookups ───────────────────────────────────────────────────
+    permissions   = report.get("permissions", [])
+    skill_entries = [e for e in permissions if e.get("type") == "skill"]
+    code_risks    = report.get("codeRisks") or {}
+
+    # Instant-reject map:  label → first matching file path
+    ir_map: Dict[str, str] = {
+        item["label"]: item["path"] for item in code_risks.get("instantRejects", [])
     }
-    v_emoji, v_zh, v_en = verdict_map.get(verdict, ("⚠️", "谨慎安装", "Install with Caution"))
-    v_label = v_zh if lang == "zh" else v_en
-    verdict_header = "## 安全结论" if lang == "zh" else "## Security Verdict"
-    lines = [title, f"{generated_label}：{report['generatedAt']}", "", verdict_header,
-             f"### {v_emoji} {v_label}", ""]
+    # Obfuscation map: label → first matching file path
+    ob_map: Dict[str, str] = {
+        item["label"]: item["path"] for item in code_risks.get("obfuscation", [])
+    }
 
-    # ── 即时拒绝风险章节 ────────────────────────────────────────────────────
-    code_risks = report.get("codeRisks", {})
-    instant_rejects = code_risks.get("instantRejects", [])
-    obfuscation = code_risks.get("obfuscation", [])
-    if instant_rejects:
-        ir_header = "## 即时拒绝风险 🚨" if lang == "zh" else "## Instant Reject Flags 🚨"
-        ir_note = ("> 以下风险项属于严重安全威胁，建议立即拒绝安装该 Skill。"
-                   if lang == "zh"
-                   else "> The following flags indicate critical security threats. Installation is strongly discouraged.")
-        lines.extend([ir_header, ir_note, ""])
-        for item in instant_rejects:
-            label = item["label"]
-            label_display = INSTANT_REJECT_LABELS_ZH.get(label, label) if lang == "zh" else label
-            lines.append(f"- ❌ **{label_display}** — `{item['path']}`")
-        lines.append("")
-    if obfuscation:
-        ob_header = "## 混淆代码检测 ⚠️" if lang == "zh" else "## Obfuscation Detected ⚠️"
-        lines.extend([ob_header, ""])
-        for item in obfuscation:
-            label = item["label"]
-            label_display = OBFUSCATION_LABELS_ZH.get(label, label) if lang == "zh" else label
-            lines.append(f"- ⚠️ **{label_display}** — `{item['path']}`")
-        lines.append("")
+    # High-risk tool map: tool → list of (file, keyword) tuples (aggregated)
+    hr_map: Dict[str, List[tuple]] = {}
+    for entry in skill_entries:
+        for tool in entry.get("highRiskTools", []):
+            hr_map.setdefault(tool, [])
+        for tool, details in (entry.get("highRiskDetails") or {}).items():
+            hr_map.setdefault(tool, []).extend(details)
 
-    lines.append(risk_header)
-    overall = report.get('overallScore', 0)
-    if lang == "zh":
-        lines.extend([
-            f"- 综合安全评分：{overall}/100",
-            f"- 隐私安全：{report.get('privacyScore', 0)}/100",
-            f"- 权限安全：{report.get('privilegeScore', 0)}/100",
-            f"- 内存安全：{report.get('memoryScore', 0)}/100",
-            f"- Token 安全：{report.get('tokenScore', 0)}/100",
-            f"- 稳定性：{report.get('failureScore', 0)}/100",
-            "> 评分说明：80-100=优秀，60-79=良好，40-59=一般，<40=需改进",
-        ])
-    else:
-        lines.extend([
-            f"- Overall Security Score: {overall}/100",
-            f"- Privacy: {report.get('privacyScore', 0)}/100",
-            f"- Privilege: {report.get('privilegeScore', 0)}/100",
-            f"- Memory Footprint: {report.get('memoryScore', 0)}/100",
-            f"- Token Cost: {report.get('tokenScore', 0)}/100",
-            f"- Stability: {report.get('failureScore', 0)}/100",
-            "> Score legend: 80-100=Excellent, 60-79=Good, 40-59=Fair, <40=Needs Improvement",
-        ])
+    # Flatten notes / config keys across all skill entries
+    all_notes: List[str] = []
+    all_cfg_keys: List[str] = []
+    for entry in skill_entries:
+        all_notes.extend(entry.get("notes", []))
+        all_cfg_keys.extend(entry.get("configKeys", []))
 
-    lines.append("")
-    lines.append(rec_header)
-    suggestion_lines = _render_suggestions(report.get("suggestions", []), lang)
-    for text_line in suggestion_lines:
-        lines.append(f"- {text_line}")
+    # Pattern labels found in skill body ("Body matches X")
+    body_hits: set = {n.replace("Body matches ", "").strip()
+                      for n in all_notes if n.startswith("Body matches ")}
 
-    warnings = report.get("warnings") or []
-    if warnings:
-        lines.append("")
-        lines.append(warn_header)
-        for warn in warnings:
-            lines.append(f"- ⚠️ { _translate_warning(warn, lang)}")
+    # Pattern labels found in skill log files
+    skill_log_hits: List[Dict[str, str]] = report.get("skillLogHits", [])
+    log_hit_map: Dict[str, List[Dict]] = {}
+    for hit in skill_log_hits:
+        log_hit_map.setdefault(hit.get("label", "?"), []).append(hit)
 
-    perm_columns = (
-        "| 类型 | 名称 | 高危权限 | 风险等级 | 备注 |"
-        if lang == "zh"
-        else "| Type | Name | High-Risk Tools | Risk Level | Notes |"
+    # Config / credential notes
+    sensitive_key_notes = [
+        n for n in all_notes
+        if "Sensitive config key" in n or "Configured credentials detected" in n
+    ]
+
+    # ── 1. Title ──────────────────────────────────────────────────────────────
+    skill_names = [e.get("name", "") for e in skill_entries if e.get("name")]
+    title_suffix = f" — {', '.join(skill_names)}" if skill_names else ""
+    lines += [
+        f"# Skill Security Audit Report{title_suffix}",
+        f"Generated: {report.get('generatedAt', '—')}",
+        "",
+    ]
+
+    # ── 2. Verdict ────────────────────────────────────────────────────────────
+    verdict = report.get("verdict", "CAUTION")
+    v_map = {
+        "SAFE":    ("🟢", "Safe to Install"),
+        "CAUTION": ("⚠️",  "Install with Caution"),
+        "REJECT":  ("❌", "Do NOT Install"),
+    }
+    v_emoji, v_label = v_map.get(verdict, ("⚠️", "Install with Caution"))
+    lines += [
+        "## Security Verdict",
+        f"### {v_emoji} {v_label}",
+        "",
+    ]
+
+    # ── 3. Score Overview ─────────────────────────────────────────────────────
+    overall = report.get("overallScore", 0)
+    lines += [
+        "## Risk Scores",
+        "",
+        "| Dimension | Score | Rating |",
+        "| --- | :---: | --- |",
+        f"| 🏆 **Overall Security** | **{overall}/100** | **{_badge(overall)}** |",
+        f"| 🔏 Privacy | {report.get('privacyScore', 0)}/100 | {_badge(report.get('privacyScore', 0))} |",
+        f"| 🔐 Privilege | {report.get('privilegeScore', 0)}/100 | {_badge(report.get('privilegeScore', 0))} |",
+        f"| 💾 Memory Footprint | {report.get('memoryScore', 0)}/100 | {_badge(report.get('memoryScore', 0))} |",
+        f"| 🪙 Token Cost | {report.get('tokenScore', 0)}/100 | {_badge(report.get('tokenScore', 0))} |",
+        f"| ✅ Stability | {report.get('failureScore', 0)}/100 | {_badge(report.get('failureScore', 0))} |",
+        "",
+        "> Score legend: 80–100 = Excellent | 60–79 = Good | 40–59 = Fair | <40 = Needs Improvement",
+        "",
+        "---",
+        "",
+    ]
+
+    # ── 4. Detailed Security Checklist ───────────────────────────────────────
+    lines += [
+        "## 🔍 Detailed Security Checklist",
+        "",
+        "> Each item below was actively inspected. "
+        "**✅ Pass** = no issue found. "
+        "**❌ Fail** = critical problem requiring immediate attention. "
+        "**⚠️ Warning** = risk detected that needs human review.",
+        "",
+    ]
+
+    # ── 4A. Critical Security Checks (instant-reject) ────────────────────────
+    critical_defs = [
+        ("eval_obfuscation",      "No obfuscated `eval` execution (`eval(base64.b64decode(...))`)"),
+        ("exec_compile",          "No dynamic code compilation (`exec(compile(...))`)"),
+        ("dynamic_pip_install",   "No dynamic Python package install (`subprocess … pip install`)"),
+        ("dynamic_npm_install",   "No dynamic Node package install (`subprocess … npm install`)"),
+        ("ip_exfil",              "No HTTP requests sent directly to raw IP addresses"),
+        ("credential_exfil",      "No credentials / secrets POSTed to external endpoints"),
+        ("soul_write",            "No unauthorised writes to `SOUL.md` (agent identity file)"),
+        ("openclaw_config_write", "No unauthorised writes to `openclaw.json` (runtime config)"),
+        ("credential_request",    "No credential prompting via `input()` at runtime"),
+    ]
+    _section(
+        "🚨 Critical Security Checks (Instant Reject)",
+        [
+            (desc, False,
+             f"**CRITICAL** — detected in `{ir_map[lbl]}`; installation must be REJECTED")
+            if lbl in ir_map
+            else (desc, True, "")
+            for lbl, desc in critical_defs
+        ],
     )
-    lines.extend(["", perm_header, perm_columns, "| --- | --- | --- | --- | --- |"])
-    level_map = {"High": "高", "Medium": "中", "Low": "低"}
-    for entry in (item for item in report["permissions"] if item.get("type") == "skill"):
-        high_values = entry.get("highRiskTools") or ["-"]
-        base_notes = [_translate_note(note, lang) for note in entry.get("notes", [])]
-        detail_map = entry.get("highRiskDetails", {})
-        first_tool = True
-        for tool in high_values:
-            tool_notes: List[str] = []
-            if first_tool and base_notes:
-                tool_notes.extend(base_notes)
-            details = detail_map.get(tool, [])
-            if details:
-                joined = "; ".join(
-                    f"{path}（关键字：{keyword}）" if lang == "zh" else f"{path} (keyword: {keyword})"
-                    for path, keyword in details
-                )
-                prefix = "匹配文件：" if lang == "zh" else "Matched files: "
-                tool_notes.append(prefix + joined)
-            notes_text = "; ".join(tool_notes) or "-"
-            level = _risk_label(entry.get("riskScore", 0))
-            if lang == "zh":
-                level = level_map.get(level, level)
+
+    # ── 4B. Code Obfuscation Detection ───────────────────────────────────────
+    obfusc_defs = [
+        ("base64_exec", "No `base64.b64decode()` execution patterns (payload hiding)"),
+        ("hex_dense",   "No dense hex-byte sequences (≥ 10 consecutive `\\xNN` bytes)"),
+        ("chr_concat",  "No `chr()` concatenation chains (≥ 5 chained `chr()` calls)"),
+    ]
+    _section(
+        "🔍 Code Obfuscation Detection",
+        [
+            (desc, None,
+             f"Obfuscation pattern detected in `{ob_map[lbl]}` — manual code review required")
+            if lbl in ob_map
+            else (desc, True, "")
+            for lbl, desc in obfusc_defs
+        ],
+    )
+
+    # ── 4C. High-Risk Tool Detection ─────────────────────────────────────────
+    hr_defs = [
+        ("exec",    "No shell execution (`subprocess` / `os.system` / `Popen`)"),
+        ("browser", "No headless browser automation (`playwright` / `selenium`)"),
+        ("message", "No external messaging operations (`message.send` / `send_message`)"),
+        ("nodes",   "No remote node / device control (`nodes.` / `node_client`)"),
+        ("cron",    "No scheduled task / cron job registration (`schedule` / `apscheduler`)"),
+        ("canvas",  "No canvas / dashboard manipulation (`canvas.` / `canvas_`)"),
+        ("gateway", "No outbound network calls (`requests` / `httpx` / `aiohttp` / WebSocket)"),
+    ]
+
+    def _hr_detail(tool: str) -> str:
+        hits = hr_map.get(tool, [])
+        if not hits:
+            return "Detected (no keyword detail available)"
+        parts = [f"`{p}` (keyword: `{k}`)" for p, k in hits[:3]]
+        extra = f" … +{len(hits) - 3} more" if len(hits) > 3 else ""
+        return "Matched — " + "; ".join(parts) + extra
+
+    _section(
+        "⚠️ High-Risk Tool Detection",
+        [
+            (desc, None, _hr_detail(tool) + " — verify this usage is intentional and safe")
+            if tool in hr_map
+            else (desc, True, "")
+            for tool, desc in hr_defs
+        ],
+    )
+
+    # ── 4D. Sensitive Data in Source Code ────────────────────────────────────
+    src_sensitive_defs = [
+        ("API Key",        "No OpenAI / generic API key patterns (`sk-…`)"),
+        ("Ethereum Key",   "No Ethereum private key (0x + 64 hex chars)"),
+        ("Mnemonic",       "No mnemonic seed phrase (12–24 word sequence)"),
+        ("Private Block",  "No PEM private key block (`-----BEGIN … PRIVATE KEY-----`)"),
+        ("AWS Access Key", "No AWS access key (`AKIA…`)"),
+        ("JWT",            "No embedded JWT token (`eyJ…`)"),
+        ("Database URL",   "No DB connection string (`postgres://`, `mysql://`, …)"),
+    ]
+    _section(
+        "🔑 Sensitive Data in Source Code",
+        [
+            (desc, False,
+             f"Pattern `{lbl}` matched in skill source — rotate/remove immediately")
+            if lbl in body_hits
+            else (desc, True, "")
+            for lbl, desc in src_sensitive_defs
+        ],
+    )
+
+    # ── 4E. Sensitive Data in Log Files ──────────────────────────────────────
+    log_sensitive_defs = [
+        ("API Key",       "No API key patterns in embedded log files"),
+        ("Private Key",   "No private key patterns in embedded log files"),
+        ("Personal Info", "No PII (phone number / e-mail) in embedded log files"),
+        ("Password",      "No password patterns in embedded log files"),
+    ]
+    log_items: List[tuple] = []
+    for lbl, desc in log_sensitive_defs:
+        if lbl in log_hit_map:
+            first_hit = log_hit_map[lbl][0]
+            raw_line = first_hit.get("line", "")
+            snippet = (raw_line[:80] + "…") if len(raw_line) > 80 else raw_line
+            log_items.append((
+                desc, None,
+                f"Found in `{first_hit.get('path', '?')}` — snippet: `{_c(snippet)}`"
+            ))
+        else:
+            log_items.append((desc, True, ""))
+    _section("📋 Log & Data Hygiene", log_items)
+
+    # ── 4F. Configuration & Environment Security ─────────────────────────────
+    env_notes = [n for n in all_notes if n.startswith("Environment variables:")]
+    cli_notes = [n for n in all_notes if n.startswith("CLI dependencies:")]
+
+    cfg_items: List[tuple] = []
+
+    # Sensitive key names in front matter
+    if sensitive_key_notes:
+        cfg_items.append((
+            "No sensitive config keys (`key` / `secret` / `token` / `password` / `api` / `private`)",
+            False,
+            "; ".join(_c(n) for n in sensitive_key_notes[:3]),
+        ))
+    else:
+        cfg_items.append((
+            "No sensitive config keys (`key` / `secret` / `token` / `password` / `api` / `private`)",
+            True, "",
+        ))
+
+    # Environment variables
+    if env_notes:
+        cfg_items.append((
+            "Environment variables declared in front matter (review each one)",
+            None, "; ".join(_c(n) for n in env_notes),
+        ))
+    else:
+        cfg_items.append((
+            "Environment variables declared in front matter",
+            True, "None declared",
+        ))
+
+    # CLI / binary dependencies
+    if cli_notes:
+        cfg_items.append((
+            "CLI / binary dependencies declared in front matter (review each one)",
+            None, "; ".join(_c(n) for n in cli_notes),
+        ))
+    else:
+        cfg_items.append((
+            "CLI / binary dependencies declared in front matter",
+            True, "None declared",
+        ))
+
+    _section("⚙️ Configuration & Environment Security", cfg_items)
+
+    # ── 4G. Skill Manifest Integrity ─────────────────────────────────────────
+    mfst_items: List[tuple] = []
+    has_skills = len(skill_entries) > 0
+    mfst_items.append((
+        "`SKILL.md` file present in the uploaded package",
+        has_skills,
+        "" if has_skills else "No `SKILL.md` found — the package cannot be fully audited",
+    ))
+    if has_skills:
+        first = skill_entries[0]
+        cfg_keys = first.get("configKeys") or []
+        cfg_keys_lower = [k.lower() for k in cfg_keys]
+        skill_name = first.get("name") or ""
+
+        mfst_items.append((
+            "Valid YAML front matter found in `SKILL.md`",
+            bool(cfg_keys),
+            f"Fields detected: `{'`, `'.join(cfg_keys)}`" if cfg_keys else "No front matter block found",
+        ))
+        mfst_items.append((
+            "`name` field declared in front matter",
+            bool(skill_name),
+            f"`name: {skill_name}`" if skill_name else "Missing `name` field — add it for traceability",
+        ))
+        mfst_items.append((
+            "`description` field declared in front matter",
+            "description" in cfg_keys_lower,
+            "" if "description" in cfg_keys_lower
+            else "Missing `description` — add a short purpose statement",
+        ))
+        mfst_items.append((
+            "`version` field declared in front matter",
+            "version" in cfg_keys_lower,
+            "" if "version" in cfg_keys_lower
+            else "Missing `version` — add a semver string (e.g. `1.0.0`)",
+        ))
+    _section("📄 Skill Manifest Integrity", mfst_items)
+
+    # ── 5. Key Recommendations ────────────────────────────────────────────────
+    lines += ["---", "", "## 🔧 Key Recommendations", ""]
+    for sug in _render_suggestions(report.get("suggestions", []), "en"):
+        lines.append(f"- {sug}")
+    lines.append("")
+
+    # ── 6. Skill Package Overview ─────────────────────────────────────────────
+    if skill_entries:
+        lines += [
+            "---",
+            "",
+            "## 📦 Skill Package Overview",
+            "",
+            "| Skill | High-Risk Tools Detected | Risk Level |",
+            "| --- | --- | --- |",
+        ]
+        for entry in skill_entries:
+            tools_str = ", ".join(entry.get("highRiskTools", [])) or "None"
+            rl = _risk_label(entry.get("riskScore", 0))
+            icon = {"High": "🔴", "Medium": "🟡", "Low": "🟢"}.get(rl, "")
             lines.append(
-                "| {type} | {name} | {high} | {level} | {notes} |".format(
-                    type=entry.get("type", "-"),
-                    name=entry.get("name", "-"),
-                    high=tool,
-                    level=level,
-                    notes=notes_text,
-                )
+                f"| {_c(entry.get('name', '-'))} | {tools_str} | {icon} {rl} |"
             )
-            first_tool = False
+        lines.append("")
 
-    memory_block = report.get("memory", {})
-    if memory_block.get("files"):
-        memory_columns = (
-            "| 文件 | 大小 | 问题 |" if lang == "zh" else "| File | Size | Issues |"
-        )
-        lines.extend(["", memory_header, memory_columns, "| --- | --- | --- |"])
-        for item in memory_block["files"]:
-            issues = ", ".join(item.get("issues", []))
-            lines.append(f"| {item['path']} | {item['size']} | {issues} |")
-    elif not memory_block.get("dataAvailable", True):
-        note = "memory/ directory not found; unable to audit persistence."
-        lines.extend(["", memory_header, f"> ⚠️ {_translate_warning(note, lang)}"])
-
-    add_pattern_section(memory_block.get("patternHits"), "## 记忆敏感匹配", "## Memory Pattern Hits")
-
-    token_block = report.get("tokens", {})
-    if token_block.get("byModel"):
-        token_columns = "| 模型 | Tokens |" if lang == "zh" else "| Model | Tokens |"
-        lines.extend(["", token_header, token_columns, "| --- | --- |"])
-        for item in token_block.get("byModel", []):
-            lines.append(f"| {item['model']} | {item['tokens']} |")
-    elif not token_block.get("dataAvailable", True):
-        lines.extend(["", token_header, f"> ⚠️ {_translate_warning('Token usage data missing from logs.', lang)}"])
-
-    log_block = report.get("logs", {})
-    if log_block.get("dataAvailable", True) and log_block.get("files"):
-        filtered_logs = _select_logs(log_block["files"])
-        if filtered_logs:
-            log_columns = (
-                "| 文件 | 大小 | 错误 | 行数 | 更新时间 |"
-                if lang == "zh"
-                else "| File | Size | Errors | Lines | Updated At |"
-            )
-            lines.extend(["", log_header, log_columns, "| --- | --- | --- | --- | --- |"])
-            for item in filtered_logs:
-                lines.append(
-                    f"| {item['path']} | {item['size']} | {item['errors']} | {item['lines']} | {item['updatedAt']} |"
-                )
-    elif not log_block.get("dataAvailable", True):
-        lines.extend(["", log_header, f"> ⚠️ {_translate_warning('logs/ directory not found; failure rate unavailable.', lang)}"])
-
-    add_pattern_section(log_block.get("patternHits"), "## 日志敏感匹配", "## Log Pattern Hits")
-    add_pattern_section(report.get("skillLogHits"), "## Skill 日志敏感匹配", "## Skill Log Pattern Hits")
-
+    # ── 7. AI Review (optional) ───────────────────────────────────────────────
     ai_review = report.get("aiReview")
     if ai_review:
-        header = "## AI 分析" if lang == "zh" else "## AI Review"
-        lines.append("")
-        lines.append(header)
-        status = ai_review.get("status")
-        if status == "ok":
+        lines += ["---", "", "## 🤖 AI Review", ""]
+        if ai_review.get("status") == "ok":
             lines.append(ai_review.get("summary", "").strip() or "(empty)")
         else:
-            reason = ai_review.get("reason", "unknown")
-            msg = f"AI 分析失败：{reason}" if lang == "zh" else f"AI review failed: {reason}"
-            lines.append(f"> ⚠️ {msg}")
+            lines.append(
+                f"> ⚠️ AI review failed: {ai_review.get('reason', 'unknown')}"
+            )
+        lines.append("")
 
     return "\n".join(lines)
 

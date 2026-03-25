@@ -345,7 +345,7 @@ def build_report(
         f.write(
             f"# {scope} Multichain Audit Report\n\n"
             f"生成时间：{timestamp}\n\n"
-            f"## 范围概况\n- 目标：{target}\n- 链别：{chain.upper()}\n- 工具：multichain-contract-vuln CLI (v0.1)\n\n"
+            f"## 范围概况\n- 目标：{Path(target).name}\n- 链别：{chain.upper()}\n- 工具：multichain-contract-vuln CLI (v0.1)\n\n"
         )
         f.write("## 自动化摘要\n" + "\\n".join(summary_lines) + "\n\n")
 

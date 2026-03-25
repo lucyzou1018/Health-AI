@@ -1,4 +1,15 @@
+# Web framework
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
 python-multipart>=0.0.9
+
+# Wallet signature verification
 eth-account>=0.11.0
+
+# PDF report generation
+fpdf2>=2.7.0
+Markdown>=3.4.0
+Pillow>=10.0.0
+
+# Skill Security Audit — YAML config parsing (optional, gracefully skipped if absent)
+PyYAML>=6.0

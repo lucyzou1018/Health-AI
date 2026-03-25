@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import json
 import secrets
+import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional, List
 
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB hard cap per upload
+MAX_WALLET_SESSIONS = 1000            # evict expired sessions above this threshold
+
 from fastapi import FastAPI, File, HTTPException, UploadFile, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -31,18 +35,33 @@ task_manager = TaskManager(BASE_DIR, repo_root=REPO_ROOT)
 
 # 简单的内存会话存储 (生产环境应使用 Redis)
 wallet_sessions: Dict[str, Dict[str, Any]] = {}
+_sessions_lock = threading.Lock()  # protects wallet_sessions against concurrent access
+
+# Per-task-id locks for PDF generation — prevents two concurrent requests from
+# writing to the same .pdf file simultaneously.
+_pdf_gen_locks: Dict[str, threading.Lock] = {}
+_pdf_gen_locks_meta = threading.Lock()  # protects _pdf_gen_locks dict itself
+
+
+def _get_pdf_lock(task_id: str) -> threading.Lock:
+    with _pdf_gen_locks_meta:
+        if task_id not in _pdf_gen_locks:
+            _pdf_gen_locks[task_id] = threading.Lock()
+        return _pdf_gen_locks[task_id]
+
 
 def verify_wallet_token(token: str = Header(None, alias="X-Wallet-Token")) -> Optional[str]:
     """验证钱包 token，返回钱包地址"""
     if not token:
         return None
-    session = wallet_sessions.get(token)
-    if not session:
-        return None
-    if session.get("expires_at", 0) < int(time.time()):
-        del wallet_sessions[token]
-        return None
-    return session.get("wallet_address")
+    with _sessions_lock:
+        session = wallet_sessions.get(token)
+        if not session:
+            return None
+        if session.get("expires_at", 0) < int(time.time()):
+            wallet_sessions.pop(token, None)  # pop avoids KeyError if evicted concurrently
+            return None
+        return session.get("wallet_address")
 
 app = FastAPI(title="Health AI", version="0.2.0")
 app.add_middleware(
@@ -113,8 +132,15 @@ def health_check() -> Dict[str, str]:
 
 
 @app.post("/api/uploads", response_model=UploadResponse)
-async def upload_file(file: UploadFile = File(...)) -> UploadResponse:
-    content = await file.read()
+def upload_file(file: UploadFile = File(...)) -> UploadResponse:
+    # Using a sync handler: FastAPI dispatches it to the default threadpool so
+    # the blocking file-read / disk-write don't block the async event loop.
+    content = file.file.read()  # sync read from the underlying SpooledTemporaryFile
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large. Maximum allowed size is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB.",
+        )
     upload_id = task_manager.save_upload(file.filename, content)
     return UploadResponse(uploadId=upload_id, filename=file.filename)
 
@@ -126,6 +152,7 @@ def create_task(
 ) -> TaskResponse:
     # 优先使用 payload 中的钱包地址，否则使用 token 验证的地址
     effective_wallet = payload.wallet_address or wallet_address
+
     try:
         record = task_manager.create_task(
             skill_type=payload.skill_type,
@@ -135,7 +162,14 @@ def create_task(
             wallet_address=effective_wallet,
             file_name=payload.file_name,
         )
-    except (FileNotFoundError, ValueError) as exc:
+    except ValueError as exc:
+        if str(exc) == "DUPLICATE_TASK":
+            raise HTTPException(
+                status_code=409,
+                detail="A task of this type is already running. Please wait for it to complete."
+            )
+        raise HTTPException(status_code=400, detail=str(exc))
+    except FileNotFoundError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:  # pragma: no cover - 调试信息
         raise HTTPException(status_code=500, detail=str(exc))
@@ -187,20 +221,45 @@ def download_report(task_id: str):
         raise HTTPException(status_code=404, detail="report file missing")
     return FileResponse(path)
 
-@app.get("/api/tasks/{task_id}/artifact")
-def download_artifact(task_id: str, kind: Literal["summary", "log"]):
+@app.get("/api/tasks/{task_id}/report/pdf")
+def download_report_pdf(task_id: str):
+    """将 markdown 报告实时渲染成 PDF 并返回"""
     try:
         record = task_manager.get_task(task_id)
     except KeyError:
         raise HTTPException(status_code=404, detail="task not found")
-    attr = f"{kind}_path"
-    target = getattr(record, attr, None)
-    if not target:
-        raise HTTPException(status_code=404, detail=f"{kind} missing")
-    path = Path(target)
-    if not path.exists():
-        raise HTTPException(status_code=404, detail=f"{kind} file missing")
-    return FileResponse(path)
+    if not record.report_path:
+        raise HTTPException(status_code=404, detail="report missing")
+    md_path = Path(record.report_path)
+    if not md_path.exists():
+        raise HTTPException(status_code=404, detail="report file missing")
+
+    from .pdf_generator import generate_pdf
+    pdf_path = md_path.with_suffix(".pdf")
+
+    # Acquire a per-task lock so concurrent requests don't write the same file
+    # simultaneously.  The second request will wait, then find a fresh PDF and
+    # skip regeneration.
+    pdf_lock = _get_pdf_lock(task_id)
+    with pdf_lock:
+        needs_regen = (
+            not pdf_path.exists()
+            or pdf_path.stat().st_mtime < md_path.stat().st_mtime
+        )
+        if needs_regen:
+            try:
+                generate_pdf(md_path, pdf_path)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        filename=f"report-{task_id[:8]}.pdf",
+    )
+
+
+# /api/tasks/{task_id}/artifact 接口已禁用（summary/log 含服务器内部信息，不对外暴露）
 
 
 # --------------------------- Wallet Authentication ---------------------------
@@ -235,11 +294,18 @@ def verify_wallet_login(payload: WalletAuthRequest) -> WalletAuthResponse:
     # 生成 session token
     token = secrets.token_urlsafe(32)
     expires_at = int(time.time()) + 7 * 24 * 3600  # 7 天有效期
-    
-    wallet_sessions[token] = {
-        "wallet_address": wallet_address,
-        "expires_at": expires_at,
-    }
+
+    with _sessions_lock:
+        # Evict expired sessions before inserting to bound memory usage.
+        if len(wallet_sessions) >= MAX_WALLET_SESSIONS:
+            now = int(time.time())
+            expired_keys = [k for k, v in wallet_sessions.items() if v.get("expires_at", 0) < now]
+            for k in expired_keys:
+                wallet_sessions.pop(k, None)
+        wallet_sessions[token] = {
+            "wallet_address": wallet_address,
+            "expires_at": expires_at,
+        }
     
     return WalletAuthResponse(
         token=token,

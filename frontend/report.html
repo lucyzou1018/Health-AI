@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>审计报告 - Health AI</title>
+  <title>Audit Report - Health AI</title>
   <link rel="stylesheet" href="styles.css?v=20260356" />
   <style>
     .report-container { max-width: 1000px; margin: 0 auto; padding: 24px; }
@@ -64,44 +64,43 @@
       <span class="brand-logo">AI</span>
       <h1 class="brand-name">Health AI</h1>
     </div>
-    <a class="ghost-btn" href="workspace.html" id="back-link">返回控制台</a>
+    <a class="ghost-btn" href="workspace.html" id="back-link">← Back to Dashboard</a>
   </header>
 
   <div class="report-container" id="report-container">
-    <div class="loading">加载报告中...</div>
+    <div class="loading">Loading report...</div>
   </div>
 
   <script>
     const API_BASE = window.location.origin;
-    
+
     function getTaskId() {
       const params = new URLSearchParams(window.location.search);
       return params.get('task');
     }
-    
+
     const RISK_CONFIG = {
-      high: { keywords: ['arbitrary-send-eth', 'reentrancy', 'unchecked-transfer', 'delegatecall'], label: '高风险' },
-      medium: { keywords: ['divide-before-multiply', 'incorrect-equality', 'timestamp', 'low-level-calls'], label: '中风险' },
-      low: { keywords: ['assembly', 'naming-convention', 'pragma', 'solc-version', 'unindexed'], label: '低风险' }
+      high: { keywords: ['arbitrary-send-eth', 'reentrancy', 'unchecked-transfer', 'delegatecall'], label: 'High Risk' },
+      medium: { keywords: ['divide-before-multiply', 'incorrect-equality', 'timestamp', 'low-level-calls'], label: 'Medium Risk' },
+      low: { keywords: ['assembly', 'naming-convention', 'pragma', 'solc-version', 'unindexed'], label: 'Low Risk' }
     };
-    
-    // Detector 名称中文映射
+
     const DETECTOR_NAMES = {
-      'arbitrary-send-eth': 'ETH 任意转账',
-      'reentrancy': '重入攻击',
-      'unchecked-transfer': '未检查转账返回值',
-      'delegatecall': '委托调用风险',
-      'divide-before-multiply': '先除后乘精度损失',
-      'incorrect-equality': '危险严格等式',
-      'timestamp': '时间戳依赖',
-      'low-level-calls': '低级别调用',
-      'assembly': '内联汇编',
-      'naming-convention': '命名规范',
-      'pragma': '编译器版本混用',
-      'solc-version': 'Solidity 版本问题',
-      'unindexed-event-address': '事件参数未索引',
-      'unused-return': '未使用返回值',
-      'missing-zero-check': '缺少零地址检查'
+      'arbitrary-send-eth': 'Arbitrary ETH Transfer',
+      'reentrancy': 'Reentrancy',
+      'unchecked-transfer': 'Unchecked Transfer Return',
+      'delegatecall': 'Delegatecall Risk',
+      'divide-before-multiply': 'Divide Before Multiply',
+      'incorrect-equality': 'Dangerous Strict Equality',
+      'timestamp': 'Timestamp Dependency',
+      'low-level-calls': 'Low-Level Calls',
+      'assembly': 'Inline Assembly',
+      'naming-convention': 'Naming Convention',
+      'pragma': 'Compiler Version Mismatch',
+      'solc-version': 'Solidity Version Issue',
+      'unindexed-event-address': 'Unindexed Event Parameter',
+      'unused-return': 'Unused Return Value',
+      'missing-zero-check': 'Missing Zero-Address Check'
     };
     
     function parseReport(text) {
@@ -139,7 +138,7 @@
             if (RISK_CONFIG.high.keywords.some(k => currentDetector.toLowerCase().includes(k))) level = 'high';
             else if (RISK_CONFIG.medium.keywords.some(k => currentDetector.toLowerCase().includes(k))) level = 'medium';
             
-            detectors.push({ name: currentDetector, desc: currentDesc || "详见报告", location, level });
+            detectors.push({ name: currentDetector, desc: currentDesc || "See report for details", location, level });
           }
         }
         return detectors;
@@ -168,8 +167,8 @@
         const functions = [...new Set(ethCalls.map(d => d.location.split('.')[1]?.split('(')[0] || '').filter(Boolean))].slice(0, 5);
         summary.push({
           level: 'high',
-          title: 'ETH 转账风险',
-          desc: `${functions.join(', ') || '多个函数'} 等使用 .call 发送 ETH，需确保有重入保护和权限控制`
+          title: 'ETH Transfer Risk',
+          desc: `${functions.join(', ') || 'Multiple functions'} use .call to send ETH — ensure reentrancy protection and access control are in place.`
         });
       }
       
@@ -178,8 +177,8 @@
       if (timestamps.length > 0) {
         summary.push({
           level: 'medium',
-          title: '时间依赖风险',
-          desc: `大量使用 block.timestamp（${timestamps.length} 处），在关键逻辑中可能被矿工操纵`
+          title: 'Timestamp Dependency',
+          desc: `block.timestamp used in ${timestamps.length} location(s) — may be manipulated by miners in critical logic.`
         });
       }
       
@@ -188,8 +187,8 @@
       if (divisions.length > 0) {
         summary.push({
           level: 'medium',
-          title: '精度损失风险',
-          desc: '存在先除后乘的计算（如 dayIndex），可能导致整数截断和精度损失'
+          title: 'Precision Loss',
+          desc: 'Divide-before-multiply detected — may cause integer truncation and precision loss.'
         });
       }
       
@@ -198,8 +197,8 @@
       if (equalities.length > 0) {
         summary.push({
           level: 'medium',
-          title: '严格等式风险',
-          desc: '使用危险严格等式判断状态，建议改用布尔标记或范围比较'
+          title: 'Dangerous Strict Equality',
+          desc: 'Strict equality used for state checks — consider using boolean flags or range comparisons instead.'
         });
       }
       
@@ -208,14 +207,14 @@
       if (reentrancy.length > 0) {
         summary.push({
           level: 'high',
-          title: '重入攻击风险',
-          desc: '检测到潜在重入漏洞，建议使用 Checks-Effects-Interactions 模式或 ReentrancyGuard'
+          title: 'Reentrancy Risk',
+          desc: 'Potential reentrancy vulnerability detected — use the Checks-Effects-Interactions pattern or ReentrancyGuard.'
         });
       }
       
       if (summary.length === 0) return '';
       
-      let html = `<div class="issues-section" style="margin-bottom: 24px;"><div class="issues-header">⚠️ 关键风险点</div><div style="padding: 16px 20px;">`;
+      let html = `<div class="issues-section" style="margin-bottom: 24px;"><div class="issues-header">⚠️ Key Risk Points</div><div style="padding: 16px 20px;">`;
       for (const risk of summary) {
         html += `<div class="issue-item ${risk.level}" style="margin-bottom: 12px;"><div class="issue-title">${risk.level === 'high' ? '🔴' : '🟡'} ${risk.title}</div><div class="issue-desc">${risk.desc}</div></div>`;
       }
@@ -231,11 +230,11 @@
         grouped[item.name].push(item);
       }
       
-      let html = `<div class="issue-category"><div class="category-header" data-category="${level}"><div class="category-icon ${level}">${icon}</div><div class="category-name">${config.label}</div><div class="category-count ${level}">${items.length} 个</div><div class="category-arrow">▶</div></div><div class="issue-list" id="list-${level}">`;
+      let html = `<div class="issue-category"><div class="category-header" data-category="${level}"><div class="category-icon ${level}">${icon}</div><div class="category-name">${config.label}</div><div class="category-count ${level}">${items.length}</div><div class="category-arrow">▶</div></div><div class="issue-list" id="list-${level}">`;
       
       for (const [name, groupItems] of Object.entries(grouped)) {
         const cnName = DETECTOR_NAMES[name] || name;
-        html += `<div class="issue-item ${level}"><div class="issue-title">${cnName}</div><div class="issue-location">📍 ${groupItems.length} 处</div><div class="issue-desc">${groupItems[0].desc || '详见报告'}</div></div>`;
+        html += `<div class="issue-item ${level}"><div class="issue-title">${cnName}</div><div class="issue-location">📍 ${groupItems.length} occurrence(s)</div><div class="issue-desc">${groupItems[0].desc || 'See report for details'}</div></div>`;
       }
       
       html += '</div></div>';
@@ -313,17 +312,17 @@
       const container = document.getElementById('report-container');
       
       if (!taskId) {
-        container.innerHTML = '<div class="error">❌ 缺少任务ID，请在URL中添加 ?task=任务ID</div>';
+        container.innerHTML = '<div class="error">❌ Missing task ID. Please add ?task=<taskId> to the URL.</div>';
         return;
       }
       
       try {
         const taskResp = await fetch(`${API_BASE}/api/tasks/${taskId}`);
-        if (!taskResp.ok) throw new Error('获取任务信息失败: ' + taskResp.status);
+        if (!taskResp.ok) throw new Error('Failed to fetch task: ' + taskResp.status);
         const task = await taskResp.json();
-        
+
         if (task.status !== 'completed') {
-          container.innerHTML = `<div class="error">⏳ 任务尚未完成，当前状态: ${task.status}</div>`;
+          container.innerHTML = `<div class="error">⏳ Task not yet completed. Current status: ${task.status}</div>`;
           return;
         }
         
@@ -334,7 +333,7 @@
         }
         
         const reportResp = await fetch(`${API_BASE}/api/tasks/${taskId}/report`);
-        if (!reportResp.ok) throw new Error('获取报告失败: ' + reportResp.status);
+        if (!reportResp.ok) throw new Error('Failed to fetch report: ' + reportResp.status);
         const reportText = await reportResp.text();
         
         // Handle different report types
@@ -349,30 +348,65 @@
           const lines = reportText.split('\n');
           for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            // Parse Safety Scores (higher = safer)
-            // Match formats: "- Privacy: 35" or "隐私安全：35/100"
-            const overallMatch = line.match(/(?:Overall Safety|综合安全评分)[:：\/]?\s*(\d+)/i);
-            if (overallMatch) scores['Overall'] = parseInt(overallMatch[1]);
-            const privacyMatch = line.match(/(?:^-\s*Privacy|隐私安全)[:：\/]?\s*(\d+)/i);
-            if (privacyMatch) scores['Privacy'] = parseInt(privacyMatch[1]);
-            const privilegeMatch = line.match(/(?:^-\s*Privilege|权限安全)[:：\/]?\s*(\d+)/i);
-            if (privilegeMatch) scores['Privilege'] = parseInt(privilegeMatch[1]);
-            const memoryMatch = line.match(/(?:^-\s*Memory(?: Footprint)?|内存安全)[:：\/]?\s*(\d+)/i);
-            if (memoryMatch) scores['Memory'] = parseInt(memoryMatch[1]);
-            const tokenMatch = line.match(/(?:^-\s*Token(?: Cost)?|Token 安全)[:：\/]?\s*(\d+)/i);
-            if (tokenMatch) scores['Token'] = parseInt(tokenMatch[1]);
-            const failureMatch = line.match(/(?:^-\s*(?:Failure Rate|Stability)|稳定性)[:：\/]?\s*(\d+)/i);
-            if (failureMatch) scores['Failure'] = parseInt(failureMatch[1]);
-          }
-          
-          // If new format not found, fallback to old format
-          if (Object.keys(scores).length === 0) {
-            for (let i = 0; i < lines.length; i++) {
-              const line = lines[i];
-              if (line.match(/^- (Privacy|Privilege|Memory|Token|Failure)/)) {
-                const match = line.match(/- (\w+[^:]+):\s*(\d+)/);
-                if (match) scores[match[1]] = parseInt(match[2]);
-              }
+            // Parse Safety Scores — new table format:
+            //   | 🏆 **Overall Security** | **83/100** | ... |
+            //   | 🔏 Privacy | 95/100 | ... |
+            // Also supports old plain-text format: "- Privacy: 35" / "隐私安全：35/100"
+
+            // Overall Security (table format)
+            if (/Overall Security/.test(line)) {
+              const m = line.match(/\*?\*?(\d+)\/100/);
+              if (m) scores['Overall'] = parseInt(m[1]);
+            }
+            // Overall Safety (old plain format)
+            if (!scores['Overall']) {
+              const m = line.match(/(?:Overall Safety|综合安全评分)[:：\/]?\s*(\d+)/i);
+              if (m) scores['Overall'] = parseInt(m[1]);
+            }
+
+            // Privacy
+            if (/\|\s*[^\|]*Privacy/.test(line)) {
+              const m = line.match(/\|\s*[^\|]*Privacy[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+              if (m) scores['Privacy'] = parseInt(m[1]);
+            } else {
+              const m = line.match(/(?:^-\s*Privacy|隐私安全)[:：\/]?\s*(\d+)/i);
+              if (m) scores['Privacy'] = parseInt(m[1]);
+            }
+
+            // Privilege
+            if (/\|\s*[^\|]*Privilege/.test(line)) {
+              const m = line.match(/\|\s*[^\|]*Privilege[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+              if (m) scores['Privilege'] = parseInt(m[1]);
+            } else {
+              const m = line.match(/(?:^-\s*Privilege|权限安全)[:：\/]?\s*(\d+)/i);
+              if (m) scores['Privilege'] = parseInt(m[1]);
+            }
+
+            // Memory Footprint
+            if (/\|\s*[^\|]*Memory/.test(line)) {
+              const m = line.match(/\|\s*[^\|]*Memory[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+              if (m) scores['Memory'] = parseInt(m[1]);
+            } else {
+              const m = line.match(/(?:^-\s*Memory(?: Footprint)?|内存安全)[:：\/]?\s*(\d+)/i);
+              if (m) scores['Memory'] = parseInt(m[1]);
+            }
+
+            // Token Cost
+            if (/\|\s*[^\|]*Token/.test(line)) {
+              const m = line.match(/\|\s*[^\|]*Token[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+              if (m) scores['Token'] = parseInt(m[1]);
+            } else {
+              const m = line.match(/(?:^-\s*Token(?: Cost)?|Token 安全)[:：\/]?\s*(\d+)/i);
+              if (m) scores['Token'] = parseInt(m[1]);
+            }
+
+            // Stability (mapped to Failure key)
+            if (/\|\s*[^\|]*Stability/.test(line)) {
+              const m = line.match(/\|\s*[^\|]*Stability[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+              if (m) scores['Failure'] = parseInt(m[1]);
+            } else {
+              const m = line.match(/(?:^-\s*(?:Failure Rate|Stability)|稳定性)[:：\/]?\s*(\d+)/i);
+              if (m) scores['Failure'] = parseInt(m[1]);
             }
           }
           
@@ -404,9 +438,9 @@
           }
           
           // Render security audit dashboard
-          document.title = 'Skill 安全审计报告 - Health AI';
-          const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : '未知';
-          
+          document.title = 'Skill Security Audit Report - Health AI';
+          const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown';
+
           // Get scores (0-100, higher = safer)
           overallScore = overallScore || 0;
           const privacyScore = scores['Privacy'] || scores['privacyScore'] || 0;
@@ -414,83 +448,81 @@
           const memoryScore = scores['Memory'] || scores['memoryScore'] || 0;
           const tokenScore = scores['Token'] || scores['tokenScore'] || 0;
           const failureScore = scores['Failure'] || scores['failureScore'] || 0;
-          
-          let html = '<div class="report-header"><h1>🔒 Skill 安全审计报告</h1><div class="report-meta">任务ID: ' + task.taskId + ' · 检测时间: ' + updatedAt + '</div></div>';
-          
-          // Score dashboard - 显示所有6个维度 (higher = safer)
-          // 80-100=优秀(green/low), 60-79=良好, 40-59=一般(yellow/medium), <40=需改进(red/high)
+
+          let html = '<div class="report-header"><h1>🔒 Skill Security Audit Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
+
+          // Score dashboard — all 6 dimensions (higher = safer)
           function getScoreClass(score) {
-            if (score >= 80) return 'low';      // 优秀 - 绿色
-            if (score >= 60) return 'total';    // 良好 - 蓝色
-            if (score >= 40) return 'medium';   // 一般 - 黄色
-            return 'high';                      // 需改进 - 红色
+            if (score >= 80) return 'low';
+            if (score >= 60) return 'total';
+            if (score >= 40) return 'medium';
+            return 'high';
           }
-          
+
           html += '<div class="risk-dashboard" style="grid-template-columns: repeat(6, 1fr);">';
-          html += '<div class="risk-card ' + getScoreClass(overallScore) + '"><div class="risk-number">' + overallScore + '</div><div class="risk-label">📊 综合</div></div>';
-          html += '<div class="risk-card ' + getScoreClass(privacyScore) + '"><div class="risk-number">' + privacyScore + '</div><div class="risk-label">🔒 隐私</div></div>';
-          html += '<div class="risk-card ' + getScoreClass(privilegeScore) + '"><div class="risk-number">' + privilegeScore + '</div><div class="risk-label">🔐 权限</div></div>';
-          html += '<div class="risk-card ' + getScoreClass(memoryScore) + '"><div class="risk-number">' + memoryScore + '</div><div class="risk-label">💾 内存</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(overallScore) + '"><div class="risk-number">' + overallScore + '</div><div class="risk-label">📊 Overall</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(privacyScore) + '"><div class="risk-number">' + privacyScore + '</div><div class="risk-label">🔒 Privacy</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(privilegeScore) + '"><div class="risk-number">' + privilegeScore + '</div><div class="risk-label">🔐 Privilege</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(memoryScore) + '"><div class="risk-number">' + memoryScore + '</div><div class="risk-label">💾 Memory</div></div>';
           html += '<div class="risk-card ' + getScoreClass(tokenScore) + '"><div class="risk-number">' + tokenScore + '</div><div class="risk-label">🪙 Token</div></div>';
           html += '<div class="risk-card ' + getScoreClass(failureScore) + '"><div class="risk-number">' + failureScore + '</div><div class="risk-label">✅ Stability</div></div>';
           html += '</div>';
-          
-          // Key findings
+
+          // Key recommendations
           if (recs.length > 0) {
-            html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">🔴 关键建议</div><div style="padding:16px 20px;">';
+            html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">🔴 Key Recommendations</div><div style="padding:16px 20px;">';
             recs.forEach(rec => {
               html += '<div class="issue-item high" style="margin-bottom:8px;"><div class="issue-desc">' + rec + '</div></div>';
             });
             html += '</div></div>';
           }
-          
+
           // Warnings
           if (warnings.length > 0) {
-            html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">⚠️ 警告信息</div><div style="padding:16px 20px;">';
+            html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">⚠️ Warnings</div><div style="padding:16px 20px;">';
             warnings.forEach(warn => {
               html += '<div class="issue-item medium" style="margin-bottom:8px;"><div class="issue-desc">' + warn + '</div></div>';
             });
             html += '</div></div>';
           }
-          
+
           // Full report
-          html += '<div class="issues-section"><div class="issues-header">📄 完整报告</div><div style="padding:16px 20px;"><div class="raw-report">' + markdownToHtml(reportText) + '</div></div></div>';
+          html += '<div class="issues-section"><div class="issues-header">📄 Full Report</div><div style="padding:16px 20px;"><div class="raw-report">' + markdownToHtml(reportText) + '</div></div></div>';
           
           container.innerHTML = html;
           return;
         } else if (task.skillType === 'skill-stress-lab') {
           // Render stress test report
-          document.title = '压力测试报告 - Health AI';
-          const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : '未知';
-          let html = '<div class="report-header"><h1>🧪 压力测试报告</h1><div class="report-meta">任务ID: ' + task.taskId + ' · 类型: Skill Stress Lab · 检测时间: ' + updatedAt + '</div></div>';
+          document.title = 'Stress Test Report - Health AI';
+          const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown';
+          let html = '<div class="report-header"><h1>🧪 Stress Test Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Type: Skill Stress Lab · Scanned: ' + updatedAt + '</div></div>';
           html += '<div class="raw-report">' + markdownToHtml(reportText) + '</div>';
           container.innerHTML = html;
           return;
         }
         
         // Default: contract audit report
-        document.title = '合约安全审计报告 - Health AI';
+        document.title = 'Contract Audit Report - Health AI';
         const detectors = parseReport(reportText);
-        const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : '未知';
-        
+        const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown';
+
         if (detectors.length === 0) {
-          container.innerHTML = '<div class="error">⚠️ 未能从报告中提取问题数据，显示原始报告：<br><br><a href="' + API_BASE + '/api/tasks/' + taskId + '/report" target="_blank">查看原始报告</a></div>';
+          container.innerHTML = '<div class="error">⚠️ No issues found in report. <a href="' + API_BASE + '/api/tasks/' + taskId + '/report" target="_blank">View raw report</a></div>';
           return;
         }
-        
+
         const high = detectors.filter(d => d.level === 'high');
         const medium = detectors.filter(d => d.level === 'medium');
         const low = detectors.filter(d => d.level === 'low');
-        
+
         let html = '';
-        html += '<div class="report-header"><h1>📋 合约安全审计报告</h1><div class="report-meta">任务ID: ' + task.taskId + ' · 链别: EVM · 检测时间: ' + updatedAt + '</div></div>';
-        
-        html += `<div class="risk-dashboard"><div class="risk-card high"><div class="risk-number">${high.length}</div><div class="risk-label">🔴 高风险</div></div><div class="risk-card medium"><div class="risk-number">${medium.length}</div><div class="risk-label">🟡 中风险</div></div><div class="risk-card low"><div class="risk-number">${low.length}</div><div class="risk-label">🟢 低风险</div></div><div class="risk-card total"><div class="risk-number">${detectors.length}</div><div class="risk-label">📊 总计</div></div></div>`;
-        
-        // 关键风险点 - 聚合总结
+        html += '<div class="report-header"><h1>📋 Contract Audit Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Chain: EVM · Scanned: ' + updatedAt + '</div></div>';
+
+        html += `<div class="risk-dashboard"><div class="risk-card high"><div class="risk-number">${high.length}</div><div class="risk-label">🔴 High</div></div><div class="risk-card medium"><div class="risk-number">${medium.length}</div><div class="risk-label">🟡 Medium</div></div><div class="risk-card low"><div class="risk-number">${low.length}</div><div class="risk-label">🟢 Low</div></div><div class="risk-card total"><div class="risk-number">${detectors.length}</div><div class="risk-label">📊 Total</div></div></div>`;
+
         html += generateKeyRisksSummary(detectors);
-        
-        html += `<div class="issues-section"><div class="issues-header">📑 详细问题列表</div>`;
+
+        html += `<div class="issues-section"><div class="issues-header">📑 Issue Details</div>`;
         if (high.length > 0) html += renderCategory('high', '🔴', high);
         if (medium.length > 0) html += renderCategory('medium', '🟡', medium);
         if (low.length > 0) html += renderCategory('low', '🟢', low);
@@ -508,7 +540,7 @@
           });
         });
       } catch (err) {
-        container.innerHTML = `<div class="error">❌ 错误: ${err.message}<br><br>请刷新页面重试，或联系管理员。</div>`;
+        container.innerHTML = `<div class="error">❌ Error: ${err.message}<br><br>Please refresh and try again.</div>`;
         console.error(err);
       }
     }

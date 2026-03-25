@@ -2,40 +2,41 @@
 
 :root {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  
-  /* 高级深色主题 - 参考 Linear/Vercel */
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #12121a;
-  --bg-tertiary: #1a1a24;
-  --bg-hover: #22222c;
-  
-  --text-primary: #f0f0f5;
-  --text-secondary: #a0a0b0;
-  --text-tertiary: #606070;
-  
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-default: rgba(255, 255, 255, 0.1);
-  --border-hover: rgba(255, 255, 255, 0.15);
-  
-  /* 主色调 - 克制的蓝紫 */
-  --accent: #6366f1;
-  --accent-hover: #818cf8;
-  --accent-subtle: rgba(99, 102, 241, 0.1);
-  
-  /* 状态色 - 柔和 */
-  --success: #22c55e;
+
+  /* ── Deep navy palette — professional, not gloomy ── */
+  --bg-primary:   #070c1c;   /* deep navy, far from void-black */
+  --bg-secondary: #0c1228;   /* card / panel surface          */
+  --bg-tertiary:  #111a35;   /* inset / input areas           */
+  --bg-hover:     #18224a;   /* hover lift                    */
+
+  --text-primary:   #edf0fa;   /* slightly cool-white           */
+  --text-secondary: #8a9ec8;   /* blue-grey, not flat grey      */
+  --text-tertiary:  #4a5880;   /* dimmed but still tinted       */
+
+  /* Borders carry the indigo hue */
+  --border-subtle:  rgba(99, 120, 255, 0.09);
+  --border-default: rgba(99, 120, 255, 0.16);
+  --border-hover:   rgba(99, 120, 255, 0.28);
+
+  /* Accent — indigo / violet */
+  --accent:        #6366f1;
+  --accent-hover:  #818cf8;
+  --accent-subtle: rgba(99, 102, 241, 0.12);
+
+  /* Status */
+  --success:        #22c55e;
   --success-subtle: rgba(34, 197, 94, 0.1);
-  --error: #ef4444;
-  --error-subtle: rgba(239, 68, 68, 0.1);
-  --warning: #f59e0b;
-  
+  --error:          #ef4444;
+  --error-subtle:   rgba(239, 68, 68, 0.1);
+  --warning:        #f59e0b;
+
   --radius-sm: 6px;
-  --radius: 8px;
+  --radius:    8px;
   --radius-lg: 12px;
-  
+
   --shadow-sm: 0 0 0 1px var(--border-subtle);
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--border-subtle);
-  --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--border-subtle);
+  --shadow:    0 2px 8px rgba(0,0,0,0.35), 0 0 0 1px var(--border-subtle);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px var(--border-subtle);
 }
 
 * {
@@ -45,28 +46,33 @@
 body {
   margin: 0;
   font-family: var(--font-sans);
-  background: var(--bg-primary);
+  background: linear-gradient(160deg, #070c1c 0%, #09102a 45%, #070b20 100%);
+  background-attachment: fixed;
   color: var(--text-primary);
   min-height: 100vh;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* fixed nav 高度 60px — 防止内容被遮 */
+  padding-top: 60px;
 }
 
-/* Header - 玻璃态效果 */
+/* Header - 固定吸顶（fixed 跨浏览器最可靠） */
 .brand-nav {
-  background: rgba(10, 10, 15, 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  padding: 20px 24px 36px;
+  background: rgba(7, 12, 28, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border-subtle);
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
-  min-height: 64px;
+  left: 0;
+  right: 0;
+  z-index: 200;
+  height: 60px;
 }
 
 .brand-stack {
@@ -191,7 +197,7 @@ body {
   position: relative;
   max-width: 960px;
   margin: 0 auto;
-  padding: 0 20px 48px;
+  padding: 8px 20px 48px;
 }
 
 /* Workspace Grid */
@@ -498,19 +504,23 @@ button#run-task:active {
   display: none;
 }
 
-.artifact-links a {
+.artifact-links a,
+.artifact-dl-btn {
   padding: 6px 12px;
   border-radius: var(--radius);
   background: var(--bg-tertiary);
   color: var(--text-secondary);
   text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
   font-size: 12px;
   font-weight: 500;
   transition: all 150ms ease;
   border: 1px solid var(--border-subtle);
 }
 
-.artifact-links a:hover {
+.artifact-links a:hover,
+.artifact-dl-btn:hover {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
@@ -798,8 +808,8 @@ button#run-task:active {
 
 .history-item {
   display: grid;
-  grid-template-columns: 1fr 70px 80px;
-  gap: 12px;
+  grid-template-columns: 1fr 90px 140px;
+  gap: 24px;
   align-items: center;
   padding: 8px 14px;
   background: transparent;
@@ -838,9 +848,9 @@ button#run-task:active {
 }
 
 .history-status {
-  padding: 0;
+  padding: 0 8px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   text-transform: capitalize;
   background: var(--bg-secondary);
@@ -850,7 +860,7 @@ button#run-task:active {
   height: 20px;
   line-height: 20px;
   box-sizing: border-box;
-  width: 48px;
+  white-space: nowrap;
   text-align: center;
   margin: 0;
   font-family: 'SF Mono', Monaco, 'Courier New', monospace;
@@ -860,26 +870,24 @@ button#run-task:active {
   background: rgba(34, 197, 94, 0.15);
   border-color: rgba(34, 197, 94, 0.5);
   color: #4ade80;
-  display: inline-block;
-  height: 20px;
-  line-height: 20px;
-  width: 48px;
-  text-align: center;
-  margin: 0;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
 }
 
 .history-status.error {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.5);
   color: #f87171;
-  display: inline-block;
-  height: 20px;
-  line-height: 20px;
-  width: 48px;
-  text-align: center;
-  margin: 0;
-  font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+}
+
+.history-status.processing {
+  background: rgba(99, 120, 255, 0.12);
+  border-color: rgba(99, 120, 255, 0.4);
+  color: var(--accent);
+  animation: pulse-badge 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
 }
 
 @keyframes fadeInUp {
@@ -1069,6 +1077,7 @@ body.landing-only header h1 {
   font-size: 12px;
   color: var(--accent);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .history-link:hover {
@@ -1097,19 +1106,45 @@ body.landing-only header h1 {
 
 .history-col2 {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
 }
 
 .history-col3 {
   display: flex;
-  justify-content: flex-end;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .history-no-report {
   font-size: 12px;
   color: var(--text-tertiary);
+}
+
+.history-dl-btn {
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  background: rgba(99, 120, 255, 0.08);
+  border: 1px solid rgba(99, 120, 255, 0.22);
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 150ms ease;
+  white-space: nowrap;
+}
+
+.history-dl-btn:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.history-dl-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ========================================
@@ -1139,17 +1174,7 @@ body.landing-only header h1 {
 
 /* 网格背景 */
 .grid-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 60px 60px;
-  pointer-events: none;
-  z-index: 1;
+  display: none;
 }
 
 /* Logo脉冲效果 */
@@ -1187,7 +1212,7 @@ body.landing-only header h1 {
 #landing {
   position: relative;
   z-index: 2;
-  min-height: 100vh;
+  min-height: calc(100vh - 60px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1208,11 +1233,11 @@ body.landing-only header h1 {
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(99, 120, 255, 0.08);
+  border: 1px solid rgba(99, 120, 255, 0.2);
   border-radius: 100px;
   font-size: 13px;
-  color: var(--text-secondary);
+  color: #a5b8f8;
   margin-bottom: 32px;
   backdrop-filter: blur(10px);
 }
@@ -1240,10 +1265,11 @@ body.landing-only header h1 {
 }
 
 .title-gradient {
-  background: linear-gradient(135deg, #fff 0%, #a5b4fc 50%, #6366f1 100%);
+  background: linear-gradient(135deg, #e8ecff 0%, #a5b4fc 45%, #818cf8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  filter: drop-shadow(0 0 30px rgba(99,102,241,0.25));
 }
 
 /* 副标题 */
@@ -1270,7 +1296,7 @@ body.landing-only header h1 {
   align-items: center;
   gap: 12px;
   padding: 16px 32px;
-  background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #5b5ef5 0%, #7c3aed 100%);
   border: none;
   border-radius: 12px;
   color: white;
@@ -1280,9 +1306,10 @@ body.landing-only header h1 {
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
-  box-shadow: 
-    0 0 0 1px rgba(255, 255, 255, 0.1),
-    0 4px 20px rgba(99, 102, 241, 0.3);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.12),
+    0 4px 24px rgba(99,102,241,0.4),
+    0 0 60px rgba(99,102,241,0.15);
 }
 
 .hero-btn--primary::before {
@@ -1412,15 +1439,11 @@ body:not(.landing-only) .ambient-glow {
   opacity: 0.6;
 }
 
-/* 工作区头部 */
+/* 工作区头部 — 不再单独设置 position，继承 .brand-nav 的 fixed */
 .workspace-header {
-  position: relative;
-  z-index: 10;
-  background: rgba(10, 10, 15, 0.8);
+  /* position 由 .brand-nav fixed 统一管理，此处只做外观微调 */
   backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 20px 24px;
-  min-height: 64px;
+  -webkit-backdrop-filter: blur(20px);
 }
 
 .workspace-header .brand-name {
@@ -2624,13 +2647,14 @@ body:not(.landing-only) .ambient-glow {
    VISUAL OVERHAUL — 2-col Hero + Charts + Animations
    ══════════════════════════════════════════════════ */
 
-/* Enhanced aurora — more vivid colors */
+/* Aurora — vivid and clearly visible */
 .ambient-glow {
   background:
-    radial-gradient(ellipse 80% 50% at 15% 15%, rgba(99,102,241,0.18) 0%, transparent 55%),
-    radial-gradient(ellipse 60% 40% at 85% 75%, rgba(139,92,246,0.14) 0%, transparent 50%),
-    radial-gradient(ellipse 50% 60% at 65% 5%,  rgba(34,211,238,0.10) 0%, transparent 45%),
-    radial-gradient(ellipse 40% 35% at 5%  90%, rgba(16,185,129,0.07) 0%, transparent 40%);
+    radial-gradient(ellipse 80% 55% at 10% 10%, rgba(99,102,241,0.32) 0%, transparent 55%),
+    radial-gradient(ellipse 65% 45% at 88% 78%, rgba(139,92,246,0.26) 0%, transparent 50%),
+    radial-gradient(ellipse 55% 65% at 68% 2%,  rgba(34,211,238,0.18) 0%, transparent 48%),
+    radial-gradient(ellipse 45% 38% at 3%  92%, rgba(16,185,129,0.13) 0%, transparent 42%),
+    radial-gradient(ellipse 35% 30% at 50% 50%, rgba(99,102,241,0.08) 0%, transparent 60%);
   animation: auroraShift 12s ease-in-out infinite;
 }
 
@@ -2676,18 +2700,29 @@ body:not(.landing-only) .ambient-glow {
 
 /* ── Dashboard cards ─────────────────────────── */
 .dash-card {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: linear-gradient(145deg, rgba(12,20,48,0.88) 0%, rgba(9,14,36,0.88) 100%);
+  border: 1px solid rgba(99,120,255,0.14);
   border-radius: 20px;
   padding: 20px;
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
+  overflow: hidden;
 }
-
+.dash-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99,140,255,0.45), transparent);
+  pointer-events: none;
+}
 .dash-card:hover {
-  border-color: rgba(255,255,255,0.14);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+  border-color: rgba(99,120,255,0.26);
+  box-shadow: 0 12px 40px rgba(0,0,30,0.5);
 }
 
 .dash-hd {
@@ -3054,10 +3089,10 @@ body:not(.landing-only) .ambient-glow {
   align-items: center;
   gap: 12px;
   padding: 13px 15px;
-  background: rgba(255, 255, 255, 0.018);
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  background: linear-gradient(145deg, rgba(14,22,50,0.85) 0%, rgba(10,16,38,0.85) 100%);
+  border: 1px solid rgba(99,120,255,0.12);
   border-radius: 12px;
-  transition: border-color 200ms, background 200ms, transform 200ms;
+  transition: border-color 200ms, background 200ms, transform 200ms, box-shadow 200ms;
   position: relative;
   overflow: hidden;
 }
@@ -3068,12 +3103,13 @@ body:not(.landing-only) .ambient-glow {
   left: 15%;
   right: 15%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.35), transparent);
+  background: linear-gradient(90deg, transparent, rgba(99,130,255,0.5), transparent);
 }
 .feat-card:hover {
-  border-color: rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(99,120,255,0.24);
+  background: linear-gradient(145deg, rgba(18,28,62,0.9) 0%, rgba(14,20,48,0.9) 100%);
   transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0,0,40,0.4);
 }
 
 .feat-icon-wrap {
@@ -3132,23 +3168,31 @@ body:not(.landing-only) .ambient-glow {
   white-space: nowrap;
 }
 
-/* ── Workspace Panel top glow ────────────────────────────────── */
+/* ── Workspace Panel — navy-glass surface + top glow ────────── */
 .ws-panel {
   position: relative;
+  background: linear-gradient(155deg, rgba(12,20,44,0.96) 0%, rgba(9,15,36,0.96) 100%);
+  border-color: rgba(99,120,255,0.14);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 .ws-panel::before {
   content: '';
   position: absolute;
   top: -1px;
-  left: 12%;
-  right: 12%;
+  left: 10%;
+  right: 10%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(99,130,255,0.55), transparent);
   border-radius: 1px;
   pointer-events: none;
 }
 .ws-panel:hover::before {
-  background: linear-gradient(90deg, transparent, rgba(99,102,241,0.65), transparent);
+  background: linear-gradient(90deg, transparent, rgba(99,130,255,0.80), transparent);
+}
+.ws-panel:hover {
+  border-color: rgba(99,120,255,0.24);
+  box-shadow: 0 8px 32px rgba(0,0,20,0.5), 0 0 0 1px rgba(99,120,255,0.18);
 }
 
 /* ── Upload Zone — scan animation ───────────────────────────── */
@@ -3415,8 +3459,8 @@ button#run-task:hover:not(:disabled) {
 
 .history-thead {
   display: grid;
-  grid-template-columns: 1fr 70px 80px;
-  gap: 12px;
+  grid-template-columns: 1fr 90px 140px;
+  gap: 24px;
   padding: 6px 14px 8px;
   border-bottom: 1px solid rgba(255,255,255,0.05);
   margin-bottom: 2px;
@@ -3428,8 +3472,8 @@ button#run-task:hover:not(:disabled) {
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
-.history-thead span:nth-child(2) { text-align: center; }
-.history-thead span:last-child   { text-align: right; }
+.history-thead span:nth-child(2) { text-align: left; }
+.history-thead span:last-child   { text-align: left; }
 
 /* Filter buttons with icons */
 .filter-btn {
@@ -3630,4 +3674,33 @@ button#run-task:hover:not(:disabled) {
   border-color: #ef4444;
   color: #fff;
   box-shadow: 0 4px 16px rgba(239, 68, 68, 0.35);
+}
+
+/* ── Upload error inline message ─────────────────────────── */
+.upload-error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border-radius: 7px;
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  color: #f87171;
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 6px;
+  animation: ueSlideIn 180ms ease;
+}
+@keyframes ueSlideIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.upload-error.hidden { display: none; }
+.upload-error .ue-icon { flex-shrink: 0; opacity: 0.9; }
+.upload-error .ue-text { flex: 1; letter-spacing: 0.01em; }
+
+/* Upload zone error state */
+.upload-zone.has-error {
+  border-color: rgba(239, 68, 68, 0.45) !important;
+  background: rgba(239, 68, 68, 0.03) !important;
 }

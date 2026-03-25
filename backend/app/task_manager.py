@@ -58,6 +58,7 @@ class TaskManager:
         self._lock = threading.Lock()
         self.executor = ThreadPoolExecutor(max_workers=2)
         self._load_index()
+        self._recover_orphaned_tasks()  # 服务重启时恢复孤儿任务
 
     # --------------------------- persistence ---------------------------
     def _load_index(self) -> None:
@@ -70,11 +71,54 @@ class TaskManager:
         except Exception:
             self.tasks = {}
 
-    def _save_index(self) -> None:
-        payload = {task_id: record.to_dict() for task_id, record in self.tasks.items()}
+    # 刚创建的任务在此秒数内不会被视为孤儿（防止 reload 时误杀）
+    ORPHAN_GRACE_SECONDS = 30
+
+    def _recover_orphaned_tasks(self) -> None:
+        """服务重启时，将孤儿任务（running/queued）标记为 failed。
+        仅处理 created_at 超过 ORPHAN_GRACE_SECONDS 秒的任务，
+        避免在 uvicorn --reload 时将刚提交的任务误杀。"""
+        from datetime import timezone
+        now_ts = datetime.now(timezone.utc).timestamp()
+        orphaned = []
+        for task_id, record in self.tasks.items():
+            if record.status not in ("running", "queued"):
+                continue
+            try:
+                created_ts = datetime.fromisoformat(
+                    record.created_at.replace("Z", "+00:00")
+                ).timestamp()
+            except Exception:
+                created_ts = 0
+            if now_ts - created_ts >= self.ORPHAN_GRACE_SECONDS:
+                orphaned.append(task_id)
+
+        if not orphaned:
+            return
+        for task_id in orphaned:
+            record = self.tasks[task_id]
+            record.status = "failed"
+            record.message = "服务已重启，任务中断。请重新提交文件进行分析。"
+            record.updated_at = _now()
+        self._save_index()
+        print(f"[TaskManager] Recovered {len(orphaned)} orphaned task(s) on startup.")
+
+    def _build_index_payload(self) -> dict:
+        """Serialize self.tasks to a plain dict.  Must be called with self._lock held."""
+        return {tid: r.to_dict() for tid, r in self.tasks.items()}
+
+    def _flush_index(self, payload: dict) -> None:
+        """Write the serialized payload to disk atomically.
+        Must be called WITHOUT self._lock held — file I/O must not block
+        other threads that need the lock."""
         tmp = self.index_path.with_suffix(".tmp")
         tmp.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
         tmp.replace(self.index_path)
+
+    def _save_index(self) -> None:
+        """Convenience wrapper used only at startup (single-threaded context)."""
+        payload = self._build_index_payload()
+        self._flush_index(payload)
 
     # --------------------------- uploads ---------------------------
     def save_upload(self, filename: str, content: bytes) -> str:
@@ -124,8 +168,26 @@ class TaskManager:
             file_name=file_name,
         )
         with self._lock:
+            # Atomic check: same wallet + same skill type → only one active task allowed.
+            if wallet_address:
+                wallet_lower = wallet_address.lower()
+                conflict = next(
+                    (
+                        r for r in self.tasks.values()
+                        if r.wallet_address
+                        and r.wallet_address.lower() == wallet_lower
+                        and r.skill_type == skill_type
+                        and r.status in ("running", "queued", "pending")
+                    ),
+                    None,
+                )
+                if conflict:
+                    raise ValueError("DUPLICATE_TASK")
             self.tasks[task_id] = record
-            self._save_index()
+            # Serialize inside the lock, but flush to disk AFTER releasing it so
+            # that file I/O does not block other threads waiting on the lock.
+            index_payload = self._build_index_payload()
+        self._flush_index(index_payload)
         workspace = self.tasks_dir / task_id
         input_dir = workspace / "input"
         try:
@@ -150,18 +212,20 @@ class TaskManager:
 
     def get_tasks_by_wallet(self, wallet_address: str, skill_type: Optional[str] = None, limit: int = 50) -> list:
         """获取指定钱包的分析历史"""
+        wallet_lower = wallet_address.lower()
         with self._lock:
+            # Only snapshot matching records; release lock before any sorting/filtering.
             tasks = [
                 self._snapshot(record)
                 for record in self.tasks.values()
-                if record.wallet_address and record.wallet_address.lower() == wallet_address.lower()
+                if record.wallet_address and record.wallet_address.lower() == wallet_lower
             ]
-            # 按时间倒序
-            tasks.sort(key=lambda x: x.created_at, reverse=True)
-            # 按 skill_type 筛选
-            if skill_type:
-                tasks = [t for t in tasks if t.skill_type == skill_type]
-            return tasks[:limit]
+        # Sort and filter OUTSIDE the lock — O(n log n) CPU work should not
+        # block concurrent get_task / create_task callers.
+        tasks.sort(key=lambda x: x.created_at, reverse=True)
+        if skill_type:
+            tasks = [t for t in tasks if t.skill_type == skill_type]
+        return tasks[:limit]
 
     # --------------------------- helpers ---------------------------
     def _copy_code(self, source: Path, dest: Path) -> None:
@@ -189,6 +253,9 @@ class TaskManager:
         record.message = result.get("message", "")
         return result
 
+    # 单个子进程最长执行时间（秒）。超过视为卡死，强制终止。
+    SUBPROCESS_TIMEOUT = 600  # 10 分钟
+
     def _run_command(
         self,
         cmd: list[str],
@@ -200,20 +267,34 @@ class TaskManager:
         merged_env = os.environ.copy()
         if env:
             merged_env.update(env)
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            cwd=str(cwd) if cwd else None,
-            env=merged_env,
-        )
+        try:
+            proc = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=str(cwd) if cwd else None,
+                env=merged_env,
+                timeout=self.SUBPROCESS_TIMEOUT,
+            )
+        except subprocess.TimeoutExpired:
+            log_file.write_text(
+                "$ " + " ".join(cmd) + "\n\n"
+                + f"[ERROR] 执行超时（超过 {self.SUBPROCESS_TIMEOUT} 秒）\n"
+            )
+            raise RuntimeError(
+                f"分析超时（超过 {self.SUBPROCESS_TIMEOUT // 60} 分钟）。"
+                "请检查文件是否过大或脚本是否存在死循环。"
+            )
         log_file.write_text(
             "$ " + " ".join(cmd) + "\n\n"
             + "[stdout]\n" + (proc.stdout or "") + "\n"
             + "[stderr]\n" + (proc.stderr or "") + "\n"
         )
         if proc.returncode != 0:
-            raise RuntimeError(f"命令执行失败 (exit {proc.returncode}): {' '.join(cmd)}")
+            raise RuntimeError(
+                f"命令执行失败 (exit {proc.returncode})。\n"
+                f"[stderr] {(proc.stderr or '').strip()[:500]}"
+            )
         return proc.stdout
 
     def _run_security_audit(self, code_dir: Path, report_dir: Path, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -471,8 +552,12 @@ class TaskManager:
             if log is not None:
                 record.log_path = log
             record.updated_at = _now()
-            self._save_index()
-            return self._snapshot(record)
+            # Serialize while holding the lock so the snapshot is consistent,
+            # then write to disk after releasing to minimise lock contention.
+            index_payload = self._build_index_payload()
+            snapshot = self._snapshot(record)
+        self._flush_index(index_payload)
+        return snapshot
 
     def _execute_task(self, task_id: str, workspace: Path, input_dir: Path) -> None:
         try:
