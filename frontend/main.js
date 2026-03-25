@@ -110,7 +110,11 @@ function clearUploadError() {
   el.classList.add("hidden");
   uploadZone?.classList.remove("has-error");
 }
-const DEFAULT_API = window.location.origin;
+// Local dev: frontend runs on :3000 (static), backend on :8000 (FastAPI)
+// Production (Vercel): vercel.json rewrites /api/* to backend, so origin works fine
+const DEFAULT_API = (window.location.hostname === 'localhost' && window.location.port === '3000')
+  ? 'http://localhost:8000'
+  : window.location.origin;
 const API_BASE = window.HEALTH_AI_API || DEFAULT_API;
 const DETECTOR_REMEDIATIONS = {
   "arbitrary-send-eth": "Switch fund distribution to a pull/payment pattern and combine with ReentrancyGuard and CEI to avoid external call risks.",
