@@ -487,11 +487,141 @@
           container.innerHTML = html;
           return;
         } else if (task.skillType === 'skill-stress-lab') {
-          // Render stress test report
+          // Render stress test report — enhanced dashboard like security audit
           document.title = 'Stress Test Report - Health AI';
           const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown';
-          let html = '<div class="report-header"><h1>🧪 Stress Test Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Type: Skill Stress Lab · Scanned: ' + updatedAt + '</div></div>';
-          html += '<div class="raw-report">' + markdownToHtml(reportText) + '</div>';
+
+          // --- Parse 5-dimension scores ---
+          const stressScores = {};
+          const stressLines = reportText.split('\n');
+          for (let i = 0; i < stressLines.length; i++) {
+            const line = stressLines[i];
+            const stabilityM = line.match(/(?:🛡️\s*)?(?:\*\*)?(?:稳定性|Stability)(?:\*\*)?[^\d]*(\d+)\/100/i);
+            if (stabilityM) stressScores['Stability'] = parseInt(stabilityM[1]);
+            const performanceM = line.match(/(?:⚡\s*)?(?:\*\*)?(?:性能|Performance)(?:\*\*)?[^\d]*(\d+)\/100/i);
+            if (performanceM) stressScores['Performance'] = parseInt(performanceM[1]);
+            const resourceM = line.match(/(?:💾\s*)?(?:\*\*)?(?:资源|Resource)(?:\*\*)?[^\d]*(\d+)\/100/i);
+            if (resourceM) stressScores['Resource'] = parseInt(resourceM[1]);
+            const consistencyM = line.match(/(?:🔄\s*)?(?:\*\*)?(?:一致性|Consistency)(?:\*\*)?[^\d]*(\d+)\/100/i);
+            if (consistencyM) stressScores['Consistency'] = parseInt(consistencyM[1]);
+            const recoveryM = line.match(/(?:🆘\s*)?(?:\*\*)?(?:恢复|Recovery)(?:\*\*)?[^\d]*(\d+)\/100/i);
+            if (recoveryM) stressScores['Recovery'] = parseInt(recoveryM[1]);
+            const overallM = line.match(/(?:📊\s*|🎯\s*|综合|Overall)[^\d]*(\d+)\/100/i);
+            if (overallM && !stressScores['Overall']) stressScores['Overall'] = parseInt(overallM[1]);
+          }
+
+          const stStability    = stressScores['Stability']    || 0;
+          const stPerformance  = stressScores['Performance']  || 0;
+          const stResource     = stressScores['Resource']     || 0;
+          const stConsistency  = stressScores['Consistency']  || 0;
+          const stRecovery     = stressScores['Recovery']     || 0;
+          let stOverall = stressScores['Overall'] || 0;
+          if (!stOverall) {
+            const vals = [stStability, stPerformance, stResource, stConsistency, stRecovery].filter(s => s > 0);
+            stOverall = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+          }
+
+          function getScoreClass(score) {
+            if (score >= 80) return 'low';
+            if (score >= 60) return 'total';
+            if (score >= 40) return 'medium';
+            return 'high';
+          }
+
+          // --- Parse key metrics from original summary section ---
+          const successRateM = reportText.match(/成功次数:\s*(\d+)\s*\(([^)]+)\)/);
+          const totalRunsM   = reportText.match(/总次数:\s*(\d+)/);
+          const avgDurM      = reportText.match(/平均耗时:\s*([\d.]+)s/);
+          const p95DurM      = reportText.match(/P95\s*耗时:\s*([\d.]+)s/);
+          const testRunsM    = reportText.match(/测试轮次\*?\*?:\s*(\d+)/);
+          const concurrencyM = reportText.match(/并发度\*?\*?:\s*(\d+)/);
+          const commandM     = reportText.match(/Command:\s*`([^`]+)`/);
+
+          const totalRuns   = totalRunsM ? parseInt(totalRunsM[1]) : (testRunsM ? parseInt(testRunsM[1]) : 0);
+          const successes   = successRateM ? parseInt(successRateM[1]) : totalRuns;
+          const successRate = successRateM ? successRateM[2] : (totalRuns ? '100.0%' : '-');
+          const failures    = totalRuns - successes;
+          const avgDuration = avgDurM ? avgDurM[1] + 's' : '-';
+          const p95Duration = p95DurM ? p95DurM[1] + 's' : '-';
+          const testRuns    = testRunsM ? testRunsM[1] : String(totalRuns);
+          const concurrency = concurrencyM ? concurrencyM[1] : '-';
+
+          // --- Parse failure samples ---
+          const failureSamples = [];
+          const failRegex = /- Run #(\d+) exit (\d+), duration ([\d.]+)s/g;
+          let fm;
+          while ((fm = failRegex.exec(reportText)) !== null) {
+            failureSamples.push({ run: fm[1], exitCode: fm[2], duration: fm[3] });
+          }
+
+          // --- Build HTML ---
+          let html = '<div class="report-header"><h1>🧪 Stress Test Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
+
+          // Score dashboard — 6 cards
+          html += '<div class="risk-dashboard" style="grid-template-columns: repeat(6, 1fr);">';
+          html += '<div class="risk-card ' + getScoreClass(stOverall)     + '"><div class="risk-number">' + stOverall     + '</div><div class="risk-label">📊 Overall</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(stStability)   + '"><div class="risk-number">' + stStability   + '</div><div class="risk-label">🛡️ Stability</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(stPerformance) + '"><div class="risk-number">' + stPerformance + '</div><div class="risk-label">⚡ Performance</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(stResource)    + '"><div class="risk-number">' + stResource    + '</div><div class="risk-label">💾 Resource</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(stConsistency) + '"><div class="risk-number">' + stConsistency + '</div><div class="risk-label">🔄 Consistency</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(stRecovery)    + '"><div class="risk-number">' + stRecovery    + '</div><div class="risk-label">🆘 Recovery</div></div>';
+          html += '</div>';
+
+          // Score legend
+          html += '<div style="margin-bottom:24px;padding:10px 16px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);font-size:12px;color:var(--text-tertiary);text-align:center;">Score: 80-100 = Excellent 🟢 &nbsp;|&nbsp; 60-79 = Good 🔵 &nbsp;|&nbsp; 40-59 = Fair 🟡 &nbsp;|&nbsp; &lt;40 = Needs Work 🔴</div>';
+
+          // Test configuration section
+          html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">⚙️ Test Configuration</div><div style="padding:16px 20px;">';
+          html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">';
+          html += '<div class="issue-item low" style="margin:0;"><div class="issue-title">Test Runs</div><div class="issue-desc" style="font-size:18px;font-weight:600;">' + testRuns + '</div></div>';
+          html += '<div class="issue-item low" style="margin:0;"><div class="issue-title">Concurrency</div><div class="issue-desc" style="font-size:18px;font-weight:600;">' + concurrency + '</div></div>';
+          if (commandM) {
+            html += '<div class="issue-item low" style="margin:0;grid-column:span 2;"><div class="issue-title">Command</div><div class="issue-desc"><code style="font-size:12px;background:var(--bg-hover);padding:4px 8px;border-radius:4px;">' + commandM[1] + '</code></div></div>';
+          }
+          html += '</div></div></div>';
+
+          // Performance metrics section
+          html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">📈 Performance Metrics</div><div style="padding:16px 20px;">';
+          html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">';
+          html += '<div style="text-align:center;padding:16px;background:var(--bg-hover);border-radius:var(--radius-sm);"><div style="font-size:24px;font-weight:700;color:' + (failures === 0 ? '#22c55e' : '#ef4444') + ';">' + successRate + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Success Rate</div></div>';
+          html += '<div style="text-align:center;padding:16px;background:var(--bg-hover);border-radius:var(--radius-sm);"><div style="font-size:24px;font-weight:700;color:var(--accent);">' + avgDuration + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Avg Duration</div></div>';
+          html += '<div style="text-align:center;padding:16px;background:var(--bg-hover);border-radius:var(--radius-sm);"><div style="font-size:24px;font-weight:700;color:var(--accent);">' + p95Duration + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">P95 Duration</div></div>';
+          html += '<div style="text-align:center;padding:16px;background:var(--bg-hover);border-radius:var(--radius-sm);"><div style="font-size:24px;font-weight:700;color:' + (failures > 0 ? '#ef4444' : '#22c55e') + ';">' + failures + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Failures</div></div>';
+          html += '</div></div></div>';
+
+          // Failure details (if any)
+          if (failureSamples.length > 0) {
+            html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">🔴 Failure Details</div><div style="padding:16px 20px;">';
+            failureSamples.forEach(function(f) {
+              html += '<div class="issue-item high" style="margin-bottom:8px;"><div class="issue-title">Run #' + f.run + '</div><div class="issue-desc">Exit code: ' + f.exitCode + ' · Duration: ' + f.duration + 's</div></div>';
+            });
+            html += '</div></div>';
+          }
+
+          // Recommendations based on scores
+          const stressRecs = [];
+          if (stStability < 80)   stressRecs.push('Stability score is below 80 — investigate intermittent failures and improve error handling.');
+          if (stPerformance < 80)  stressRecs.push('Performance score is below 80 — consider optimizing response time; average duration may be too high.');
+          if (stResource < 80)     stressRecs.push('Resource score is below 80 — check for resource leaks or excessive memory/CPU usage under load.');
+          if (stConsistency < 80)  stressRecs.push('Consistency score is below 80 — results vary between runs; ensure deterministic behavior.');
+          if (stRecovery < 80)     stressRecs.push('Recovery score is below 80 — the system struggles to recover from failures; add retry logic or graceful degradation.');
+          if (failures > 0)        stressRecs.push(failures + ' failure(s) detected out of ' + totalRuns + ' runs — review failure logs for root cause.');
+
+          if (stressRecs.length > 0) {
+            html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">💡 Recommendations</div><div style="padding:16px 20px;">';
+            stressRecs.forEach(function(rec) {
+              html += '<div class="issue-item medium" style="margin-bottom:8px;"><div class="issue-desc">' + rec + '</div></div>';
+            });
+            html += '</div></div>';
+          } else {
+            html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">✅ Assessment</div><div style="padding:16px 20px;">';
+            html += '<div class="issue-item low" style="margin-bottom:0;"><div class="issue-desc">All dimensions scored 80 or above with zero failures. The skill demonstrates excellent stability and performance under stress testing conditions.</div></div>';
+            html += '</div></div>';
+          }
+
+          // Full report
+          html += '<div class="issues-section"><div class="issues-header">📄 Full Report</div><div style="padding:16px 20px;"><div class="raw-report">' + markdownToHtml(reportText) + '</div></div></div>';
+
           container.innerHTML = html;
           return;
         }
