@@ -554,11 +554,6 @@
 })();
 </script>
 
-  <!-- Vercel Analytics
-       Pure-HTML equivalent of: import { Analytics } from "@vercel/analytics/react"
-       Uses the @vercel/analytics inject() API — no build step required. -->
-  <script type="module">
-    import { inject } from "https://cdn.jsdelivr.net/npm/@vercel/analytics@1/dist/index.mjs";
-    inject();
-  </script>
+  <!-- Vercel Web Analytics -->
+  <script defer src="/_vercel/insights/script.js"></script>
 </body>
