@@ -277,7 +277,8 @@
             tableHtml = '<table style="width:100%;border-collapse:collapse;margin:12px 0;font-size:12px;">';
           }
           const cells = line.split('|').filter(c => c.trim());
-          if (cells.length > 0 && !line.match(/^\s*[-:]+\s*$/)) {
+          const isSeparator = cells.length > 0 && cells.every(c => /^\s*:?-+:?\s*$/.test(c));
+          if (cells.length > 0 && !isSeparator) {
             const isHeader = result.length === 0 || (inTable && tableHtml.split('<tr>').length === 2);
             const tag = isHeader ? 'th' : 'td';
             const style = isHeader 
@@ -382,22 +383,16 @@
               if (m) scores['Privilege'] = parseInt(m[1]);
             }
 
-            // Memory Footprint
-            if (/\|\s*[^\|]*Memory/.test(line)) {
-              const m = line.match(/\|\s*[^\|]*Memory[^\|]*\|\s*\*?\*?(\d+)\/100/i);
-              if (m) scores['Memory'] = parseInt(m[1]);
-            } else {
-              const m = line.match(/(?:^-\s*Memory(?: Footprint)?|内存安全)[:：\/]?\s*(\d+)/i);
-              if (m) scores['Memory'] = parseInt(m[1]);
+            // Integrity (replaces Memory)
+            if (/\|\s*[^\|]*Integrity/.test(line)) {
+              const m = line.match(/\|\s*[^\|]*Integrity[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+              if (m) scores['Integrity'] = parseInt(m[1]);
             }
 
-            // Token Cost
-            if (/\|\s*[^\|]*Token/.test(line)) {
-              const m = line.match(/\|\s*[^\|]*Token[^\|]*\|\s*\*?\*?(\d+)\/100/i);
-              if (m) scores['Token'] = parseInt(m[1]);
-            } else {
-              const m = line.match(/(?:^-\s*Token(?: Cost)?|Token 安全)[:：\/]?\s*(\d+)/i);
-              if (m) scores['Token'] = parseInt(m[1]);
+            // Supply Chain (replaces Token)
+            if (/\|\s*[^\|]*Supply Chain/.test(line)) {
+              const m = line.match(/\|\s*[^\|]*Supply Chain[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+              if (m) scores['SupplyChain'] = parseInt(m[1]);
             }
 
             // Stability (mapped to Failure key)
@@ -443,11 +438,11 @@
 
           // Get scores (0-100, higher = safer)
           overallScore = overallScore || 0;
-          const privacyScore = scores['Privacy'] || scores['privacyScore'] || 0;
-          const privilegeScore = scores['Privilege'] || scores['privilegeScore'] || 0;
-          const memoryScore = scores['Memory'] || scores['memoryScore'] || 0;
-          const tokenScore = scores['Token'] || scores['tokenScore'] || 0;
-          const failureScore = scores['Failure'] || scores['failureScore'] || 0;
+          const privacyScore     = scores['Privacy']     || scores['privacyScore']    || 0;
+          const privilegeScore   = scores['Privilege']   || scores['privilegeScore']  || 0;
+          const integrityScore   = scores['Integrity']   || scores['integrityScore']  || 0;
+          const supplyChainScore = scores['SupplyChain'] || scores['supplyChainScore']|| 0;
+          const failureScore     = scores['Failure']     || scores['failureScore']    || 0;
 
           let html = '<div class="report-header"><h1>🔒 Skill Security Audit Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
 
@@ -460,12 +455,12 @@
           }
 
           html += '<div class="risk-dashboard" style="grid-template-columns: repeat(6, 1fr);">';
-          html += '<div class="risk-card ' + getScoreClass(overallScore) + '"><div class="risk-number">' + overallScore + '</div><div class="risk-label">📊 Overall</div></div>';
-          html += '<div class="risk-card ' + getScoreClass(privacyScore) + '"><div class="risk-number">' + privacyScore + '</div><div class="risk-label">🔒 Privacy</div></div>';
-          html += '<div class="risk-card ' + getScoreClass(privilegeScore) + '"><div class="risk-number">' + privilegeScore + '</div><div class="risk-label">🔐 Privilege</div></div>';
-          html += '<div class="risk-card ' + getScoreClass(memoryScore) + '"><div class="risk-number">' + memoryScore + '</div><div class="risk-label">💾 Memory</div></div>';
-          html += '<div class="risk-card ' + getScoreClass(tokenScore) + '"><div class="risk-number">' + tokenScore + '</div><div class="risk-label">🪙 Token</div></div>';
-          html += '<div class="risk-card ' + getScoreClass(failureScore) + '"><div class="risk-number">' + failureScore + '</div><div class="risk-label">✅ Stability</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(overallScore)     + '"><div class="risk-number">' + overallScore     + '</div><div class="risk-label">📊 Overall</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(privacyScore)     + '"><div class="risk-number">' + privacyScore     + '</div><div class="risk-label">🔏 Privacy</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(privilegeScore)   + '"><div class="risk-number">' + privilegeScore   + '</div><div class="risk-label">🔐 Privilege</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(integrityScore)   + '"><div class="risk-number">' + integrityScore   + '</div><div class="risk-label">🛡️ Integrity</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(supplyChainScore) + '"><div class="risk-number">' + supplyChainScore + '</div><div class="risk-label">🔗 Supply Chain</div></div>';
+          html += '<div class="risk-card ' + getScoreClass(failureScore)     + '"><div class="risk-number">' + failureScore     + '</div><div class="risk-label">✅ Stability</div></div>';
           html += '</div>';
 
           // Key recommendations

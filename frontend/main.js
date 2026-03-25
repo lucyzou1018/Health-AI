@@ -902,22 +902,61 @@ function buildSecurityAuditSummary(text) {
   const scores = {};
   const lines = text.split(/\r?\n/);
   
-  // Parse scores from report (support both Chinese and English formats)
+  // Parse scores from report
+  // New table format: | 🏆 **Overall Security** | **83/100** | ... |
+  //                   | 🔏 Privacy | 95/100 | ... |
+  // Legacy format:    - Privacy: 95/100
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Match formats: "- Privacy: 35" or "隐私安全：35/100"
-    const overallMatch = line.match(/(?:Overall Safety|综合安全评分)[:：\/]?\s*(\d+)/i);
-    if (overallMatch) scores['Overall'] = parseInt(overallMatch[1]);
-    const privacyMatch = line.match(/(?:^-\s*Privacy|隐私安全)[:：\/]?\s*(\d+)/i);
-    if (privacyMatch) scores['Privacy'] = parseInt(privacyMatch[1]);
-    const privilegeMatch = line.match(/(?:^-\s*Privilege|权限安全)[:：\/]?\s*(\d+)/i);
-    if (privilegeMatch) scores['Privilege'] = parseInt(privilegeMatch[1]);
-    const memoryMatch = line.match(/(?:^-\s*Memory(?: Footprint)?|内存安全)[:：\/]?\s*(\d+)/i);
-    if (memoryMatch) scores['Memory'] = parseInt(memoryMatch[1]);
-    const tokenMatch = line.match(/(?:^-\s*Token(?: Cost)?|Token 安全)[:：\/]?\s*(\d+)/i);
-    if (tokenMatch) scores['Token'] = parseInt(tokenMatch[1]);
-    const failureMatch = line.match(/(?:^-\s*(?:Failure Rate|Stability)|稳定性)[:：\/]?\s*(\d+)/i);
-    if (failureMatch) scores['Failure'] = parseInt(failureMatch[1]);
+
+    // Overall Security (table format)
+    if (/Overall Security/.test(line)) {
+      const m = line.match(/\*?\*?(\d+)\/100/);
+      if (m) scores['Overall'] = parseInt(m[1]);
+    }
+    if (!scores['Overall']) {
+      const m = line.match(/(?:Overall Safety|综合安全评分)[:：\/]?\s*(\d+)/i);
+      if (m) scores['Overall'] = parseInt(m[1]);
+    }
+
+    // Privacy
+    if (/\|\s*[^\|]*Privacy/.test(line)) {
+      const m = line.match(/\|\s*[^\|]*Privacy[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+      if (m) scores['Privacy'] = parseInt(m[1]);
+    } else {
+      const m = line.match(/(?:^-\s*Privacy|隐私安全)[:：\/]?\s*(\d+)/i);
+      if (m) scores['Privacy'] = parseInt(m[1]);
+    }
+
+    // Privilege
+    if (/\|\s*[^\|]*Privilege/.test(line)) {
+      const m = line.match(/\|\s*[^\|]*Privilege[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+      if (m) scores['Privilege'] = parseInt(m[1]);
+    } else {
+      const m = line.match(/(?:^-\s*Privilege|权限安全)[:：\/]?\s*(\d+)/i);
+      if (m) scores['Privilege'] = parseInt(m[1]);
+    }
+
+    // Integrity (replaces Memory)
+    if (/\|\s*[^\|]*Integrity/.test(line)) {
+      const m = line.match(/\|\s*[^\|]*Integrity[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+      if (m) scores['Integrity'] = parseInt(m[1]);
+    }
+
+    // Supply Chain (replaces Token)
+    if (/\|\s*[^\|]*Supply Chain/.test(line)) {
+      const m = line.match(/\|\s*[^\|]*Supply Chain[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+      if (m) scores['SupplyChain'] = parseInt(m[1]);
+    }
+
+    // Stability (mapped to Failure key)
+    if (/\|\s*[^\|]*Stability/.test(line)) {
+      const m = line.match(/\|\s*[^\|]*Stability[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+      if (m) scores['Failure'] = parseInt(m[1]);
+    } else {
+      const m = line.match(/(?:^-\s*(?:Failure Rate|Stability)|稳定性)[:：\/]?\s*(\d+)/i);
+      if (m) scores['Failure'] = parseInt(m[1]);
+    }
   }
   
   // Fallback: calculate overall if not parsed
@@ -928,27 +967,27 @@ function buildSecurityAuditSummary(text) {
   }
   
   // Get individual scores
-  const privacyScore = scores['Privacy'] || 0;
-  const privilegeScore = scores['Privilege'] || 0;
-  const memoryScore = scores['Memory'] || 0;
-  const tokenScore = scores['Token'] || 0;
-  const failureScore = scores['Failure'] || 0;
-  
+  const privacyScore     = scores['Privacy']     || 0;
+  const privilegeScore   = scores['Privilege']   || 0;
+  const integrityScore   = scores['Integrity']   || 0;
+  const supplyChainScore = scores['SupplyChain'] || 0;
+  const failureScore     = scores['Failure']     || 0;
+
   // Determine score class based on value (higher = safer)
   function getScoreClass(score) {
     if (score >= 80) return 'low';      // 优秀 - 绿色
-    if (score >= 60) return 'total';    // 良好 - 蓝色  
+    if (score >= 60) return 'total';    // 良好 - 蓝色
     if (score >= 40) return 'medium';   // 一般 - 黄色
     return 'high';                      // 需改进 - 红色
   }
-  
+
   // Build 6 score cards — 3-column grid (2 rows of 3)
   let html = `<div class="report-stats-cards report-stats-cards--6">`;
   html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label"><span class="stat-icon">📊</span>Overall</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(privacyScore)}"><span class="stat-number">${privacyScore}</span><span class="stat-label"><span class="stat-icon">🔒</span>Privacy</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(privacyScore)}"><span class="stat-number">${privacyScore}</span><span class="stat-label"><span class="stat-icon">🔏</span>Privacy</span></div>`;
   html += `<div class="stat-card ${getScoreClass(privilegeScore)}"><span class="stat-number">${privilegeScore}</span><span class="stat-label"><span class="stat-icon">🔐</span>Privilege</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(memoryScore)}"><span class="stat-number">${memoryScore}</span><span class="stat-label"><span class="stat-icon">💾</span>Memory</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(tokenScore)}"><span class="stat-number">${tokenScore}</span><span class="stat-label"><span class="stat-icon">🪙</span>Token</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(integrityScore)}"><span class="stat-number">${integrityScore}</span><span class="stat-label"><span class="stat-icon">🛡️</span>Integrity</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(supplyChainScore)}"><span class="stat-number">${supplyChainScore}</span><span class="stat-label"><span class="stat-icon">🔗</span>Supply Chain</span></div>`;
   html += `<div class="stat-card ${getScoreClass(failureScore)}"><span class="stat-number">${failureScore}</span><span class="stat-label"><span class="stat-icon">✅</span>Stability</span></div>`;
   html += `</div>`;
 

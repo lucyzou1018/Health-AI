@@ -50,6 +50,21 @@ def _safe(text: str) -> str:
         "\u274c": "[X]", "\u2705": "[v]","u2728": "*",
         "\u2764": "<3",  "\U0001f512": "[lock]",
         "\U0001f4cb": "", "\U0001f4ca": "", "\U0001f4c4": "",
+        # 新增常用 emoji
+        "\U0001f6e1": "[shield]",  # 🛡
+        "\U0001f517": "[link]",    # 🔗
+        "\u2705": "[v]",           # ✅
+        "\u274c": "[X]",           # ❌
+        "\u26a0": "[!]",           # ⚠️
+        "\U0001f50d": "[search]",  # 🔍
+        "\U0001f527": "[wrench]",  # 🔧
+        "\U0001f4cb": "",          # 📋
+        "\u2699": "[gear]",        # ⚙
+        "\U0001f4c4": "",          # 📄
+        "\U0001f511": "[key]",     # 🔑
+        "\U0001f3c6": "[trophy]",  # 🏆
+        "\U0001f510": "[lock]",    # 🔐
+        "\U0001f50f": "[lock]",    # 🔏
     }
     for k, v in replacements.items():
         text = text.replace(k, v)
@@ -99,6 +114,14 @@ class AuditPDF(FPDF):
         self.set_text_color(*NAVY)
         self.cell(0, 7, _safe(text), ln=True)
         self.ln(2)
+
+    # ── 子章节标题（### 级别） ────────────────────────────────────────────────
+    def subsection_title(self, text: str):
+        self.ln(2)
+        self.set_font("Helvetica", "B", 9.5)
+        self.set_text_color(*INDIGO)
+        self.cell(0, 6, _safe(text), ln=True)
+        self.ln(1)
 
     # ── 普通段落 ──────────────────────────────────────────────────────────────
     def body_text(self, text: str):
@@ -170,7 +193,7 @@ class AuditPDF(FPDF):
             # 多行自适应高度
             max_lines = 1
             for cell_text, cw in zip(row, col_widths):
-                lines = self.get_string_width(str(cell_text)) / (cw - 2)
+                lines = self.get_string_width(_safe(str(cell_text))) / (cw - 2)
                 max_lines = max(max_lines, int(lines) + 1)
             row_h = min(max_lines * 4.5, 18)
             for cell_text, cw in zip(row, col_widths):
@@ -221,38 +244,102 @@ def _extract_between(text: str, start_marker: str, end_markers: list[str]) -> st
 
 
 def _parse_table(block: str) -> tuple[list[str], list[list[str]]]:
-    """解析 Markdown 表格"""
+    """解析 Markdown 表格，自动跳过分隔行（| --- | :---: | 等）"""
     lines = [l.strip() for l in block.strip().splitlines() if l.strip().startswith("|")]
     if len(lines) < 2:
         return [], []
     headers = [c.strip() for c in lines[0].strip("|").split("|")]
     rows = []
-    for line in lines[2:]:  # 跳过分隔行
-        row = [c.strip() for c in line.strip("|").split("|")]
-        rows.append(row)
+    for line in lines[1:]:
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        # 跳过分隔行：每个 cell 都是 --- / :---: 之类
+        if cells and all(re.match(r"^\s*:?-+:?\s*$", c) for c in cells):
+            continue
+        rows.append(cells)
     return headers, rows
 
 
 def _parse_scores(text: str) -> dict[str, int]:
-    """从 ## Risk Scores 块解析分数"""
+    """从 ## Risk Scores 表格中解析各维度分数（新格式：Markdown table）"""
     block = _extract_between(text, "## Risk Scores", ["## ", "---"])
     scores = {}
-    label_map = {
-        "overall security score": "Overall",
-        "privacy":    "Privacy",
-        "privilege":  "Privilege",
+
+    # 维度名映射（去掉 emoji 后小写匹配）
+    dimension_map = {
+        "overall security": "Overall",
+        "overall":          "Overall",
+        "privacy":          "Privacy",
+        "privilege":        "Privilege",
+        "integrity":        "Integrity",
+        "supply chain":     "Supply Chain",
+        "stability":        "Stability",
+        # 兼容旧报告中可能存在的旧维度名
         "memory footprint": "Memory",
-        "token cost":  "Token",
-        "stability":   "Stability",
+        "token cost":       "Token",
     }
+
     for line in block.splitlines():
-        m = re.match(r"-\s*(.+?):\s*(\d+)/100", line, re.I)
-        if m:
-            raw_label = m.group(1).strip().lower()
-            val = int(m.group(2))
-            label = label_map.get(raw_label, m.group(1).strip())
+        if not line.strip().startswith("|"):
+            continue
+        # 跳过分隔行
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if all(re.match(r"^\s*:?-+:?\s*$", c) for c in cells):
+            continue
+        if len(cells) < 2:
+            continue
+
+        dim_raw = cells[0]  # e.g. "🔏 Privacy" or "🏆 **Overall Security**"
+        score_raw = cells[1]  # e.g. "100/100" or "**94/100**"
+
+        # 提取数字分数
+        score_m = re.search(r"(\d+)/100", score_raw)
+        if not score_m:
+            continue
+        val = int(score_m.group(1))
+
+        # 去掉 markdown 粗体符号和 emoji（latin-1 兜底），再小写匹配
+        dim_clean = re.sub(r"\*+", "", dim_raw)  # 去掉 **
+        dim_clean = dim_clean.encode("ascii", errors="ignore").decode("ascii")  # 去掉 emoji
+        dim_clean = dim_clean.strip().lower()
+
+        label = None
+        for key, mapped in dimension_map.items():
+            if key in dim_clean:
+                label = mapped
+                break
+
+        if label:
             scores[label] = val
+
     return scores
+
+
+def _parse_checklist_sections(text: str) -> list[tuple[str, list[str], list[list[str]]]]:
+    """
+    解析 ## 🔍 Detailed Security Checklist 下的所有 ### 子章节。
+    返回列表: [(subsection_title, headers, rows), ...]
+    """
+    block = _extract_between(text, "## 🔍 Detailed Security Checklist", ["## "])
+    if not block:
+        # 兼容没有 emoji 的旧格式
+        block = _extract_between(text, "## Detailed Security Checklist", ["## "])
+    if not block:
+        return []
+
+    results = []
+    # 按 ### 分割
+    parts = re.split(r"\n(###\s+.+)", block)
+    # parts[0] 是前言文字，之后交替：标题 / 内容
+    i = 1
+    while i < len(parts) - 1:
+        sub_title = parts[i].lstrip("#").strip()
+        sub_body  = parts[i + 1] if i + 1 < len(parts) else ""
+        headers, rows = _parse_table(sub_body)
+        if headers and rows:
+            results.append((sub_title, headers, rows))
+        i += 2
+
+    return results
 
 
 # ─── 主入口 ───────────────────────────────────────────────────────────────────
@@ -315,44 +402,63 @@ def generate_pdf(md_path: Path, out_path: Path) -> None:
     scores = _parse_scores(md)
     if scores:
         pdf.section_title("Risk Scores")
-        pdf.score_cards(scores)
+        # Overall 单独展示，其余维度展示为卡片
+        overall = scores.pop("Overall", None)
+        if overall is not None:
+            color = score_color(overall)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_text_color(*color)
+            pdf.cell(0, 7, f"Overall Security Score: {overall}/100  ({score_label(overall)})", ln=True)
+            pdf.ln(2)
+        if scores:
+            pdf.score_cards(scores)
         # 图例
         pdf.set_font("Helvetica", "", 7.5)
         pdf.set_text_color(*GRAY)
         pdf.cell(0, 5, "80-100 = Excellent   60-79 = Good   40-59 = Fair   <40 = Needs Work", ln=True)
         pdf.ln(3)
 
-    # ── Recommendations ────────────────────────────────────────────────────────
-    rec_block = _extract_between(md, "## Recommendations", ["## "])
+    # ── Key Recommendations ────────────────────────────────────────────────────
+    # 兼容新旧两种章节名
+    rec_block = (_extract_between(md, "## 🔧 Key Recommendations", ["## "])
+                 or _extract_between(md, "## Recommendations", ["## "]))
     recs = [l[1:].strip() for l in rec_block.splitlines() if l.strip().startswith("-")]
     if recs:
-        pdf.section_title("Recommendations")
+        pdf.section_title("Key Recommendations")
         for i, r in enumerate(recs, 1):
             pdf.rec_item(r, i)
         pdf.ln(2)
 
-    # ── Permission Overview ────────────────────────────────────────────────────
+    # ── Detailed Security Checklist ────────────────────────────────────────────
+    checklist_sections = _parse_checklist_sections(md)
+    if checklist_sections:
+        pdf.section_title("Detailed Security Checklist")
+        # 列宽：# | Check Item | Status | Details
+        default_widths_4 = [10, 95, 18, 47]
+        default_widths_3 = [10, 110, 50]
+        for sub_title, headers, rows in checklist_sections:
+            pdf.subsection_title(sub_title)
+            n = len(headers)
+            if n == 4:
+                widths = default_widths_4
+            elif n == 3:
+                widths = default_widths_3
+            else:
+                widths = [170 / n] * n
+            pdf.draw_table(headers, rows, widths)
+
+    # ── 兼容：旧格式的 Permission Overview（若存在） ────────────────────────────
     perm_block = _extract_between(md, "## Permission Overview", ["## "])
     perm_h, perm_rows = _parse_table(perm_block)
     if perm_h and perm_rows:
         pdf.section_title("Permission Overview")
-        # 列宽
         n = len(perm_h)
         widths = [170 / n] * n
         if n == 5:
             widths = [20, 32, 35, 22, 61]
         pdf.draw_table(perm_h, perm_rows, widths)
 
-    # ── Memory Pattern Hits ────────────────────────────────────────────────────
-    mem_block = _extract_between(md, "## Memory Pattern Hits", ["## "])
-    mem_h, mem_rows = _parse_table(mem_block)
-    if mem_h and mem_rows:
-        pdf.section_title("Memory Pattern Hits")
-        n = len(mem_h)
-        widths = [30, 50, 90] if n == 3 else [170 / n] * n
-        pdf.draw_table(mem_h, mem_rows, widths)
-
-    # ── Log Summary ───────────────────────────────────────────────────────────
+    # ── 兼容：旧格式的 Log Summary（若存在） ──────────────────────────────────
     log_block = _extract_between(md, "## Log Summary", ["## "])
     log_h, log_rows = _parse_table(log_block)
     if log_h and log_rows:
@@ -360,22 +466,6 @@ def generate_pdf(md_path: Path, out_path: Path) -> None:
         n = len(log_h)
         widths = [60, 22, 18, 18, 52] if n == 5 else [170 / n] * n
         pdf.draw_table(log_h, log_rows, widths)
-
-    # ── Log Pattern Hits ──────────────────────────────────────────────────────
-    lpat_block = _extract_between(md, "## Log Pattern Hits", ["## "])
-    lpat_h, lpat_rows = _parse_table(lpat_block)
-    if lpat_h and lpat_rows:
-        # 只展示前 30 行，避免 PDF 过长
-        display_rows = lpat_rows[:30]
-        pdf.section_title("Log Pattern Hits")
-        if len(lpat_rows) > 30:
-            pdf.set_font("Helvetica", "I", 8)
-            pdf.set_text_color(*GRAY)
-            pdf.cell(0, 5, f"(Showing first 30 of {len(lpat_rows)} entries)", ln=True)
-            pdf.ln(1)
-        n = len(lpat_h)
-        widths = [30, 55, 85] if n == 3 else [170 / n] * n
-        pdf.draw_table(lpat_h, display_rows, widths)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pdf.output(str(out_path))

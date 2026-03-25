@@ -278,15 +278,33 @@ def _score_external_metrics(payload: Dict[str, Any], body: str) -> Dict[str, int
         "gateway",
     ]
     memory_keywords = ["log", "history", "persist", "state", "memory"]
-    token_keywords = ["openai", "gpt", "llm", "token", "context"]
-    failure_keywords = ["kill switch", "retry", "timeout", "exception", "fail", "watchdog", "error"]
+    # Use precise multi-word or rare tokens to avoid false positives on generic words
+    token_keywords = ["openai", "gpt-", "llm", "token_limit", "max_tokens", "prompt_tokens"]
+    failure_keywords = ["kill switch", "retry", "timeout", "watchdog", "circuit breaker"]
+
+    def _matched(keywords: List[str]) -> List[str]:
+        return [kw for kw in keywords if kw in haystack]
+
+    privacy_hits = _matched(privacy_keywords)
+    privilege_hits = _matched(privilege_keywords)
+    memory_hits = _matched(memory_keywords)
+    token_hits = _matched(token_keywords)
+    failure_hits = _matched(failure_keywords)
 
     return {
-        "privacy": _score(5, 15, privacy_keywords),
-        "privilege": _score(15, 10, privilege_keywords),
-        "memory": _score(10, 10, memory_keywords),
-        "token": _score(10, 10, token_keywords),
-        "failure": _score(20, 10, failure_keywords),
+        # Base is 0: only deduct when a specific keyword is actually found.
+        # This ensures a clean skill can achieve 100 in every dimension.
+        "privacy":   min(90, len(privacy_hits)   * 15),
+        "privilege": min(90, len(privilege_hits)  * 10),
+        "memory":    min(90, len(memory_hits)     * 10),
+        "token":     min(90, len(token_hits)      * 15),
+        "failure":   min(90, len(failure_hits)    * 15),
+        # Also store matched keywords so the report can explain deductions
+        "_privacy_hits":   privacy_hits,
+        "_privilege_hits": privilege_hits,
+        "_memory_hits":    memory_hits,
+        "_token_hits":     token_hits,
+        "_failure_hits":   failure_hits,
     }
 
     bins: List[str] = []
@@ -862,12 +880,12 @@ def build_suggestions(report: Dict[str, Any]) -> List[Dict[str, Any]]:
             suggestions.append({"type": "tool", "skill": entry["name"], "tool": tool})
 
     total_size = memory_block.get("totalSize", 0)
-    if report["memoryScore"] < 60 and total_size:
+    if report.get("integrityScore", 100) < 60 and total_size:
         suggestions.append({"type": "memory_size", "size": total_size})
 
     token_block = report.get("tokens", {})
     models = token_block.get("byModel", [])
-    if report["tokenScore"] < 60 and models:
+    if report.get("supplyChainScore", 100) < 60 and models:
         top = models[0]
         suggestions.append({"type": "token", "model": top["model"], "tokens": top["tokens"]})
 
@@ -1205,7 +1223,7 @@ def generate_report(
     has_log_data = log_info.get("dataAvailable", True) and log_info.get("files")
     has_token_data = token_info.get("dataAvailable", True) and token_info.get("totalTokens", 0) > 0
 
-    # Use static analysis scores when runtime data is missing
+    # Keyword-based static scores (memory / token only; all others now checklist-driven)
     static_scores = _aggregate_static_scores(skills)
 
     report = {
@@ -1217,28 +1235,26 @@ def generate_report(
         "externalOnly": bool(combined),
         "skillLogHits": skill_log_hits,
         "codeRisks": aggregate_code_risks,
+        "staticScores": static_scores,
     }
 
-    # Calculate scores: use runtime data if available, otherwise use static analysis
-    # Calculate risk scores (0-100, higher = more risky)
-    risk_privacy = score_privacy(privacy_hits) if has_memory_data or privacy_hits > 0 else static_scores.get("privacy", 0)
-    risk_privilege = score_privilege(permissions) if permissions else static_scores.get("privilege", 0)
-    risk_memory = score_memory(memory_info.get("totalSize", 0)) if has_memory_data else static_scores.get("memory", 0)
-    risk_token = score_tokens(token_info.get("totalTokens", 0)) if has_token_data else static_scores.get("token", 0)
-    risk_failure = score_failures(log_info.get("errorRate", 0.0)) if has_log_data else static_scores.get("failure", 0)
-    
-    # Convert to safety scores (0-100, higher = safer)
-    report["privacyScore"] = max(0, 100 - risk_privacy)
-    report["privilegeScore"] = max(0, 100 - risk_privilege)
-    report["memoryScore"] = max(0, 100 - risk_memory)
-    report["tokenScore"] = max(0, 100 - risk_token)
-    report["failureScore"] = max(0, 100 - risk_failure)
-    
-    # Calculate overall safety score
-    report["overallScore"] = int((report["privacyScore"] + report["privilegeScore"] + report["memoryScore"] + report["tokenScore"] + report["failureScore"]) / 5)
+    # Derive all five dimension scores directly from checklist findings so every
+    # deduction is traceable to a visible ❌ / ⚠️ checklist row.
+    checklist_risks = _compute_checklist_scores(report)
 
-    # Add static scores to report for reference
-    report["staticScores"] = static_scores
+    # Convert to safety scores (0-100, higher = safer)
+    report["privacyScore"]    = max(0, 100 - checklist_risks["privacy"])
+    report["privilegeScore"]  = max(0, 100 - checklist_risks["privilege"])
+    report["integrityScore"]  = max(0, 100 - checklist_risks["integrity"])
+    report["supplyChainScore"] = max(0, 100 - checklist_risks["supplychain"])
+    report["failureScore"]    = max(0, 100 - checklist_risks["failure"])
+
+    # Calculate overall safety score (average of 5 dimensions)
+    report["overallScore"] = int((
+        report["privacyScore"]   + report["privilegeScore"] +
+        report["integrityScore"] + report["supplyChainScore"] +
+        report["failureScore"]
+    ) / 5)
 
     # Warnings are suppressed — runtime data (memory/logs) is intentionally not
     # collected from the server; scores fall back to static analysis only.
@@ -1247,6 +1263,130 @@ def generate_report(
     report["suggestions"] = build_suggestions(report)
     report["verdict"] = compute_verdict(report)
     return report
+
+
+def _compute_checklist_scores(report: Dict[str, Any]) -> Dict[str, int]:
+    """
+    Compute risk scores (0–100, higher = more risky) directly from checklist
+    findings so every deduction maps 1-to-1 to a visible ❌ / ⚠️ checklist row.
+
+    Dimension mapping (exclusive — each checklist item feeds exactly one score):
+
+    🔏 Privacy      ← 4A: credential_exfil/request · 4E: log hygiene · 4F: config key / env vars
+    🔐 Privilege    ← 4A: soul_write / openclaw_config_write (identity & config tampering only)
+    🛡️ Integrity    ← 4A: eval_obfuscation / exec_compile · 4B: obfuscation · 4D: sensitive data in source
+    🔗 Supply Chain ← 4A: dynamic installs / ip_exfil · 4C: high-risk tools · 4F: CLI deps
+    ✅ Stability    ← 4G: manifest completeness (SKILL.md, name, version, description)
+    """
+    permissions   = report.get("permissions", [])
+    skill_entries = [e for e in permissions if e.get("type") == "skill"]
+    code_risks    = report.get("codeRisks") or {}
+
+    # Instant-reject labels (❌ Critical)
+    ir_labels: set = {item["label"] for item in code_risks.get("instantRejects", [])}
+
+    # Obfuscation hits count (⚠️)
+    ob_count: int = len(code_risks.get("obfuscation", []))
+
+    # High-risk tools (⚠️)
+    hr_tools: set = set()
+    for entry in skill_entries:
+        hr_tools.update(entry.get("highRiskTools", []))
+
+    # Notes / config keys across all skill entries
+    all_notes: List[str] = []
+    all_cfg_keys: List[str] = []
+    for entry in skill_entries:
+        all_notes.extend(entry.get("notes", []))
+        all_cfg_keys.extend(entry.get("configKeys", []))
+    cfg_keys_lower = [k.lower() for k in all_cfg_keys]
+    skill_name = skill_entries[0].get("name", "") if skill_entries else ""
+
+    # 4D: Sensitive data patterns found in source code (❌)
+    body_hits: set = {n.replace("Body matches ", "").strip()
+                      for n in all_notes if n.startswith("Body matches ")}
+
+    # 4E: Log hygiene issues (⚠️)
+    skill_log_hits = report.get("skillLogHits", [])
+    log_categories: set = {hit.get("label", "") for hit in skill_log_hits}
+
+    # 4F: Config / credential notes
+    sensitive_key_notes = [
+        n for n in all_notes
+        if "Sensitive config key" in n or "Configured credentials detected" in n
+    ]
+    env_notes_local = [n for n in all_notes if n.startswith("Environment variables:")]
+    cli_notes_local  = [n for n in all_notes if n.startswith("CLI dependencies:")]
+
+    # ── 🔏 Privacy (data-exposure risks) ────────────────────────────────────
+    risk_privacy = 0
+    # 4A: credential exfiltration / prompting (❌)
+    if "credential_exfil"   in ir_labels: risk_privacy += 40
+    if "credential_request" in ir_labels: risk_privacy += 25
+    # 4E: sensitive data found in log files (⚠️, each distinct category)
+    risk_privacy += min(30, len(log_categories) * 15)
+    # 4F: sensitive config key names (❌)
+    if sensitive_key_notes: risk_privacy += 15
+    # 4F: env var names that contain sensitive keywords (⚠️)
+    if env_notes_local:
+        all_env_vars: List[str] = []
+        for n in env_notes_local:
+            all_env_vars.extend(v.strip() for v in n.replace("Environment variables:", "").split(","))
+        sensitive_env_count = sum(
+            1 for v in all_env_vars
+            if any(kw in v.lower() for kw in ["key", "secret", "token", "password", "private"])
+        )
+        risk_privacy += min(10, sensitive_env_count * 5)
+
+    # ── 🔐 Privilege (identity / runtime-config tampering) ───────────────────
+    risk_privilege = 0
+    # 4A: writes to AI identity file or runtime config (❌)
+    if "soul_write"            in ir_labels: risk_privilege += 40
+    if "openclaw_config_write" in ir_labels: risk_privilege += 30
+
+    # ── 🛡️ Integrity (code trustworthiness) ──────────────────────────────────
+    risk_integrity = 0
+    # 4A: dynamic code execution via eval / exec (❌)
+    if "eval_obfuscation" in ir_labels: risk_integrity += 40
+    if "exec_compile"     in ir_labels: risk_integrity += 35
+    # 4B: obfuscation patterns detected (⚠️, each pattern)
+    risk_integrity += min(30, ob_count * 15)
+    # 4D: sensitive / secret data hardcoded in source (❌, each distinct type)
+    risk_integrity += min(60, len(body_hits) * 25)
+
+    # ── 🔗 Supply Chain (dependency & network risks) ─────────────────────────
+    risk_supply = 0
+    # 4A: dynamic package installs / raw-IP exfiltration (❌)
+    if "dynamic_pip_install" in ir_labels: risk_supply += 35
+    if "dynamic_npm_install" in ir_labels: risk_supply += 35
+    if "ip_exfil"            in ir_labels: risk_supply += 25
+    # 4C: high-risk tool usage (⚠️, each detected tool)
+    risk_supply += min(40, len(hr_tools) * 12)
+    # 4F: CLI / binary dependencies declared (⚠️, each binary)
+    if cli_notes_local:
+        cli_bins: List[str] = []
+        for n in cli_notes_local:
+            cli_bins.extend(v.strip() for v in n.replace("CLI dependencies:", "").split(","))
+        risk_supply += min(15, len(cli_bins) * 5)
+
+    # ── ✅ Stability (manifest completeness) ──────────────────────────────────
+    risk_failure = 0
+    has_skills = len(skill_entries) > 0
+    # 4G: manifest integrity (❌)
+    if not has_skills:
+        risk_failure += 30                                    # no SKILL.md at all
+    else:
+        if not skill_name:                       risk_failure += 15  # missing name
+        if "version"     not in cfg_keys_lower:  risk_failure += 10  # missing version
+        if "description" not in cfg_keys_lower:  risk_failure += 5   # missing description
+
+    return {
+        "privacy":    min(100, risk_privacy),
+        "privilege":  min(100, risk_privilege),
+        "integrity":  min(100, risk_integrity),
+        "supplychain": min(100, risk_supply),
+        "failure":    min(100, risk_failure),
+    }
 
 
 def _aggregate_static_scores(skills: List[Dict[str, Any]]) -> Dict[str, int]:
@@ -1269,14 +1409,23 @@ def _aggregate_static_scores(skills: List[Dict[str, Any]]) -> Dict[str, int]:
                 if key in ext_scores and ext_scores[key] is not None:
                     all_scores[key].append(ext_scores[key])
 
-    # Calculate average for each dimension, or use defaults if no scores
-    result = {}
+    # Aggregate hit-keyword lists across all skills
+    all_hits: Dict[str, List[str]] = {
+        "privacy": [], "privilege": [], "memory": [], "token": [], "failure": []
+    }
+    for skill in skills:
+        ext = skill.get("externalScores", {})
+        for dim in all_hits:
+            all_hits[dim].extend(ext.get(f"_{dim}_hits", []))
+
+    # Calculate average risk for each dimension; base is now 0, so clean skills score 100.
+    result: Dict[str, Any] = {}
     for key, values in all_scores.items():
-        if values:
-            result[key] = int(sum(values) / len(values))
-        else:
-            # Default scores based on risk assessment
-            result[key] = 15 if key in ["privilege", "failure"] else 5
+        result[key] = int(sum(values) / len(values)) if values else 0
+
+    # Attach de-duplicated hit lists for report rendering
+    for dim, hits in all_hits.items():
+        result[f"_{dim}_hits"] = sorted(set(hits))
 
     return result
 
@@ -1384,6 +1533,8 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
         n for n in all_notes
         if "Sensitive config key" in n or "Configured credentials detected" in n
     ]
+    env_notes = [n for n in all_notes if n.startswith("Environment variables:")]
+    cli_notes = [n for n in all_notes if n.startswith("CLI dependencies:")]
 
     # ── 1. Title ──────────────────────────────────────────────────────────────
     skill_names = [e.get("name", "") for e in skill_entries if e.get("name")]
@@ -1410,17 +1561,84 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
 
     # ── 3. Score Overview ─────────────────────────────────────────────────────
     overall = report.get("overallScore", 0)
+    static = report.get("staticScores", {})
+
+    def _reason(score: int, *parts_thunks: tuple) -> str:
+        """Return deduction reason string; '—' if perfect score."""
+        if score >= 100:
+            return "—"
+        parts = [msg for cond, msg in parts_thunks if cond]
+        return _c("; ".join(parts)) if parts else "See checklist below"
+
+    # Pre-compute env/cli hit details for reason strings
+    _env_sensitive: List[str] = []
+    for _n in env_notes:
+        _evars = [v.strip() for v in _n.replace("Environment variables:", "").split(",")]
+        _env_sensitive.extend(v for v in _evars
+                              if any(kw in v.lower() for kw in ["key", "secret", "token", "password", "private"]))
+
+    _cli_bins: List[str] = []
+    for _n in cli_notes:
+        _cli_bins.extend(v.strip() for v in _n.replace("CLI dependencies:", "").split(","))
+
+    p_score  = report.get("privacyScore",    0)
+    pr_score = report.get("privilegeScore",  0)
+    in_score = report.get("integrityScore",  0)
+    sc_score = report.get("supplyChainScore", 0)
+    st_score = report.get("failureScore",    0)
+
+    # Pre-build reason strings (avoid backslashes inside f-string expressions)
+    _log_labels    = _c(", ".join(sorted(log_hit_map)[:2]))
+    _env_sens_str  = _c(", ".join(_env_sensitive[:2]))
+    _body_str      = _c(", ".join(sorted(body_hits)[:2]))
+    _hr_str        = _c(", ".join(sorted(hr_map)[:3]))
+    _cli_str       = _c(", ".join(_cli_bins[:3]))
+    _ob_cnt        = len(ob_map)
+    _st_cfg        = [k.lower() for k in (skill_entries[0].get("configKeys") or [])] if skill_entries else []
+    _st_name       = skill_entries[0].get("name", "") if skill_entries else ""
+
+    _r_privacy = _reason(p_score,
+        ("credential_exfil"   in ir_map, "credential exfiltration (Critical ❌)"),
+        ("credential_request" in ir_map, "credential prompt via `input()` (Critical ❌)"),
+        (bool(log_hit_map),       f"sensitive data in logs: {_log_labels} (⚠️)"),
+        (bool(sensitive_key_notes), "sensitive config key (❌)"),
+        (bool(_env_sensitive),    f"sensitive env var: {_env_sens_str} (⚠️)"),
+    )
+    _r_privilege = _reason(pr_score,
+        ("soul_write"            in ir_map, "writes to agent identity file `SOUL.md` (Critical ❌)"),
+        ("openclaw_config_write" in ir_map, "writes to `openclaw.json` runtime config (Critical ❌)"),
+    )
+    _r_integrity = _reason(in_score,
+        ("eval_obfuscation" in ir_map, "obfuscated eval execution (Critical ❌)"),
+        ("exec_compile"     in ir_map, "dynamic `exec(compile(...))` (Critical ❌)"),
+        (bool(ob_map),   f"{_ob_cnt} obfuscation pattern(s) detected (⚠️)"),
+        (bool(body_hits), f"hardcoded secrets: {_body_str} (❌)"),
+    )
+    _r_supply = _reason(sc_score,
+        ("dynamic_pip_install" in ir_map, "dynamic `pip install` (Critical ❌)"),
+        ("dynamic_npm_install" in ir_map, "dynamic `npm install` (Critical ❌)"),
+        ("ip_exfil"            in ir_map, "HTTP request to raw IP address (Critical ❌)"),
+        (bool(hr_map),   f"high-risk tools: {_hr_str} (⚠️)"),
+        (bool(_cli_bins), f"CLI dependencies: {_cli_str} (⚠️)"),
+    )
+    _r_stability = _reason(st_score,
+        (not skill_entries,                           "no `SKILL.md` found (❌)"),
+        (bool(skill_entries) and not _st_name,        "missing `name` field (❌)"),
+        (bool(skill_entries) and "version"     not in _st_cfg, "missing `version` field (❌)"),
+        (bool(skill_entries) and "description" not in _st_cfg, "missing `description` field (❌)"),
+    )
+
     lines += [
         "## Risk Scores",
         "",
-        "| Dimension | Score | Rating |",
-        "| --- | :---: | --- |",
-        f"| 🏆 **Overall Security** | **{overall}/100** | **{_badge(overall)}** |",
-        f"| 🔏 Privacy | {report.get('privacyScore', 0)}/100 | {_badge(report.get('privacyScore', 0))} |",
-        f"| 🔐 Privilege | {report.get('privilegeScore', 0)}/100 | {_badge(report.get('privilegeScore', 0))} |",
-        f"| 💾 Memory Footprint | {report.get('memoryScore', 0)}/100 | {_badge(report.get('memoryScore', 0))} |",
-        f"| 🪙 Token Cost | {report.get('tokenScore', 0)}/100 | {_badge(report.get('tokenScore', 0))} |",
-        f"| ✅ Stability | {report.get('failureScore', 0)}/100 | {_badge(report.get('failureScore', 0))} |",
+        "| Dimension | Score | Rating | Reason for Deduction |",
+        "| --- | :---: | --- | --- |",
+        f"| 🏆 **Overall Security** | **{overall}/100** | **{_badge(overall)}** | — |",
+        f"| 🔏 Privacy      | {p_score}/100  | {_badge(p_score)}  | {_r_privacy}    |",
+        f"| 🔐 Privilege    | {pr_score}/100 | {_badge(pr_score)} | {_r_privilege}  |",
+        f"| 🛡️ Integrity    | {in_score}/100 | {_badge(in_score)} | {_r_integrity}  |",
+        f"| 🔗 Supply Chain | {sc_score}/100 | {_badge(sc_score)} | {_r_supply}     |",
+        f"| ✅ Stability    | {st_score}/100 | {_badge(st_score)} | {_r_stability}  |",
         "",
         "> Score legend: 80–100 = Excellent | 60–79 = Good | 40–59 = Fair | <40 = Needs Improvement",
         "",
@@ -1551,9 +1769,7 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
     _section("📋 Log & Data Hygiene", log_items)
 
     # ── 4F. Configuration & Environment Security ─────────────────────────────
-    env_notes = [n for n in all_notes if n.startswith("Environment variables:")]
-    cli_notes = [n for n in all_notes if n.startswith("CLI dependencies:")]
-
+    # env_notes and cli_notes are pre-computed in the section above
     cfg_items: List[tuple] = []
 
     # Sensitive key names in front matter
