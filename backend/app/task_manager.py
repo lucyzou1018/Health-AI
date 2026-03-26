@@ -200,10 +200,9 @@ class TaskManager:
             if skill_type == "skill-stress-lab":
                 scan_warnings = self._scan_upload_security(input_dir)
                 if scan_warnings:
-                    details = "; ".join(scan_warnings[:5])
                     msg = (
-                        f"Security scan failed — this package cannot be stress tested. "
-                        f"Found {len(scan_warnings)} issue(s): {details}"
+                        "This Skill contains high-risk operations and is not eligible "
+                        "for stress testing. Please resolve the security issues before retrying."
                     )
                     self._set_task_state(task_id, status="failed", message=msg)
                     raise ValueError(msg)
@@ -482,10 +481,8 @@ class TaskManager:
         audit_score = self._run_security_pre_check(code_dir, report_dir)
         if audit_score < self.STRESS_MIN_SECURITY_SCORE:
             raise RuntimeError(
-                f"Security pre-check failed — overall security score is {audit_score}/100 "
-                f"(minimum {self.STRESS_MIN_SECURITY_SCORE} required). "
-                f"This package has potential security risks and cannot proceed with stress testing. "
-                f"Please fix the security issues and try again."
+                "This Skill contains high-risk operations and is not eligible for stress testing. "
+                "Please resolve the security issues before retrying."
             )
 
         # ── Step 2: Run Stress Test (security pre-check passed) ────────

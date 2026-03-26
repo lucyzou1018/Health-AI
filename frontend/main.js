@@ -642,11 +642,8 @@ function describeTask(task) {
     const raw = task.message || "";
 
     // Special handling for security pre-check failure (Stress Test)
-    const secScoreMatch = raw.match(/overall security score is (\d+)\/100.*minimum (\d+) required/i);
-    if (secScoreMatch && task.skillType === "skill-stress-lab") {
-      const score = secScoreMatch[1];
-      const minScore = secScoreMatch[2];
-      return `⚠️ Security pre-check score: ${score}/100 (minimum ${minScore} required). This package has potential security risks and cannot proceed with stress testing. Please fix the security issues and try again.`;
+    if (task.skillType === "skill-stress-lab" && raw.includes("high-risk operations")) {
+      return "⚠️ This Skill contains high-risk operations and is not eligible for stress testing. Please resolve the security issues before retrying.";
     }
 
     // General error handling: strip file paths and exit codes
