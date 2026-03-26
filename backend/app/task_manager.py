@@ -446,7 +446,49 @@ class TaskManager:
 
         return warnings
 
+    # Minimum security audit score required to proceed with stress testing
+    STRESS_MIN_SECURITY_SCORE = 96
+
+    def _run_security_pre_check(self, code_dir: Path, report_dir: Path) -> int:
+        """Run a Security Audit on the uploaded package and return the overall score.
+
+        The audit results are saved under report_dir/security_precheck/ so they
+        don't collide with the main stress-test outputs.
+        """
+        precheck_dir = report_dir / "security_precheck"
+        precheck_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            result = self._run_security_audit(code_dir, precheck_dir, {})
+        except Exception as exc:
+            # If the security audit itself fails, treat as score 0 (block)
+            print(f"[TaskManager] Security pre-check audit error: {exc}")
+            return 0
+
+        # Parse the overall score from the JSON report
+        summary_path = result.get("summary", "")
+        if summary_path:
+            try:
+                data = json.loads(Path(summary_path).read_text(encoding="utf-8"))
+                score = int(data.get("overallScore", 0))
+                print(f"[TaskManager] Security pre-check score: {score}/100")
+                return score
+            except Exception as exc:
+                print(f"[TaskManager] Failed to parse security pre-check score: {exc}")
+                return 0
+        return 0
+
     def _run_stress_lab(self, code_dir: Path, report_dir: Path, params: Dict[str, Any]) -> Dict[str, Any]:
+        # ── Step 1: Run Security Audit pre-check ────────────────────────
+        audit_score = self._run_security_pre_check(code_dir, report_dir)
+        if audit_score < self.STRESS_MIN_SECURITY_SCORE:
+            raise RuntimeError(
+                f"Security pre-check failed — overall security score is {audit_score}/100 "
+                f"(minimum {self.STRESS_MIN_SECURITY_SCORE} required). "
+                f"This package has potential security risks and cannot proceed with stress testing. "
+                f"Please fix the security issues and try again."
+            )
+
+        # ── Step 2: Run Stress Test (security pre-check passed) ────────
         script = self.repo_root / "skills" / "skill-stress-lab" / "scripts" / "stress_runner.py"
         log_file = report_dir / "stress_runner.log"
         summary_md = report_dir / "stress_summary.md"

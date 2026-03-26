@@ -639,11 +639,20 @@ function describeTask(task) {
   const skillName = SKILL_NAMES[task.skillType] || "Analysis";
 
   if (task.status === "failed") {
-    // 去掉技术性路径和 exit code，只保留核心错误描述
     const raw = task.message || "";
+
+    // Special handling for security pre-check failure (Stress Test)
+    const secScoreMatch = raw.match(/overall security score is (\d+)\/100.*minimum (\d+) required/i);
+    if (secScoreMatch && task.skillType === "skill-stress-lab") {
+      const score = secScoreMatch[1];
+      const minScore = secScoreMatch[2];
+      return `⚠️ Security pre-check score: ${score}/100 (minimum ${minScore} required). This package has potential security risks and cannot proceed with stress testing. Please fix the security issues and try again.`;
+    }
+
+    // General error handling: strip file paths and exit codes
     const cleaned = raw
-      .replace(/\/[^\s:]+/g, "")      // 移除文件路径
-      .replace(/exit \d+[^.)]*/gi, "") // 移除 exit code
+      .replace(/\/[^\s:]+/g, "")      // remove file paths
+      .replace(/exit \d+[^.)]*/gi, "") // remove exit code
       .replace(/\s{2,}/g, " ")
       .trim();
     const snippet = cleaned.length > 0
@@ -665,7 +674,7 @@ function describeTask(task) {
   const runMsgs = {
     "skill-security-audit":    "Scanning your Skill package for vulnerabilities…",
     "multichain-contract-vuln": "Auditing smart contract across chains…",
-    "skill-stress-lab":         "Running load test, collecting performance metrics…"
+    "skill-stress-lab":         "Running security pre-check before stress test…"
   };
   return runMsgs[task.skillType] || "Analysis in progress, please wait…";
 }
@@ -803,9 +812,17 @@ async function pollTask(taskId) {
 
     // 显示进度提示，让用户知道系统还在工作
     const elapsed = Math.round((attempts * POLL_INTERVAL) / 1000);
-    setSummary(
-      `Analyzing… (${elapsed}s elapsed — large packages may take several minutes)`
-    );
+    if (activeTab === "skill-stress-lab") {
+      // Stress Test has a security pre-check phase before the actual stress test
+      const phase = elapsed < 30
+        ? "Running security pre-check…"
+        : "Security pre-check passed, running stress test…";
+      setSummary(`${phase} (${elapsed}s elapsed)`);
+    } else {
+      setSummary(
+        `Analyzing… (${elapsed}s elapsed — large packages may take several minutes)`
+      );
+    }
 
     await delay(POLL_INTERVAL);
     attempts += 1;
