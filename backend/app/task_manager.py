@@ -443,6 +443,61 @@ class TaskManager:
     # Minimum security audit score required to proceed with stress testing
     STRESS_MIN_SECURITY_SCORE = 80
 
+    def _find_skill_dir(self, code_dir: Path, params: dict) -> Path:
+        """Resolve the skill directory from params or by scanning code_dir."""
+        if params.get("skillDir"):
+            return Path(params["skillDir"])
+        if code_dir.exists():
+            subdirs = [d for d in code_dir.iterdir() if d.is_dir()]
+            if subdirs:
+                return subdirs[0]
+        return code_dir
+
+    # Priority list for auto-detecting skill entry scripts
+    _ENTRY_CANDIDATES = [
+        "scripts/run_cli.py",
+        "scripts/main.py",
+        "scripts/run.py",
+        "scripts/audit_skill.py",
+        "scripts/audit_scan.py",
+        "main.py",
+        "run.py",
+        "__main__.py",
+    ]
+
+    def _detect_skill_entry(self, skill_dir: Path) -> str | None:
+        """Auto-detect the entry-point script inside a skill package.
+
+        Returns a command template string (with {skill} placeholder) or None.
+        """
+        # 1. Check well-known filenames in priority order
+        for candidate in self._ENTRY_CANDIDATES:
+            if (skill_dir / candidate).is_file():
+                return f"python3 {{skill}}/{candidate}"
+
+        # 2. Fallback: pick the first .py in scripts/
+        scripts_dir = skill_dir / "scripts"
+        if scripts_dir.is_dir():
+            py_files = sorted(f for f in scripts_dir.iterdir() if f.suffix == ".py")
+            if py_files:
+                return f"python3 {{skill}}/scripts/{py_files[0].name}"
+
+        # 3. Fallback: pick the first .py in root (excluding __init__.py)
+        root_py = sorted(
+            f for f in skill_dir.iterdir()
+            if f.is_file() and f.suffix == ".py" and f.name != "__init__.py"
+        )
+        if root_py:
+            return f"python3 {{skill}}/{root_py[0].name}"
+
+        # 4. Deep fallback: recursively find any .py file
+        all_py = sorted(skill_dir.rglob("*.py"))
+        if all_py:
+            rel = all_py[0].relative_to(skill_dir)
+            return f"python3 {{skill}}/{rel}"
+
+        return None
+
     def _run_security_pre_check(self, code_dir: Path, report_dir: Path) -> int:
         """Run a Security Audit on the uploaded package and return the overall score.
 
@@ -486,10 +541,24 @@ class TaskManager:
         summary_md = report_dir / "stress_summary.md"
         metrics_json = report_dir / "stress_metrics.json"
         logs_dir = report_dir / "runs"
-        # Use provided command or default to security_preflight.py
+
+        # Resolve skill directory
+        skill_dir = self._find_skill_dir(code_dir, params)
+        print(f"[StressLab] skill_dir = {skill_dir}")
+        if skill_dir.exists():
+            print(f"[StressLab] skill_dir contents: {list(skill_dir.iterdir())}")
+
+        # Build stress test command.
+        # Always use audit_skill.py to run concurrent security audits against the
+        # uploaded Skill.  Individual skill scripts require bespoke arguments
+        # (--input, --chain, --side …) that we cannot guess, so a generic
+        # security-audit scan is the only universally runnable workload.
         command = params.get("command")
         if not command:
-            command = "python3 {skill}/scripts/security_preflight.py"
+            audit_script = self.repo_root / "skills" / "skill-security-audit" / "scripts" / "audit_skill.py"
+            command = f"python3 {audit_script} --skill-path {{skill}}"
+            print(f"[StressLab] using audit_skill.py as stress command")
+
         runs = max(1, min(100, int(params.get("runs", 10))))
         concurrency = max(1, min(100, int(params.get("concurrency", 1))))
         cmd = [
@@ -505,19 +574,9 @@ class TaskManager:
             str(logs_dir),
             "--summary-report",
             str(summary_md),
+            "--skill-dir",
+            str(skill_dir),
         ]
-        # Note: --collect-metrics is not supported by stress_runner.py, skip it
-        if params.get("workdir"):
-            cmd.extend(["--workdir", str(params["workdir"])])
-        if params.get("skillDir"):
-            cmd.extend(["--skill-dir", str(params["skillDir"])])
-        elif code_dir.exists():
-            # Find the actual skill subdirectory (e.g., input/skill-name/)
-            skill_subdirs = [d for d in code_dir.iterdir() if d.is_dir()]
-            if skill_subdirs:
-                cmd.extend(["--skill-dir", str(skill_subdirs[0])])
-            else:
-                cmd.extend(["--skill-dir", str(code_dir)])
         if params.get("openaiUsageFile"):
             cmd.extend(["--openai-usage-file", str(params["openaiUsageFile"])])
         if params.get("apiCountFile"):
@@ -578,21 +637,50 @@ class TaskManager:
             successes = metrics.get('successes', runs)
             success_rate = successes / runs if runs > 0 else 1.0
             failures = runs - successes
-            
-            # Stability: based on success rate
+            failure_rate = failures / runs if runs > 0 else 0.0
+
+            # Stability: based on success rate (linear)
             stability_score = int(success_rate * 100)
-            
-            # Performance: based on avg duration (lower is better, <0.1s = 100, >1s = 0)
-            performance_score = max(0, min(100, int(100 - (avg_duration - 0.1) * 100)))
-            
-            # Resource: assume good if low failures
-            resource_score = 90 if failures == 0 else max(0, 90 - failures * 10)
-            
+
+            # Performance: based on avg duration with generous thresholds
+            # <=1s → 100, 1-10s → 90-60, 10-30s → 60-40, 30-60s → 40-20, >60s → 20
+            if avg_duration <= 1:
+                performance_score = 100
+            elif avg_duration <= 10:
+                performance_score = int(90 - (avg_duration - 1) * (30 / 9))  # 90→60
+            elif avg_duration <= 30:
+                performance_score = int(60 - (avg_duration - 10) * (20 / 20))  # 60→40
+            elif avg_duration <= 60:
+                performance_score = int(40 - (avg_duration - 30) * (20 / 30))  # 40→20
+            else:
+                performance_score = max(10, int(20 - (avg_duration - 60) * 0.1))
+
+            # Resource: based on failure rate (tolerant)
+            if failure_rate == 0:
+                resource_score = 90
+            elif failure_rate <= 0.1:
+                resource_score = 80
+            elif failure_rate <= 0.3:
+                resource_score = 60
+            elif failure_rate <= 0.5:
+                resource_score = 40
+            else:
+                resource_score = max(10, int(40 - failure_rate * 30))
+
             # Consistency: based on success rate
             consistency_score = stability_score
-            
-            # Recovery: 100 if no failures, lower if failures
-            recovery_score = 100 if failures == 0 else max(0, 100 - failures * 20)
+
+            # Recovery: based on failure rate (tolerant)
+            if failures == 0:
+                recovery_score = 100
+            elif failure_rate <= 0.1:
+                recovery_score = 85
+            elif failure_rate <= 0.3:
+                recovery_score = 65
+            elif failure_rate <= 0.5:
+                recovery_score = 45
+            else:
+                recovery_score = max(10, int(45 - failure_rate * 35))
         
         # Calculate overall score
         overall_score = int((stability_score + performance_score + resource_score + consistency_score + recovery_score) / 5)
