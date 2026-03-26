@@ -529,15 +529,9 @@ class TaskManager:
             return False
 
     def _run_stress_lab(self, code_dir: Path, report_dir: Path, params: Dict[str, Any]) -> Dict[str, Any]:
-        # ── Step 1: Security Audit pre-check ─────────────────────────────
-        audit_score = self._run_security_pre_check(code_dir, report_dir)
-        if audit_score < self.STRESS_MIN_SECURITY_SCORE:
-            raise RuntimeError(
-                "This Skill contains high-risk operations and is not eligible for stress testing. "
-                "Please resolve the security issues before retrying."
-            )
-
-        # ── Step 2: Detect primary entry & validate runnability ────────────
+        # ── Step 1: Check mandatory parameters ───────────────────────────
+        #   Detect the primary entry script and probe whether it can run
+        #   without any extra arguments (beyond Runs / Concurrency).
         skill_dir = self._find_skill_dir(code_dir, params)
         print(f"[StressLab] skill_dir = {skill_dir}")
 
@@ -551,14 +545,24 @@ class TaskManager:
                 )
             print(f"[StressLab] primary entry: {entry}")
 
-            # Probe: can it run without mandatory arguments?
+            # Probe: can the script run without mandatory arguments?
             if not self._probe_entry_script(entry, skill_dir):
                 raise RuntimeError(
-                    "This Skill requires specific input parameters to run and is not "
-                    "yet supported for automated stress testing. Please use a Skill "
-                    "that can execute independently without mandatory arguments."
+                    "This Skill requires additional input parameters (e.g. file paths "
+                    "or addresses) beyond Runs and Concurrency. Automated stress testing "
+                    "does not yet support Skills with mandatory arguments — please use a "
+                    "Skill that can execute independently."
                 )
             command = entry
+
+        # ── Step 2: Security Audit pre-check ─────────────────────────────
+        #   Only reached if the skill can run without extra arguments.
+        audit_score = self._run_security_pre_check(code_dir, report_dir)
+        if audit_score < self.STRESS_MIN_SECURITY_SCORE:
+            raise RuntimeError(
+                "This Skill contains high-risk operations and is not eligible for stress testing. "
+                "Please resolve the security issues before retrying."
+            )
 
         # ── Step 3: Run Stress Test ──────────────────────────────────────
         script = self.repo_root / "skills" / "skill-stress-lab" / "scripts" / "stress_runner.py"
