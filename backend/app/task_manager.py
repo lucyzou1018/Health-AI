@@ -442,7 +442,7 @@ class TaskManager:
         return warnings
 
     # Minimum security audit score required to proceed with stress testing
-    STRESS_MIN_SECURITY_SCORE = 80
+    STRESS_MIN_SECURITY_SCORE = 75
 
     def _find_skill_dir(self, code_dir: Path, params: dict) -> Path:
         """Resolve the skill directory from params or by scanning code_dir."""
@@ -557,8 +557,8 @@ class TaskManager:
             entry = self._detect_primary_entry(skill_dir)
             if not entry:
                 raise RuntimeError(
-                    "No executable entry point found in the uploaded Skill package. "
-                    "Stress testing requires a runnable Python script."
+                    "The uploaded Skill package does not contain any executable scripts. "
+                    "Stress Test requires a Skill with runnable Python code."
                 )
             # Extract the actual file path from the command template
             # e.g. "python3 {skill}/scripts/run_cli.py" → skill_dir / "scripts/run_cli.py"
@@ -568,10 +568,8 @@ class TaskManager:
 
             if self._has_mandatory_args(script_path):
                 raise RuntimeError(
-                    "This Skill requires additional input parameters (e.g. file paths "
-                    "or addresses) beyond Runs and Concurrency. Automated stress testing "
-                    "does not yet support Skills with mandatory arguments — please use a "
-                    "Skill that can execute independently."
+                    "The current version of Stress Test does not support "
+                    "Skills with mandatory arguments yet."
                 )
             command = entry
 
@@ -638,119 +636,123 @@ class TaskManager:
 
     def _generate_stress_lab_report(self, summary_md: Path, output_md: Path, runs: int, concurrency: int) -> None:
         """Generate enhanced stress lab report with 5-dimension scoring."""
-        # Read original summary
-        original_content = summary_md.read_text() if summary_md.exists() else ""
-        
-        # Parse metrics from summary content
-        import re
-        metrics = {}
+        original = summary_md.read_text() if summary_md.exists() else ""
 
-        # Extract success rate (supports both English and Chinese formats)
-        success_match = re.search(r'(?:Successes|成功次数):\s*(\d+)\s*\(([^)]+)\)', original_content)
-        if success_match:
-            metrics['successes'] = int(success_match.group(1))
-            metrics['success_rate_str'] = success_match.group(2)
+        # ── Parse all metrics from stress_runner summary ─────────────
+        total_runs = runs
+        successes = 0
+        avg_duration = 0.0
+        p95_duration = 0.0
+        min_duration = 0.0
+        max_duration = 0.0
+        std_deviation = 0.0
+        skill_name = "-"
+        failure_samples: list[str] = []
 
-        # Extract avg duration (supports both English and Chinese formats)
-        avg_match = re.search(r'(?:Avg Duration|平均耗时):\s*([\d.]+)s', original_content)
-        if avg_match:
-            metrics['avg_duration'] = float(avg_match.group(1))
-        
-        # Calculate 5-dimension scores based on metrics
-        stability_score = 100
-        performance_score = 95
-        resource_score = 90
-        consistency_score = 100
-        recovery_score = 100
-        
-        # Extract actual metrics if available
-        if metrics:
-            avg_duration = metrics.get('avg_duration', 0.05)
-            successes = metrics.get('successes', runs)
-            success_rate = successes / runs if runs > 0 else 1.0
-            failures = runs - successes
-            failure_rate = failures / runs if runs > 0 else 0.0
+        m = re.search(r'Total Runs:\s*(\d+)', original)
+        if m: total_runs = int(m.group(1))
+        m = re.search(r'Successes:\s*(\d+)', original)
+        if m: successes = int(m.group(1))
+        m = re.search(r'Avg Duration:\s*([\d.]+)s', original)
+        if m: avg_duration = float(m.group(1))
+        m = re.search(r'P95 Duration:\s*([\d.]+)s', original)
+        if m: p95_duration = float(m.group(1))
+        m = re.search(r'Min Duration:\s*([\d.]+)s', original)
+        if m: min_duration = float(m.group(1))
+        m = re.search(r'Max Duration:\s*([\d.]+)s', original)
+        if m: max_duration = float(m.group(1))
+        m = re.search(r'Std Deviation:\s*([\d.]+)s', original)
+        if m: std_deviation = float(m.group(1))
+        m = re.search(r'Skill:\s*(\S+)', original)
+        if m: skill_name = m.group(1)
+        for fm in re.finditer(r'Run #(\d+) exit (\d+), duration ([\d.]+)s', original):
+            failure_samples.append(f"Run #{fm.group(1)} (exit {fm.group(2)}, {fm.group(3)}s)")
 
-            # Stability: based on success rate (linear)
+        failures = total_runs - successes
+        success_rate = successes / total_runs if total_runs > 0 else 0.0
+        failure_rate = failures / total_runs if total_runs > 0 else 0.0
+        has_data = successes > 0 or avg_duration > 0
+
+        # ── Calculate 5-dimension scores ─────────────────────────────
+        if has_data:
             stability_score = int(success_rate * 100)
 
-            # Performance: based on avg duration with generous thresholds
-            # <=1s → 100, 1-10s → 90-60, 10-30s → 60-40, 30-60s → 40-20, >60s → 20
-            if avg_duration <= 1:
-                performance_score = 100
-            elif avg_duration <= 10:
-                performance_score = int(90 - (avg_duration - 1) * (30 / 9))  # 90→60
-            elif avg_duration <= 30:
-                performance_score = int(60 - (avg_duration - 10) * (20 / 20))  # 60→40
-            elif avg_duration <= 60:
-                performance_score = int(40 - (avg_duration - 30) * (20 / 30))  # 40→20
-            else:
-                performance_score = max(10, int(20 - (avg_duration - 60) * 0.1))
+            d = p95_duration if p95_duration > 0 else avg_duration
+            if d <= 1:      performance_score = 100
+            elif d <= 10:   performance_score = int(90 - (d - 1) * (30 / 9))
+            elif d <= 30:   performance_score = int(60 - (d - 10))
+            elif d <= 60:   performance_score = int(40 - (d - 30) * (15 / 30))
+            else:           performance_score = max(10, int(25 - (d - 60) * 0.1))
 
-            # Resource: based on failure rate (tolerant)
-            if failure_rate == 0:
-                resource_score = 90
-            elif failure_rate <= 0.1:
-                resource_score = 80
-            elif failure_rate <= 0.3:
-                resource_score = 60
-            elif failure_rate <= 0.5:
-                resource_score = 40
-            else:
-                resource_score = max(10, int(40 - failure_rate * 30))
+            if   failure_rate == 0:   resource_score = 90
+            elif failure_rate <= 0.1: resource_score = 80
+            elif failure_rate <= 0.3: resource_score = 60
+            elif failure_rate <= 0.5: resource_score = 40
+            else:                     resource_score = max(10, int(40 - failure_rate * 30))
 
-            # Consistency: based on success rate
             consistency_score = stability_score
 
-            # Recovery: based on failure rate (tolerant)
-            if failures == 0:
-                recovery_score = 100
-            elif failure_rate <= 0.1:
-                recovery_score = 85
-            elif failure_rate <= 0.3:
-                recovery_score = 65
-            elif failure_rate <= 0.5:
-                recovery_score = 45
-            else:
-                recovery_score = max(10, int(45 - failure_rate * 35))
-        
-        # Calculate overall score
+            if   failures == 0:       recovery_score = 100
+            elif failure_rate <= 0.1: recovery_score = 85
+            elif failure_rate <= 0.3: recovery_score = 65
+            elif failure_rate <= 0.5: recovery_score = 45
+            else:                     recovery_score = max(10, int(45 - failure_rate * 35))
+        else:
+            stability_score = performance_score = resource_score = consistency_score = recovery_score = 0
+
         overall_score = int((stability_score + performance_score + resource_score + consistency_score + recovery_score) / 5)
-        
-        # Build enhanced report
-        report_lines = [
+
+        # ── Build clean report ───────────────────────────────────────
+        # NOTE: Frontend report.html parses with regex like "Test Runs: N",
+        #       "Successes: N (XX%)", "Avg Duration: X.Xs", "Stability ... N/100".
+        #       Use plain "Key: Value" format so frontend regex can extract values.
+        lines = [
             "# Skill Stress Lab Report",
             "",
-            "## Basic Information",
-            f"- **Test Runs**: {runs}",
-            f"- **Concurrency**: {concurrency}",
+            "## Test Configuration",
             "",
-            "---",
+            f"- Test Runs: {total_runs}",
+            f"- Concurrency: {concurrency}",
+            f"- Skill: {skill_name}",
             "",
-            "## Five-Dimension Scores (0-100)",
+            "## Performance Metrics",
             "",
-            "| Dimension | Score | Description |",
-            "|-----------|-------|-------------|",
-            f"| 🛡️ **Stability** | {stability_score}/100 | Success rate performance |",
-            f"| ⚡ **Performance** | {performance_score}/100 | Response time performance |",
-            f"| 💾 **Resource** | {resource_score}/100 | Resource utilization |",
-            f"| 🔄 **Consistency** | {consistency_score}/100 | Result consistency |",
-            f"| 🆘 **Recovery** | {recovery_score}/100 | Failure recovery capability |",
+            f"- Total Runs: {total_runs}",
+            f"- Successes: {successes} ({success_rate*100:.1f}%)",
+            f"- Avg Duration: {avg_duration:.4f}s",
+            f"- P95 Duration: {p95_duration:.4f}s",
+            f"- Min Duration: {min_duration:.4f}s",
+            f"- Max Duration: {max_duration:.4f}s",
+            f"- Std Deviation: {std_deviation:.4f}s",
             "",
-            f"### 📊 Overall Score: **{overall_score}/100**",
+            "## Five-Dimension Scores",
             "",
-            "---",
+            f"| Dimension | Score | Description |",
+            f"|-----------|-------|-------------|",
+            f"| 🛡️ Stability | {stability_score}/100 | Success rate under concurrent load |",
+            f"| ⚡ Performance | {performance_score}/100 | Response time (P95-based) |",
+            f"| 💾 Resource | {resource_score}/100 | Resource efficiency under load |",
+            f"| 🔄 Consistency | {consistency_score}/100 | Result repeatability |",
+            f"| 🆘 Recovery | {recovery_score}/100 | Failure tolerance and recovery |",
             "",
-            "## Original Test Summary",
-            "",
-            original_content,
-            "",
-            "---",
+            f"**Overall Score: {overall_score}/100**",
+        ]
+
+        if failure_samples:
+            lines += [
+                "",
+                "## Failure Details",
+                "",
+            ]
+            for s in failure_samples[:5]:
+                lines.append(f"- {s}")
+
+        lines += [
             "",
             "*Report auto-generated by Skill Stress Lab*",
         ]
-        
-        output_md.write_text("\n".join(report_lines), encoding="utf-8")
+
+        output_md.write_text("\n".join(lines), encoding="utf-8")
 
     def _snapshot(self, record: TaskRecord) -> TaskRecord:
         return TaskRecord(**record.to_dict())

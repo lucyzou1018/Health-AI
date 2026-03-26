@@ -643,9 +643,9 @@ function describeTask(task) {
   if (task.status === "failed") {
     const raw = task.message || "";
 
-    // Special handling for security pre-check failure (Stress Test)
-    if (task.skillType === "skill-stress-lab" && raw.includes("high-risk operations")) {
-      return "⚠️ This Skill contains high-risk operations and is not eligible for stress testing. Please resolve the security issues before retrying.";
+    // Stress Test: show backend error message directly (already user-friendly)
+    if (task.skillType === "skill-stress-lab") {
+      return `⚠️ ${raw}`;
     }
 
     // General error handling: strip file paths and exit codes
