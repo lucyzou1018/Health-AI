@@ -538,6 +538,8 @@ async function runTask() {
   updateRunButtonState();
 
   try {
+    // Clear previous task results before starting a new analysis
+    clearResults();
     setStatus("Analyzing...", "running");
     setSummary("Uploading package and preparing scan…");
     artifactBox?.classList.add("hidden");
@@ -599,11 +601,9 @@ async function runTask() {
     }
     // 任务结束：原地更新历史记录状态
     if (finalTask) upsertHistoryTask(finalTask);
-    if (finalTask?.status === "completed") {
-      // 扫描成功：重置上传区，准备下一次扫描
-      clearCurrentFile();
-    }
-    // 失败时保留文件，用户可直接点 Start Analysis 重试
+    // Keep uploaded file visible after completion so the user can see
+    // which package was analyzed.  The file will be cleared when a new
+    // analysis starts (see clearResults() in runTask).
   } catch (err) {
     setStatus("Failed", "error");
     const message = err instanceof Error ? err.message : String(err);
