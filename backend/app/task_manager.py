@@ -453,8 +453,9 @@ class TaskManager:
                 return subdirs[0]
         return code_dir
 
-    # Priority list for auto-detecting skill entry scripts
+    # Well-known entry script names (checked first, in priority order)
     _ENTRY_CANDIDATES = [
+        "scripts/security_preflight.py",
         "scripts/run_cli.py",
         "scripts/main.py",
         "scripts/run.py",
@@ -465,38 +466,37 @@ class TaskManager:
         "__main__.py",
     ]
 
-    def _detect_skill_entry(self, skill_dir: Path) -> str | None:
-        """Auto-detect the entry-point script inside a skill package.
+    def _collect_entry_candidates(self, skill_dir: Path) -> list[str]:
+        """Return a list of command templates for all Python scripts found.
 
-        Returns a command template string (with {skill} placeholder) or None.
+        Well-known names are placed first; other scripts follow alphabetically.
         """
-        # 1. Check well-known filenames in priority order
+        seen: set[str] = set()
+        result: list[str] = []
+
+        def _add(rel_path: str) -> None:
+            if rel_path not in seen:
+                seen.add(rel_path)
+                result.append(f"python3 {{skill}}/{rel_path}")
+
+        # 1. Well-known candidates
         for candidate in self._ENTRY_CANDIDATES:
             if (skill_dir / candidate).is_file():
-                return f"python3 {{skill}}/{candidate}"
+                _add(candidate)
 
-        # 2. Fallback: pick the first .py in scripts/
+        # 2. All .py in scripts/
         scripts_dir = skill_dir / "scripts"
         if scripts_dir.is_dir():
-            py_files = sorted(f for f in scripts_dir.iterdir() if f.suffix == ".py")
-            if py_files:
-                return f"python3 {{skill}}/scripts/{py_files[0].name}"
+            for f in sorted(scripts_dir.iterdir()):
+                if f.suffix == ".py":
+                    _add(f"scripts/{f.name}")
 
-        # 3. Fallback: pick the first .py in root (excluding __init__.py)
-        root_py = sorted(
-            f for f in skill_dir.iterdir()
-            if f.is_file() and f.suffix == ".py" and f.name != "__init__.py"
-        )
-        if root_py:
-            return f"python3 {{skill}}/{root_py[0].name}"
+        # 3. All .py in root (excluding __init__.py)
+        for f in sorted(skill_dir.iterdir()):
+            if f.is_file() and f.suffix == ".py" and f.name != "__init__.py":
+                _add(f.name)
 
-        # 4. Deep fallback: recursively find any .py file
-        all_py = sorted(skill_dir.rglob("*.py"))
-        if all_py:
-            rel = all_py[0].relative_to(skill_dir)
-            return f"python3 {{skill}}/{rel}"
-
-        return None
+        return result
 
     def _run_security_pre_check(self, code_dir: Path, report_dir: Path) -> int:
         """Run a Security Audit on the uploaded package and return the overall score.
@@ -526,8 +526,29 @@ class TaskManager:
                 return 0
         return 0
 
+    def _probe_entry_script(self, entry_cmd: str, skill_dir: Path) -> bool:
+        """Try running the entry script once without extra args.
+
+        Returns True if the script exits with code 0 (no mandatory params needed),
+        False otherwise.
+        """
+        import subprocess as _sp
+        # Replace {skill} placeholder with actual path
+        test_cmd = entry_cmd.replace("{skill}", str(skill_dir))
+        print(f"[StressLab] probing entry script: {test_cmd}")
+        try:
+            result = _sp.run(
+                test_cmd, shell=True, capture_output=True, timeout=30,
+                cwd=str(self.repo_root),
+            )
+            print(f"[StressLab] probe exit code: {result.returncode}")
+            return result.returncode == 0
+        except Exception as exc:
+            print(f"[StressLab] probe failed: {exc}")
+            return False
+
     def _run_stress_lab(self, code_dir: Path, report_dir: Path, params: Dict[str, Any]) -> Dict[str, Any]:
-        # ── Step 1: Run Security Audit pre-check ────────────────────────
+        # ── Step 1: Security Audit pre-check ─────────────────────────────
         audit_score = self._run_security_pre_check(code_dir, report_dir)
         if audit_score < self.STRESS_MIN_SECURITY_SCORE:
             raise RuntimeError(
@@ -535,29 +556,44 @@ class TaskManager:
                 "Please resolve the security issues before retrying."
             )
 
-        # ── Step 2: Run Stress Test (security pre-check passed) ────────
+        # ── Step 2: Detect entry script & validate runnability ───────────
+        skill_dir = self._find_skill_dir(code_dir, params)
+        print(f"[StressLab] skill_dir = {skill_dir}")
+
+        command = params.get("command")  # allow explicit override
+        if not command:
+            candidates = self._collect_entry_candidates(skill_dir)
+            print(f"[StressLab] found {len(candidates)} candidate(s)")
+
+            if not candidates:
+                raise RuntimeError(
+                    "No executable entry point found in the uploaded Skill package. "
+                    "Stress testing requires a runnable Python script."
+                )
+
+            # Probe each candidate; use the first one that runs without args
+            chosen = None
+            for candidate in candidates:
+                if self._probe_entry_script(candidate, skill_dir):
+                    chosen = candidate
+                    print(f"[StressLab] chosen entry: {chosen}")
+                    break
+                print(f"[StressLab] skipped (needs args): {candidate}")
+
+            if not chosen:
+                raise RuntimeError(
+                    "This Skill requires specific input parameters to run and is not "
+                    "yet supported for automated stress testing. Please use a Skill "
+                    "that can execute independently without mandatory arguments."
+                )
+            command = chosen
+
+        # ── Step 3: Run Stress Test ──────────────────────────────────────
         script = self.repo_root / "skills" / "skill-stress-lab" / "scripts" / "stress_runner.py"
         log_file = report_dir / "stress_runner.log"
         summary_md = report_dir / "stress_summary.md"
         metrics_json = report_dir / "stress_metrics.json"
         logs_dir = report_dir / "runs"
-
-        # Resolve skill directory
-        skill_dir = self._find_skill_dir(code_dir, params)
-        print(f"[StressLab] skill_dir = {skill_dir}")
-        if skill_dir.exists():
-            print(f"[StressLab] skill_dir contents: {list(skill_dir.iterdir())}")
-
-        # Build stress test command.
-        # Always use audit_skill.py to run concurrent security audits against the
-        # uploaded Skill.  Individual skill scripts require bespoke arguments
-        # (--input, --chain, --side …) that we cannot guess, so a generic
-        # security-audit scan is the only universally runnable workload.
-        command = params.get("command")
-        if not command:
-            audit_script = self.repo_root / "skills" / "skill-security-audit" / "scripts" / "audit_skill.py"
-            command = f"python3 {audit_script} --skill-path {{skill}}"
-            print(f"[StressLab] using audit_skill.py as stress command")
 
         runs = max(1, min(100, int(params.get("runs", 10))))
         concurrency = max(1, min(100, int(params.get("concurrency", 1))))
