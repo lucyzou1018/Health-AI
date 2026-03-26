@@ -248,7 +248,7 @@ def download_report_pdf(task_id: str):
         )
         if needs_regen:
             try:
-                generate_pdf(md_path, pdf_path)
+                generate_pdf(md_path, pdf_path, skill_type=record.skill_type)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
 

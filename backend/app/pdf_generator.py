@@ -65,6 +65,13 @@ def _safe(text: str) -> str:
         "\U0001f3c6": "[trophy]",  # 🏆
         "\U0001f510": "[lock]",    # 🔐
         "\U0001f50f": "[lock]",    # 🔏
+        # Stress test report emojis
+        "\u26a1": "[zap]",         # ⚡
+        "\U0001f4be": "[disk]",    # 💾
+        "\U0001f504": "[cycle]",   # 🔄
+        "\U0001f198": "[SOS]",     # 🆘
+        "\U0001f9ea": "[test]",    # 🧪
+        "\U0001f4c8": "[chart]",   # 📈
     }
     for k, v in replacements.items():
         text = text.replace(k, v)
@@ -534,11 +541,20 @@ def _generate_stress_pdf(md: str, out_path: Path) -> None:
         score_h, score_rows = _parse_table(score_block)
         if score_h and score_rows:
             pdf.section_title("Score Breakdown")
+            # Clean markdown formatting and emoji from dimension names
+            clean_rows = []
+            for row in score_rows:
+                cleaned = []
+                for cell in row:
+                    c = re.sub(r"\*+", "", cell)  # strip **bold**
+                    c = c.encode("ascii", errors="ignore").decode("ascii").strip()
+                    cleaned.append(c)
+                clean_rows.append(cleaned)
             n = len(score_h)
             widths = [170 / n] * n
             if n == 3:
                 widths = [60, 40, 70]
-            pdf.draw_table(score_h, score_rows, widths)
+            pdf.draw_table(score_h, clean_rows, widths)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pdf.output(str(out_path))
@@ -546,11 +562,18 @@ def _generate_stress_pdf(md: str, out_path: Path) -> None:
 
 # ─── 主入口 ───────────────────────────────────────────────────────────────────
 
-def generate_pdf(md_path: Path, out_path: Path) -> None:
+def generate_pdf(md_path: Path, out_path: Path, *, skill_type: str = "") -> None:
     md = md_path.read_text(encoding="utf-8")
 
-    # Detect report type and dispatch to the appropriate renderer
-    if "Stress Lab" in md or "Stress Summary" in md or "Five-Dimension Scores" in md or "五维度评分" in md:
+    # Detect report type: explicit skill_type takes priority, fallback to content sniffing
+    is_stress = (
+        skill_type == "skill-stress-lab"
+        or "Stress Lab" in md
+        or "Stress Summary" in md
+        or "Five-Dimension Scores" in md
+        or "五维度评分" in md
+    )
+    if is_stress:
         _generate_stress_pdf(md, out_path)
         return
 
