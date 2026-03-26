@@ -1457,12 +1457,8 @@ async function connectWallet() {
   let selectedProvider;
   
   try {
-    // 如果有多个钱包，显示选择弹窗
-    if (providers.length > 1) {
-      selectedProvider = await showWalletSelector(providers);
-    } else {
-      selectedProvider = providers[0];
-    }
+    // 始终显示钱包选择弹窗，让用户明确选择
+    selectedProvider = await showWalletSelector(providers);
   } catch (err) {
     // 用户取消
     return;
