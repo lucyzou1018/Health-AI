@@ -440,6 +440,50 @@ class TaskManager:
     # Minimum security audit score required to proceed with stress testing
     STRESS_MIN_SECURITY_SCORE = 80
 
+    def _find_skill_dir(self, code_dir: Path, params: dict) -> Path:
+        """Resolve the skill directory from params or by scanning code_dir."""
+        if params.get("skillDir"):
+            return Path(params["skillDir"])
+        if code_dir.exists():
+            subdirs = [d for d in code_dir.iterdir() if d.is_dir()]
+            if subdirs:
+                return subdirs[0]
+        return code_dir
+
+    # Priority list for auto-detecting skill entry scripts
+    _ENTRY_CANDIDATES = [
+        "scripts/run_cli.py",
+        "scripts/main.py",
+        "scripts/run.py",
+        "main.py",
+        "run.py",
+        "__main__.py",
+    ]
+
+    def _detect_skill_entry(self, skill_dir: Path) -> str | None:
+        """Auto-detect the entry-point script inside a skill package.
+
+        Returns a command template string (with {skill} placeholder) or None.
+        """
+        # 1. Check well-known filenames in priority order
+        for candidate in self._ENTRY_CANDIDATES:
+            if (skill_dir / candidate).is_file():
+                return f"python3 {{skill}}/{candidate}"
+
+        # 2. Fallback: if scripts/ has exactly one .py file, use it
+        scripts_dir = skill_dir / "scripts"
+        if scripts_dir.is_dir():
+            py_files = [f for f in scripts_dir.iterdir() if f.suffix == ".py"]
+            if len(py_files) == 1:
+                return f"python3 {{skill}}/scripts/{py_files[0].name}"
+
+        # 3. Fallback: if root has exactly one .py file, use it
+        root_py = [f for f in skill_dir.iterdir() if f.is_file() and f.suffix == ".py"]
+        if len(root_py) == 1:
+            return f"python3 {{skill}}/{root_py[0].name}"
+
+        return None
+
     def _run_security_pre_check(self, code_dir: Path, report_dir: Path) -> int:
         """Run a Security Audit on the uploaded package and return the overall score.
 
@@ -483,10 +527,22 @@ class TaskManager:
         summary_md = report_dir / "stress_summary.md"
         metrics_json = report_dir / "stress_metrics.json"
         logs_dir = report_dir / "runs"
-        # Use provided command or default to security_preflight.py
+
+        # Resolve skill directory
+        skill_dir = self._find_skill_dir(code_dir, params)
+
+        # Use provided command or auto-detect entry point
         command = params.get("command")
         if not command:
-            command = "python3 {skill}/scripts/security_preflight.py"
+            entry = self._detect_skill_entry(skill_dir)
+            if entry:
+                command = entry
+            else:
+                raise ValueError(
+                    "No executable entry point found in the uploaded Skill package. "
+                    "Expected a Python script in scripts/ or root directory."
+                )
+
         runs = max(1, min(100, int(params.get("runs", 10))))
         concurrency = max(1, min(100, int(params.get("concurrency", 1))))
         cmd = [
@@ -502,19 +558,9 @@ class TaskManager:
             str(logs_dir),
             "--summary-report",
             str(summary_md),
+            "--skill-dir",
+            str(skill_dir),
         ]
-        # Note: --collect-metrics is not supported by stress_runner.py, skip it
-        if params.get("workdir"):
-            cmd.extend(["--workdir", str(params["workdir"])])
-        if params.get("skillDir"):
-            cmd.extend(["--skill-dir", str(params["skillDir"])])
-        elif code_dir.exists():
-            # Find the actual skill subdirectory (e.g., input/skill-name/)
-            skill_subdirs = [d for d in code_dir.iterdir() if d.is_dir()]
-            if skill_subdirs:
-                cmd.extend(["--skill-dir", str(skill_subdirs[0])])
-            else:
-                cmd.extend(["--skill-dir", str(code_dir)])
         if params.get("openaiUsageFile"):
             cmd.extend(["--openai-usage-file", str(params["openaiUsageFile"])])
         if params.get("apiCountFile"):
