@@ -453,10 +453,11 @@ class TaskManager:
                 return subdirs[0]
         return code_dir
 
-    # Well-known entry script names (checked first, in priority order)
-    _ENTRY_CANDIDATES = [
-        "scripts/security_preflight.py",
+    # Primary entry script names — these represent the skill's MAIN
+    # functionality (not utility scripts like security_preflight.py).
+    _PRIMARY_ENTRY_NAMES = [
         "scripts/run_cli.py",
+        "scripts/runner.py",
         "scripts/main.py",
         "scripts/run.py",
         "scripts/audit_skill.py",
@@ -466,37 +467,17 @@ class TaskManager:
         "__main__.py",
     ]
 
-    def _collect_entry_candidates(self, skill_dir: Path) -> list[str]:
-        """Return a list of command templates for all Python scripts found.
+    def _detect_primary_entry(self, skill_dir: Path) -> str | None:
+        """Find the skill's primary entry script.
 
-        Well-known names are placed first; other scripts follow alphabetically.
+        Only checks well-known main entry names.  Does NOT fall back to
+        arbitrary utility scripts — if the main entry is not found the
+        skill is considered parameter-dependent and will be rejected.
         """
-        seen: set[str] = set()
-        result: list[str] = []
-
-        def _add(rel_path: str) -> None:
-            if rel_path not in seen:
-                seen.add(rel_path)
-                result.append(f"python3 {{skill}}/{rel_path}")
-
-        # 1. Well-known candidates
-        for candidate in self._ENTRY_CANDIDATES:
+        for candidate in self._PRIMARY_ENTRY_NAMES:
             if (skill_dir / candidate).is_file():
-                _add(candidate)
-
-        # 2. All .py in scripts/
-        scripts_dir = skill_dir / "scripts"
-        if scripts_dir.is_dir():
-            for f in sorted(scripts_dir.iterdir()):
-                if f.suffix == ".py":
-                    _add(f"scripts/{f.name}")
-
-        # 3. All .py in root (excluding __init__.py)
-        for f in sorted(skill_dir.iterdir()):
-            if f.is_file() and f.suffix == ".py" and f.name != "__init__.py":
-                _add(f.name)
-
-        return result
+                return f"python3 {{skill}}/{candidate}"
+        return None
 
     def _run_security_pre_check(self, code_dir: Path, report_dir: Path) -> int:
         """Run a Security Audit on the uploaded package and return the overall score.
@@ -556,37 +537,28 @@ class TaskManager:
                 "Please resolve the security issues before retrying."
             )
 
-        # ── Step 2: Detect entry script & validate runnability ───────────
+        # ── Step 2: Detect primary entry & validate runnability ────────────
         skill_dir = self._find_skill_dir(code_dir, params)
         print(f"[StressLab] skill_dir = {skill_dir}")
 
         command = params.get("command")  # allow explicit override
         if not command:
-            candidates = self._collect_entry_candidates(skill_dir)
-            print(f"[StressLab] found {len(candidates)} candidate(s)")
-
-            if not candidates:
+            entry = self._detect_primary_entry(skill_dir)
+            if not entry:
                 raise RuntimeError(
                     "No executable entry point found in the uploaded Skill package. "
                     "Stress testing requires a runnable Python script."
                 )
+            print(f"[StressLab] primary entry: {entry}")
 
-            # Probe each candidate; use the first one that runs without args
-            chosen = None
-            for candidate in candidates:
-                if self._probe_entry_script(candidate, skill_dir):
-                    chosen = candidate
-                    print(f"[StressLab] chosen entry: {chosen}")
-                    break
-                print(f"[StressLab] skipped (needs args): {candidate}")
-
-            if not chosen:
+            # Probe: can it run without mandatory arguments?
+            if not self._probe_entry_script(entry, skill_dir):
                 raise RuntimeError(
                     "This Skill requires specific input parameters to run and is not "
                     "yet supported for automated stress testing. Please use a Skill "
                     "that can execute independently without mandatory arguments."
                 )
-            command = chosen
+            command = entry
 
         # ── Step 3: Run Stress Test ──────────────────────────────────────
         script = self.repo_root / "skills" / "skill-stress-lab" / "scripts" / "stress_runner.py"
