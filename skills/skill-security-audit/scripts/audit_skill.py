@@ -135,6 +135,48 @@ OBFUSCATION_LABELS_ZH = {
     "chr_concat":  "chr() 字符拼接（可能混淆）",
 }
 
+# ── Side-Effects：外部写操作检测 ───────────────────────────────────────────────
+SIDE_EFFECT_PATTERNS: Dict[str, Any] = {
+    "file_write":  re.compile(r'open\s*\([^)]+,\s*["\'][wa][^"\']*["\']', re.IGNORECASE),
+    "path_write":  re.compile(r'\.(write_text|write_bytes)\s*\(', re.IGNORECASE),
+    "env_write":   re.compile(r'os\.environ\s*\[|os\.putenv\s*\(', re.IGNORECASE),
+    "net_mutate":  re.compile(r'\.(post|put|patch|delete)\s*\(\s*["\']https?://', re.IGNORECASE),
+    "fs_modify":   re.compile(r'(os\.(remove|unlink|makedirs|rename)|shutil\.(rmtree|move|copy2?))\s*\(', re.IGNORECASE),
+    "db_write":    re.compile(r'(execute|executemany)\s*\([^)]{0,200}(INSERT|UPDATE|DELETE|DROP)\b', re.IGNORECASE | re.DOTALL),
+}
+
+SIDE_EFFECT_LABELS_ZH: Dict[str, str] = {
+    "file_write": "写入文件（open w/a 模式）",
+    "path_write": "Path.write_text/write_bytes 写入",
+    "env_write":  "修改环境变量（os.environ 赋值）",
+    "net_mutate": "网络写操作（POST/PUT/PATCH/DELETE）",
+    "fs_modify":  "文件系统修改（mkdir/remove/rename 等）",
+    "db_write":   "数据库写操作（INSERT/UPDATE/DELETE）",
+}
+
+# ── Data Access：敏感数据读取检测 ──────────────────────────────────────────────
+DATA_ACCESS_PATTERNS: Dict[str, Any] = {
+    "sensitive_path":  re.compile(r'["\']/(etc|proc|sys)/|~/\.(ssh|aws|gnupg)/', re.IGNORECASE),
+    "env_secret_read": re.compile(r'os\.(getenv|environ\.get)\s*\(\s*["\'][^"\'"]*(key|secret|token|password|api)[^"\']*["\']', re.IGNORECASE),
+    "cred_file_read":  re.compile(r'open\s*\([^)]*\.(pem|key|p12|pfx|crt|jks)[^)"\']*["\']r', re.IGNORECASE),
+    "ssh_access":      re.compile(r'\b(id_rsa|id_ecdsa|id_ed25519|authorized_keys|known_hosts)\b', re.IGNORECASE),
+    "aws_cred":        re.compile(r'(\.aws/credentials|boto3\.Session|aws_access_key_id)', re.IGNORECASE),
+}
+
+DATA_ACCESS_LABELS_ZH: Dict[str, str] = {
+    "sensitive_path":  "访问敏感系统路径（/etc/, ~/.ssh/ 等）",
+    "env_secret_read": "读取敏感环境变量（key/secret/token）",
+    "cred_file_read":  "读取凭证文件（.pem/.key/.crt 等）",
+    "ssh_access":      "访问 SSH 密钥文件",
+    "aws_cred":        "访问 AWS 凭证配置",
+}
+
+# ── Tool Call Depth：调用链深度检测 ────────────────────────────────────────────
+# 方法链 .a().b().c().d() 深度 ≥ 4
+_TOOL_CHAIN_PAT = re.compile(r'(\.\w+\s*\([^)]*\)){4,}')
+# 嵌套函数调用 f(g(h(i(...)))) 深度 ≥ 4
+_TOOL_NESTED_PAT = re.compile(r'\w+\s*\([^()]*\w+\s*\([^()]*\w+\s*\([^()]*\w+\s*\(')
+
 
 def _fallback_yaml(raw: str) -> Dict[str, Any]:
     data: Dict[str, Any] = {}
@@ -1042,9 +1084,15 @@ def scan_skill_logs(skill_path: Path, limit: int = 20) -> List[Dict[str, str]]:
     return hits
 
 
-def _build_skill_bundle(paths: List[Path], max_files: int = 20, max_chars: int = 12000) -> str:
+def _build_skill_bundle(paths: List[Path], max_files: int = 200) -> str:
+    """
+    将 skill 包中所有文件的完整内容拼合为发送给 LLM 的字符串。
+
+    不设字符上限：主流模型（GPT-4o / Grok）支持 128k token（约 50 万字符），
+    skill 包源码体积通常远低于此上限，无需截断，确保 LLM 能审查全部代码。
+    若将来遇到超大包导致模型返回 context_length_exceeded，可在此处按需增加分块逻辑。
+    """
     collected: List[str] = []
-    remaining = max_chars
     files: List[Path] = []
     for base in paths:
         if not base.exists():
@@ -1063,22 +1111,26 @@ def _build_skill_bundle(paths: List[Path], max_files: int = 20, max_chars: int =
                 break
         if len(files) >= max_files:
             break
+
     for file_path in files:
         try:
-            text = file_path.read_text(encoding="utf-8", errors="ignore")
+            text = file_path.read_text(encoding="utf-8", errors="ignore").strip()
         except Exception:
             continue
-        snippet = text.strip()
-        if len(snippet) > remaining:
-            snippet = snippet[: remaining - 3] + "..."
-        collected.append(f"### {file_path}\n{snippet}")
-        remaining -= len(snippet)
-        if remaining <= 0:
-            break
+        if not text:
+            continue
+        collected.append(f"### {file_path}\n{text}")
+
     return "\n\n".join(collected)
 
 
 def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str) -> Dict[str, Any]:
+    """强制执行 AI 代码审查，返回各维度风险分（0-100）和综合风险等级。"""
+    _EMPTY = {"status": "skipped", "reason": "no local skill paths",
+              "hasRisk": False, "riskLevel": "none",
+              "privacyRisk": 0, "privilegeRisk": 0, "integrityRisk": 0,
+              "dependencyRisk": 0, "stabilityRisk": 0}
+
     paths = []
     for entry in skill_entries or []:
         origin = entry.get("originPath")
@@ -1087,45 +1139,143 @@ def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str) ->
             if p.exists():
                 paths.append(p)
     if not paths:
-        return {"status": "skipped", "reason": "no local skill paths"}
+        return _EMPTY
+
     try:
         from openai import OpenAI
     except Exception as exc:
-        return {"status": "error", "reason": f"openai package missing: {exc}"}
-    if not os.getenv("OPENAI_API_KEY"):
-        return {"status": "error", "reason": "OPENAI_API_KEY not set"}
+        return {**_EMPTY, "status": "error", "reason": f"openai package missing: {exc}"}
+
+    # 支持 OPENAI_API_KEY 和 XAI_API_KEY（xAI / Grok）
+    openai_key = os.getenv("OPENAI_API_KEY")
+    xai_key    = os.getenv("XAI_API_KEY")
+    if not openai_key and not xai_key:
+        return {**_EMPTY, "status": "error", "reason": "未配置 API Key（需设置 OPENAI_API_KEY 或 XAI_API_KEY）"}
+
     bundle = _build_skill_bundle(paths)
     if not bundle:
-        return {"status": "skipped", "reason": "skill files empty"}
-    client = OpenAI()
+        return {**_EMPTY, "reason": "skill files empty"}
+
+    if openai_key:
+        client = OpenAI(api_key=openai_key)
+        model_name = model
+    else:
+        client = OpenAI(api_key=xai_key, base_url="https://api.x.ai/v1")
+        model_name = model if model.startswith("grok") else "grok-3-mini"
+
     system_prompt = (
-        "You are a security auditor. Review provided skill files and list potential risks, sensitive data, or bad practices."
-        if lang != "zh"
-        else "你是一名安全审计员，请审查提供的 Skill 文件，指出潜在风险、敏感信息或不当做法。"
+        "You are a strict security auditor for AI agent skill packages. "
+        "Analyze the provided skill files. "
+        "Return ONLY a valid JSON object with NO markdown fences and NO extra text:\n"
+        "{\n"
+        '  "riskLevel": "none|low|medium|high",\n'
+        '  "privacyRisk": <integer 0-100>,\n'
+        '  "privilegeRisk": <integer 0-100>,\n'
+        '  "integrityRisk": <integer 0-100>,\n'
+        '  "dependencyRisk": <integer 0-100>,\n'
+        '  "stabilityRisk": <integer 0-100>\n'
+        "}\n"
+        "Risk scale: 0=clean, 1-30=low, 31-60=medium, 61-100=high. "
+        "riskLevel must match the highest individual score range."
     )
-    user_prompt = (
-        "Summarize risks and actionable fixes for the following skill contents:\n\n"
-        if lang != "zh"
-        else "请审查以下 Skill 内容并用中文给出风险与修复建议：\n\n"
-    ) + bundle
+    user_prompt = "Analyze the following skill package for security risks:\n\n" + bundle
+
+    def _parse_result(raw: str) -> Optional[Dict[str, Any]]:
+        """从 LLM 响应中提取 JSON，返回 None 表示解析失败。"""
+        import re as _re
+        json_match = _re.search(r'\{[\s\S]+?\}', raw)
+        if not json_match:
+            return None
+        parsed = json.loads(json_match.group())
+        risk_level   = str(parsed.get("riskLevel", "none")).lower()
+        privacy_r    = max(0, min(100, int(parsed.get("privacyRisk",    0))))
+        privilege_r  = max(0, min(100, int(parsed.get("privilegeRisk",  0))))
+        integrity_r  = max(0, min(100, int(parsed.get("integrityRisk",  0))))
+        dependency_r = max(0, min(100, int(parsed.get("dependencyRisk", 0))))
+        stability_r  = max(0, min(100, int(parsed.get("stabilityRisk",  0))))
+        has_risk = risk_level != "none" or max(
+            privacy_r, privilege_r, integrity_r, dependency_r, stability_r) > 0
+        return {
+            "status":         "ok",
+            "model":          model_name,
+            "riskLevel":      risk_level,
+            "hasRisk":        has_risk,
+            "privacyRisk":    privacy_r,
+            "privilegeRisk":  privilege_r,
+            "integrityRisk":  integrity_r,
+            "dependencyRisk": dependency_r,
+            "stabilityRisk":  stability_r,
+        }
+
+    def _call_responses_api() -> Optional[str]:
+        """尝试 OpenAI Responses API（SDK v2 新增，适用于 gpt-4.1 / o 系列等新模型）。"""
+        try:
+            resp = client.responses.create(
+                model=model_name,
+                instructions=system_prompt,
+                input=user_prompt,
+            )
+            # SDK v2: resp.output_text 或 resp.output[0].content[0].text
+            if hasattr(resp, "output_text"):
+                return (resp.output_text or "").strip()
+            if hasattr(resp, "output") and resp.output:
+                item = resp.output[0]
+                if hasattr(item, "content") and item.content:
+                    return (item.content[0].text or "").strip()
+        except Exception:
+            pass
+        return None
+
+    # ── 路径 1：Chat Completions（gpt-4o / gpt-4.1 / grok 等对话模型）────────────
     try:
-        response = client.responses.create(
-            model=model,
-            input=[
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
+                {"role": "user",   "content": user_prompt},
             ],
             temperature=0,
         )
-        summary = getattr(response, "output_text", "")
-        if not summary:
+        raw = (response.choices[0].message.content or "").strip()
+        result = _parse_result(raw)
+        return result if result else {**_EMPTY, "status": "ok", "model": model_name}
+
+    except Exception as chat_exc:
+        chat_err = str(chat_exc)
+
+        # ── 路径 2：Legacy Completions（codex / instruct 等旧补全模型）────────────
+        if "not a chat model" in chat_err or "v1/completions" in chat_err:
             try:
-                summary = response.output[0]["content"][0]["text"]  # type: ignore[index]
+                legacy_response = client.completions.create(
+                    model=model_name,
+                    prompt=system_prompt + "\n\n" + user_prompt,
+                    max_tokens=256,
+                    temperature=0,
+                )
+                raw = (legacy_response.choices[0].text or "").strip()
+                result = _parse_result(raw)
+                if result:
+                    return result
+                # Legacy completions 也失败，继续尝试 Responses API
             except Exception:
-                summary = ""
-        return {"status": "ok", "model": model, "summary": summary or "(empty response)"}
-    except Exception as exc:
-        return {"status": "error", "reason": str(exc)}
+                pass
+
+            # ── 路径 3：Responses API（SDK v2 新增，gpt-4.1 / o 系列等新模型）────
+            raw = _call_responses_api()
+            if raw is not None:
+                result = _parse_result(raw)
+                return result if result else {**_EMPTY, "status": "ok", "model": model_name}
+
+            return {**_EMPTY, "status": "error",
+                    "reason": f"模型 '{model_name}' 不支持任何可用接口，请检查 SKILL_AUDIT_AI_MODEL 配置是否正确"}
+
+        # ── Chat Completions 报其他错误，先尝试 Responses API 再报错 ──────────────
+        raw = _call_responses_api()
+        if raw is not None:
+            result = _parse_result(raw)
+            return result if result else {**_EMPTY, "status": "ok", "model": model_name}
+
+        return {**_EMPTY, "status": "error", "reason": f"[model={model_name}] {chat_err}"}
 
 
 def _risk_label(score: int) -> str:
@@ -1137,8 +1287,17 @@ def _risk_label(score: int) -> str:
 
 
 def detect_code_risks(base_path: Optional[Path]) -> Dict[str, Any]:
-    """检测即时拒绝标志、混淆代码、供应链攻击风险，以及源码中的硬编码敏感数据。"""
-    result: Dict[str, Any] = {"instantRejects": [], "obfuscation": [], "sensitiveData": []}
+    """检测即时拒绝标志、混淆代码、供应链攻击风险，以及源码中的硬编码敏感数据。
+    同时检测：Side-Effects（外部写操作）、Data Access（敏感数据读取）、Tool Call Depth（调用链深度）。
+    """
+    result: Dict[str, Any] = {
+        "instantRejects": [],
+        "obfuscation": [],
+        "sensitiveData": [],
+        "sideEffects": [],
+        "dataAccess": [],
+        "toolCallDepth": [],
+    }
     if base_path is None or not base_path.exists():
         return result
     base_dir = base_path if base_path.is_dir() else base_path.parent
@@ -1161,8 +1320,23 @@ def detect_code_risks(base_path: Optional[Path]) -> Dict[str, Any]:
             for label, pat in SENSITIVE_PATTERNS.items():
                 if pat.search(text):
                     result["sensitiveData"].append({"label": label, "path": rel})
-    # 去重（同一 label 只记录一次）
-    result["sensitiveData"] = list({item["label"]: item for item in result["sensitiveData"]}.values())
+            # Side-Effects：外部写操作
+            for label, pat in SIDE_EFFECT_PATTERNS.items():
+                if pat.search(text):
+                    # file_write 排除 /tmp 临时写（风险较低）
+                    if label == "file_write" and "/tmp" in text.lower():
+                        continue
+                    result["sideEffects"].append({"label": label, "path": rel})
+            # Data Access：敏感数据读取
+            for label, pat in DATA_ACCESS_PATTERNS.items():
+                if pat.search(text):
+                    result["dataAccess"].append({"label": label, "path": rel})
+            # Tool Call Depth：调用链深度 ≥ 4
+            if _TOOL_CHAIN_PAT.search(text) or _TOOL_NESTED_PAT.search(text):
+                result["toolCallDepth"].append({"label": "deep_call_chain", "path": rel})
+    # 去重（同一 label 只保留一条）
+    for key in ("sensitiveData", "sideEffects", "dataAccess", "toolCallDepth"):
+        result[key] = list({item["label"]: item for item in result[key]}.values())
     return result
 
 
@@ -1192,6 +1366,7 @@ def generate_report(
     extra_skills: Optional[List[Dict[str, Any]]] = None,
     extra_agents: Optional[List[Dict[str, Any]]] = None,
     scan_paths: Optional[List[str]] = None,
+    ai_model: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     scan_paths: 原始输入目录列表（始终执行代码扫描，无论 SKILL.md 是否存在）。
@@ -1216,10 +1391,18 @@ def generate_report(
     token_info: Dict[str, Any] = {"totalTokens": 0, "byModel": [], "dataAvailable": False}
 
     skill_log_hits: List[Dict[str, str]] = []
-    aggregate_code_risks: Dict[str, Any] = {"instantRejects": [], "obfuscation": [], "sensitiveData": []}
+    aggregate_code_risks: Dict[str, Any] = {
+        "instantRejects": [], "obfuscation": [], "sensitiveData": [],
+        "sideEffects": [], "dataAccess": [], "toolCallDepth": [],
+    }
 
     # 已扫描路径集合，避免重复扫描同一目录
     _scanned: set = set()
+
+    def _merge_risks(risks: Dict[str, Any]) -> None:
+        for key in ("instantRejects", "obfuscation", "sensitiveData",
+                    "sideEffects", "dataAccess", "toolCallDepth"):
+            aggregate_code_risks[key].extend(risks.get(key, []))
 
     for entry in skills:
         origin = entry.get("originPath")
@@ -1228,10 +1411,7 @@ def generate_report(
             if origin_path.exists():
                 _scanned.add(str(origin_path))
                 skill_log_hits.extend(scan_skill_logs(origin_path))
-                risks = detect_code_risks(origin_path)
-                aggregate_code_risks["instantRejects"].extend(risks["instantRejects"])
-                aggregate_code_risks["obfuscation"].extend(risks["obfuscation"])
-                aggregate_code_risks["sensitiveData"].extend(risks.get("sensitiveData", []))
+                _merge_risks(detect_code_risks(origin_path))
 
     # 对所有 scan_paths 执行代码扫描（即使 SKILL.md 缺失也不跳过）
     for raw in scan_paths or []:
@@ -1243,15 +1423,13 @@ def generate_report(
             continue
         _scanned.add(str(p))
         skill_log_hits.extend(scan_skill_logs(p))
-        risks = detect_code_risks(p)
-        aggregate_code_risks["instantRejects"].extend(risks["instantRejects"])
-        aggregate_code_risks["obfuscation"].extend(risks["obfuscation"])
-        aggregate_code_risks["sensitiveData"].extend(risks.get("sensitiveData", []))
+        _merge_risks(detect_code_risks(p))
 
-    # sensitiveData 全局去重（同 label 只保留一条）
-    aggregate_code_risks["sensitiveData"] = list(
-        {item["label"]: item for item in aggregate_code_risks["sensitiveData"]}.values()
-    )
+    # 全局去重（同 label 只保留一条）
+    for _key in ("sensitiveData", "sideEffects", "dataAccess", "toolCallDepth"):
+        aggregate_code_risks[_key] = list(
+            {item["label"]: item for item in aggregate_code_risks[_key]}.values()
+        )
 
     log_sensitive_hits = log_info.get("sensitiveHits", 0) + len(skill_log_hits)
     privacy_hits = memory_info.get("sensitiveHits", 0) + log_sensitive_hits
@@ -1275,6 +1453,17 @@ def generate_report(
         "codeRisks": aggregate_code_risks,
         "staticScores": static_scores,
     }
+
+    # ── AI 代码审查（必检项，在评分前执行，结果会影响各维度得分）────────────────
+    _model = ai_model or os.getenv("SKILL_AUDIT_AI_MODEL", "")
+    report["aiReview"] = (
+        run_ai_review(skills, _model, "zh")
+        if _model
+        else {"status": "skipped", "reason": "未配置 AI 模型（设置 SKILL_AUDIT_AI_MODEL 环境变量）",
+              "hasRisk": False, "riskLevel": "none",
+              "privacyRisk": 0, "privilegeRisk": 0, "integrityRisk": 0,
+              "dependencyRisk": 0, "stabilityRisk": 0}
+    )
 
     # Derive all five dimension scores directly from checklist findings so every
     # deduction is traceable to a visible ❌ / ⚠️ checklist row.
@@ -1311,9 +1500,12 @@ def _compute_checklist_scores(report: Dict[str, Any]) -> Dict[str, int]:
     Dimension mapping (exclusive — each checklist item feeds exactly one score):
 
     🔏 Privacy      ← 4A: credential_exfil/request · 4E: log hygiene · 4F: config key / env vars
+                       · Data Access: sensitive path / env secret / cred file / SSH / AWS reads
     🔐 Privilege    ← 4A: soul_write / openclaw_config_write (identity & config tampering only)
+                       · Side-Effects: file write / env write / net POST-PUT-DELETE / db write / fs modify
     🛡️ Integrity    ← 4A: eval_obfuscation / exec_compile · 4B: obfuscation · 4D: sensitive data in source
-    🔗 Supply Chain ← 4A: dynamic installs / ip_exfil · 4C: high-risk tools · 4F: CLI deps
+                       · Tool Call Depth: method chain / nested call depth ≥ 4
+    🔗 Dependency Risk ← 4A: dynamic installs / ip_exfil · 4C: high-risk tools · 4F: CLI deps
     ✅ Stability    ← 4G: manifest completeness (SKILL.md, name, version, description)
     """
     permissions   = report.get("permissions", [])
@@ -1361,6 +1553,11 @@ def _compute_checklist_scores(report: Dict[str, Any]) -> Dict[str, int]:
     env_notes_local = [n for n in all_notes if n.startswith("Environment variables:")]
     cli_notes_local  = [n for n in all_notes if n.startswith("CLI dependencies:")]
 
+    # New check results
+    side_effect_labels: set = {item["label"] for item in code_risks.get("sideEffects", [])}
+    data_access_labels: set = {item["label"] for item in code_risks.get("dataAccess", [])}
+    tool_depth_count: int   = len(code_risks.get("toolCallDepth", []))
+
     # ── 🔏 Privacy (data-exposure risks) ────────────────────────────────────
     risk_privacy = 0
     # 4A: credential exfiltration / prompting (❌)
@@ -1380,12 +1577,20 @@ def _compute_checklist_scores(report: Dict[str, Any]) -> Dict[str, int]:
             if any(kw in v.lower() for kw in ["key", "secret", "token", "password", "private"])
         )
         risk_privacy += min(10, sensitive_env_count * 5)
+    # Data Access: reading sensitive system paths / credentials / SSH keys (⚠️)
+    _da_weights = {"sensitive_path": 20, "env_secret_read": 15,
+                   "cred_file_read": 25, "ssh_access": 20, "aws_cred": 20}
+    risk_privacy += min(40, sum(_da_weights.get(lbl, 10) for lbl in data_access_labels))
 
     # ── 🔐 Privilege (identity / runtime-config tampering) ───────────────────
     risk_privilege = 0
     # 4A: writes to AI identity file or runtime config (❌)
     if "soul_write"            in ir_labels: risk_privilege += 40
     if "openclaw_config_write" in ir_labels: risk_privilege += 30
+    # Side-Effects: external write operations (⚠️)
+    _se_weights = {"file_write": 10, "path_write": 10, "env_write": 20,
+                   "net_mutate": 15, "fs_modify": 10, "db_write": 15}
+    risk_privilege += min(40, sum(_se_weights.get(lbl, 10) for lbl in side_effect_labels))
 
     # ── 🛡️ Integrity (code trustworthiness) ──────────────────────────────────
     risk_integrity = 0
@@ -1396,8 +1601,10 @@ def _compute_checklist_scores(report: Dict[str, Any]) -> Dict[str, int]:
     risk_integrity += min(30, ob_count * 15)
     # 4D: sensitive / secret data hardcoded in source (❌, each distinct type)
     risk_integrity += min(60, len(body_hits) * 25)
+    # Tool Call Depth: deeply nested/chained calls (⚠️)
+    risk_integrity += min(20, tool_depth_count * 10)
 
-    # ── 🔗 Supply Chain (dependency & network risks) ─────────────────────────
+    # ── 🔗 Dependency Risk (dependency & network risks) ──────────────────────
     risk_supply = 0
     # 4A: dynamic package installs / raw-IP exfiltration (❌)
     if "dynamic_pip_install" in ir_labels: risk_supply += 35
@@ -1422,6 +1629,15 @@ def _compute_checklist_scores(report: Dict[str, Any]) -> Dict[str, int]:
         if not skill_name:                       risk_failure += 15  # missing name
         if "version"     not in cfg_keys_lower:  risk_failure += 10  # missing version
         if "description" not in cfg_keys_lower:  risk_failure += 5   # missing description
+
+    # ── 🤖 AI 代码审查扣分（各维度按 AI 风险分的 1/4 扣除，上限 25）──────────────
+    ai_review = report.get("aiReview") or {}
+    if ai_review.get("status") == "ok" and ai_review.get("hasRisk"):
+        risk_privacy   += min(25, ai_review.get("privacyRisk",    0) // 4)
+        risk_privilege += min(25, ai_review.get("privilegeRisk",  0) // 4)
+        risk_integrity += min(25, ai_review.get("integrityRisk",  0) // 4)
+        risk_supply    += min(25, ai_review.get("dependencyRisk", 0) // 4)
+        risk_failure   += min(25, ai_review.get("stabilityRisk",  0) // 4)
 
     return {
         "privacy":    min(100, risk_privacy),
@@ -1502,8 +1718,8 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
     def _badge(score: int) -> str:
         if score >= 80: return "🟢 Excellent"
         if score >= 60: return "🟡 Good"
-        if score >= 40: return "🟠 Fair"
-        return "🔴 Needs Improvement"
+        if score >= 40: return "🟠 Caution"
+        return "🔴 Risk"
 
     lines: List[str] = []
     check_num = [0]  # mutable counter so nested helper can increment it
@@ -1545,6 +1761,16 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
     ob_map: Dict[str, str] = {
         item["label"]: item["path"] for item in code_risks.get("obfuscation", [])
     }
+    # Side-Effects map: label → file path
+    se_map: Dict[str, str] = {
+        item["label"]: item["path"] for item in code_risks.get("sideEffects", [])
+    }
+    # Data Access map: label → file path
+    da_map: Dict[str, str] = {
+        item["label"]: item["path"] for item in code_risks.get("dataAccess", [])
+    }
+    # Tool Call Depth list
+    tc_list: List[Dict[str, str]] = code_risks.get("toolCallDepth", [])
 
     # High-risk tool map: tool → list of (file, keyword) tuples (aggregated)
     hr_map: Dict[str, List[tuple]] = {}
@@ -1639,6 +1865,8 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
     _ob_cnt        = len(ob_map)
     _st_cfg        = [k.lower() for k in (skill_entries[0].get("configKeys") or [])] if skill_entries else []
     _st_name       = skill_entries[0].get("name", "") if skill_entries else ""
+    _se_str        = _c(", ".join(sorted(se_map)[:3]))
+    _da_str        = _c(", ".join(sorted(da_map)[:3]))
 
     _r_privacy = _reason(p_score,
         ("credential_exfil"   in ir_map, "credential exfiltration (Critical ❌)"),
@@ -1646,16 +1874,19 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
         (bool(log_hit_map),       f"sensitive data in logs: {_log_labels} (⚠️)"),
         (bool(sensitive_key_notes), "sensitive config key (❌)"),
         (bool(_env_sensitive),    f"sensitive env var: {_env_sens_str} (⚠️)"),
+        (bool(da_map),            f"sensitive data access: {_da_str} (⚠️)"),
     )
     _r_privilege = _reason(pr_score,
         ("soul_write"            in ir_map, "writes to agent identity file `SOUL.md` (Critical ❌)"),
         ("openclaw_config_write" in ir_map, "writes to `openclaw.json` runtime config (Critical ❌)"),
+        (bool(se_map),            f"external write operations: {_se_str} (⚠️)"),
     )
     _r_integrity = _reason(in_score,
         ("eval_obfuscation" in ir_map, "obfuscated eval execution (Critical ❌)"),
         ("exec_compile"     in ir_map, "dynamic `exec(compile(...))` (Critical ❌)"),
         (bool(ob_map),   f"{_ob_cnt} obfuscation pattern(s) detected (⚠️)"),
         (bool(body_hits), f"hardcoded secrets: {_body_str} (❌)"),
+        (bool(tc_list),   f"{len(tc_list)} deep call chain(s) detected (⚠️)"),
     )
     _r_supply = _reason(sc_score,
         ("dynamic_pip_install" in ir_map, "dynamic `pip install` (Critical ❌)"),
@@ -1680,10 +1911,10 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
         f"| 🔏 Privacy      | {p_score}/100  | {_badge(p_score)}  | {_r_privacy}    |",
         f"| 🔐 Privilege    | {pr_score}/100 | {_badge(pr_score)} | {_r_privilege}  |",
         f"| 🛡️ Integrity    | {in_score}/100 | {_badge(in_score)} | {_r_integrity}  |",
-        f"| 🔗 Supply Chain | {sc_score}/100 | {_badge(sc_score)} | {_r_supply}     |",
+        f"| 🔗 Dependency Risk | {sc_score}/100 | {_badge(sc_score)} | {_r_supply}     |",
         f"| ✅ Stability    | {st_score}/100 | {_badge(st_score)} | {_r_stability}  |",
         "",
-        "> Score legend: 80–100 = Excellent | 60–79 = Good | 40–59 = Fair | <40 = Needs Improvement",
+        "> Score legend: 80–100 = Excellent | 60–79 = Good | 40–59 = Caution | <40 = Risk",
         "",
         "---",
         "",
@@ -1790,7 +2021,58 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
         ],
     )
 
-    # ── 4E. Sensitive Data in Log Files ──────────────────────────────────────
+    # ── 4E. Side-Effects Detection ───────────────────────────────────────────
+    se_defs = [
+        ("file_write", "No file write operations (`open` in write/append mode)"),
+        ("path_write", "No `Path.write_text` / `write_bytes` operations"),
+        ("env_write",  "No environment variable modification (`os.environ` assignment / `os.putenv`)"),
+        ("net_mutate", "No network write operations (HTTP POST / PUT / PATCH / DELETE)"),
+        ("fs_modify",  "No filesystem modifications (`os.remove` / `makedirs` / `shutil.move` etc.)"),
+        ("db_write",   "No database write operations (INSERT / UPDATE / DELETE / DROP)"),
+    ]
+    _section(
+        "💥 Side-Effects Detection",
+        [
+            (desc, None, f"Detected in `{se_map[lbl]}` — verify this write is intentional and scoped")
+            if lbl in se_map
+            else (desc, True, "")
+            for lbl, desc in se_defs
+        ],
+    )
+
+    # ── 4F. Data Access Analysis ─────────────────────────────────────────────
+    da_defs = [
+        ("sensitive_path",  "No access to sensitive system paths (`/etc/`, `~/.ssh/`, `~/.aws/`, `/proc/`)"),
+        ("env_secret_read", "No reading of secret environment variables (key / secret / token / password)"),
+        ("cred_file_read",  "No reading of credential files (`.pem` / `.key` / `.crt` / `.p12`)"),
+        ("ssh_access",      "No SSH key file access (`id_rsa` / `id_ecdsa` / `authorized_keys`)"),
+        ("aws_cred",        "No AWS credential access (`~/.aws/credentials` / `boto3.Session`)"),
+    ]
+    _section(
+        "🗄️ Data Access Analysis",
+        [
+            (desc, None, f"Detected in `{da_map[lbl]}` — confirm this access is required and authorised")
+            if lbl in da_map
+            else (desc, True, "")
+            for lbl, desc in da_defs
+        ],
+    )
+
+    # ── 4G. Tool Call Depth ───────────────────────────────────────────────────
+    if tc_list:
+        tc_items = [
+            (
+                f"Deep call chain in `{item['path']}` (method chain or nested calls depth ≥ 4)",
+                None,
+                "Complex call depth may obscure behaviour — simplify or add inline comments",
+            )
+            for item in tc_list
+        ]
+    else:
+        tc_items = [("No excessively deep call chains detected (depth < 4)", True, "")]
+    _section("🔁 Tool Call Depth", tc_items)
+
+    # ── 4H. Sensitive Data in Log Files ──────────────────────────────────────
     log_sensitive_defs = [
         ("API Key",       "No API key patterns in embedded log files"),
         ("Private Key",   "No private key patterns in embedded log files"),
@@ -1811,7 +2093,7 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
             log_items.append((desc, True, ""))
     _section("📋 Log & Data Hygiene", log_items)
 
-    # ── 4F. Configuration & Environment Security ─────────────────────────────
+    # ── 4I. Configuration & Environment Security ─────────────────────────────
     # env_notes and cli_notes are pre-computed in the section above
     cfg_items: List[tuple] = []
 
@@ -1854,7 +2136,7 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
 
     _section("⚙️ Configuration & Environment Security", cfg_items)
 
-    # ── 4G. Skill Manifest Integrity ─────────────────────────────────────────
+    # ── 4J. Skill Manifest Integrity ─────────────────────────────────────────
     mfst_items: List[tuple] = []
     has_skills = len(skill_entries) > 0
     mfst_items.append((
@@ -1917,17 +2199,30 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
             )
         lines.append("")
 
-    # ── 7. AI Review (optional) ───────────────────────────────────────────────
-    ai_review = report.get("aiReview")
-    if ai_review:
-        lines += ["---", "", "## 🤖 AI Review", ""]
-        if ai_review.get("status") == "ok":
-            lines.append(ai_review.get("summary", "").strip() or "(empty)")
+    # ── 7. AI Code Review (mandatory check) ─────────────────────────────────
+    ai_review = report.get("aiReview") or {}
+    lines += ["---", "", "## 🤖 AI Code Review", ""]
+    ai_status = ai_review.get("status", "skipped")
+    if ai_status == "ok":
+        if ai_review.get("hasRisk"):
+            lines += [
+                "| Check | Status |",
+                "| --- | :---: |",
+                "| AI Code Security Review | ⚠️ Risk Detected |",
+                "",
+                "> AI review identified potential security risks. Risk scores have been applied to the dimension scores above.",
+            ]
         else:
-            lines.append(
-                f"> ⚠️ AI review failed: {ai_review.get('reason', 'unknown')}"
-            )
-        lines.append("")
+            lines += [
+                "| Check | Status |",
+                "| --- | :---: |",
+                "| AI Code Security Review | ✅ Pass |",
+            ]
+    elif ai_status == "error":
+        lines.append(f"> ⚠️ AI review unavailable: {ai_review.get('reason', 'unknown')}")
+    else:
+        lines.append(f"> ℹ️ AI review skipped: {ai_review.get('reason', 'SKILL_AUDIT_AI_MODEL not configured')}")
+    lines.append("")
 
     return "\n".join(lines)
 
@@ -1948,13 +2243,13 @@ def main() -> None:
     extra_skills = load_external_skills(args.skill_path, args.skill_url)
     extra_agents = load_external_agents(args.agent_path, args.agent_url)
     # 始终把原始路径传入，确保即使没有 SKILL.md 也能完整扫描代码风险
+    # ai_model 始终传入（由环境变量 SKILL_AUDIT_AI_MODEL 或 --ai-model 参数决定）
     report = generate_report(
         extra_skills=extra_skills,
         extra_agents=extra_agents,
         scan_paths=args.skill_path,
+        ai_model=args.ai_model,
     )
-    if args.ai_review:
-        report["aiReview"] = run_ai_review(extra_skills, args.ai_model, args.lang)
     if args.output:
         save_report(report, args.output)
         print(f"✅ JSON report saved to {args.output.name}")

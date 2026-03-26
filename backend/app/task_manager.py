@@ -322,6 +322,9 @@ class TaskManager:
             targets = skill_dirs or [str(code_dir)]
             for target in targets:
                 cmd.extend(["--skill-path", target])
+        # 始终开启 AI 代码审查（模型由环境变量 SKILL_AUDIT_AI_MODEL 决定，默认 gpt-4o-mini）
+        ai_model = os.environ.get("SKILL_AUDIT_AI_MODEL", "gpt-4o-mini")
+        cmd.extend(["--ai-model", ai_model])
         self._run_command(cmd, cwd=self.repo_root, log_file=log_file)
         summary_data = json.loads(report_json.read_text(encoding="utf-8")) if report_json.exists() else {}
         return {

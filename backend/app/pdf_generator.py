@@ -36,8 +36,8 @@ def score_label(score: int) -> str:
     if score >= 60:
         return "Good"
     if score >= 40:
-        return "Fair"
-    return "Needs Work"
+        return "Caution"
+    return "Risk"
 
 
 def _safe(text: str) -> str:
@@ -278,7 +278,8 @@ def _parse_scores(text: str) -> dict[str, int]:
         "privacy":          "Privacy",
         "privilege":        "Privilege",
         "integrity":        "Integrity",
-        "supply chain":     "Supply Chain",
+        "supply chain":     "Dependency Risk",
+        "dependency risk":  "Dependency Risk",
         "stability":        "Stability",
         # 兼容旧报告中可能存在的旧维度名
         "memory footprint": "Memory",
@@ -467,7 +468,7 @@ def _generate_stress_pdf(md: str, out_path: Path) -> None:
             pdf.score_cards(scores)
         pdf.set_font("Helvetica", "", 7.5)
         pdf.set_text_color(*GRAY)
-        pdf.cell(0, 5, "80-100 = Excellent   60-79 = Good   40-59 = Fair   <40 = Needs Work", ln=True)
+        pdf.cell(0, 5, "80-100 = Excellent   60-79 = Good   40-59 = Caution   <40 = Risk", ln=True)
         pdf.ln(3)
 
     # ── Test Configuration ──
@@ -645,7 +646,7 @@ def generate_pdf(md_path: Path, out_path: Path, *, skill_type: str = "") -> None
         # 图例
         pdf.set_font("Helvetica", "", 7.5)
         pdf.set_text_color(*GRAY)
-        pdf.cell(0, 5, "80-100 = Excellent   60-79 = Good   40-59 = Fair   <40 = Needs Work", ln=True)
+        pdf.cell(0, 5, "80-100 = Excellent   60-79 = Good   40-59 = Caution   <40 = Risk", ln=True)
         pdf.ln(3)
 
     # ── Key Recommendations ────────────────────────────────────────────────────

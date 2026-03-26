@@ -601,9 +601,11 @@ async function runTask() {
     }
     // 任务结束：原地更新历史记录状态
     if (finalTask) upsertHistoryTask(finalTask);
-    // Keep uploaded file visible after completion so the user can see
-    // which package was analyzed.  The file will be cleared when a new
-    // analysis starts (see clearResults() in runTask).
+    // Reset upload zone on success so the user knows the scan is done
+    // and the panel is ready for a new package.
+    if (finalTask && finalTask.status === "completed") {
+      clearCurrentFile();
+    }
   } catch (err) {
     setStatus("Failed", "error");
     const message = err instanceof Error ? err.message : String(err);
@@ -973,9 +975,9 @@ function buildSecurityAuditSummary(text) {
       if (m) scores['Integrity'] = parseInt(m[1]);
     }
 
-    // Supply Chain (replaces Token)
-    if (/\|\s*[^\|]*Supply Chain/.test(line)) {
-      const m = line.match(/\|\s*[^\|]*Supply Chain[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+    // Dependency Risk (replaces Token)
+    if (/\|\s*[^\|]*Dependency Risk/.test(line)) {
+      const m = line.match(/\|\s*[^\|]*Dependency Risk[^\|]*\|\s*\*?\*?(\d+)\/100/i);
       if (m) scores['SupplyChain'] = parseInt(m[1]);
     }
 
@@ -1017,15 +1019,15 @@ function buildSecurityAuditSummary(text) {
   html += `<div class="stat-card ${getScoreClass(privacyScore)}"><span class="stat-number">${privacyScore}</span><span class="stat-label"><span class="stat-icon">🔏</span>Privacy</span></div>`;
   html += `<div class="stat-card ${getScoreClass(privilegeScore)}"><span class="stat-number">${privilegeScore}</span><span class="stat-label"><span class="stat-icon">🔐</span>Privilege</span></div>`;
   html += `<div class="stat-card ${getScoreClass(integrityScore)}"><span class="stat-number">${integrityScore}</span><span class="stat-label"><span class="stat-icon">🛡️</span>Integrity</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(supplyChainScore)}"><span class="stat-number">${supplyChainScore}</span><span class="stat-label"><span class="stat-icon">🔗</span>Supply Chain</span></div>`;
+  html += `<div class="stat-card ${getScoreClass(supplyChainScore)}"><span class="stat-number">${supplyChainScore}</span><span class="stat-label"><span class="stat-icon">🔗</span>Dependency Risk</span></div>`;
   html += `<div class="stat-card ${getScoreClass(failureScore)}"><span class="stat-number">${failureScore}</span><span class="stat-label"><span class="stat-icon">✅</span>Stability</span></div>`;
   html += `</div>`;
 
   // Add score legend
   html += `<div style="margin-top: 8px; padding: 8px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #94a3b8;">`;
-  html += `Score: 80-100 = Excellent 🟢 | 60-79 = Good 🔵 | 40-59 = Fair 🟡 | &lt;40 = Needs Work 🔴`;
+  html += `Score: 80-100 = Excellent 🟢 | 60-79 = Good 🔵 | 40-59 = Caution 🟡 | &lt;40 = Risk 🔴`;
   html += `</div>`;
-  
+
   return html;
 }
 
@@ -1078,8 +1080,8 @@ function buildStressLabSummary(text) {
   function getScoreClass(score) {
     if (score >= 80) return 'low';      // Excellent - green
     if (score >= 60) return 'total';    // Good - blue
-    if (score >= 40) return 'medium';   // Fair - yellow
-    return 'high';                      // Needs Work - red
+    if (score >= 40) return 'medium';   // Caution - yellow
+    return 'high';                      // Risk - red
   }
   
   // Build 6 score cards (overall + 5 dimensions) — 3-column grid (2 rows of 3)
@@ -1094,7 +1096,7 @@ function buildStressLabSummary(text) {
 
   // Add score legend
   html += `<div style="margin-top: 8px; padding: 8px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #94a3b8;">`;
-  html += `Score: 80-100 = Excellent 🟢 | 60-79 = Good 🔵 | 40-59 = Fair 🟡 | &lt;40 = Needs Work 🔴`;
+  html += `Score: 80-100 = Excellent 🟢 | 60-79 = Good 🔵 | 40-59 = Caution 🟡 | &lt;40 = Risk 🔴`;
   html += `</div>`;
   
   return html;

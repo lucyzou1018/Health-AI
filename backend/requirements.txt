@@ -13,3 +13,6 @@ Pillow>=10.0.0
 
 # Skill Security Audit — YAML config parsing (optional, gracefully skipped if absent)
 PyYAML>=6.0
+
+# AI 代码审查（必须安装，用于调用 OpenAI / xAI API）
+openai>=1.0.0
