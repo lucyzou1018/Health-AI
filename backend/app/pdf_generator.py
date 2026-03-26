@@ -1,4 +1,4 @@
-"""把 security_audit.md 转换成专业风格的 PDF 报告"""
+"""Convert markdown audit / stress-test reports into professional-style PDFs."""
 from __future__ import annotations
 
 import re
@@ -73,20 +73,20 @@ def _safe(text: str) -> str:
 
 
 class AuditPDF(FPDF):
-    def __init__(self):
+    def __init__(self, header_title: str = "Security Audit Report"):
         super().__init__()
+        self._header_title = header_title
         self.set_auto_page_break(auto=True, margin=20)
         self.set_margins(20, 20, 20)
 
     # ── 页眉 ──────────────────────────────────────────────────────────────────
     def header(self):
-        # 深色顶栏
         self.set_fill_color(*NAVY)
         self.rect(0, 0, 210, 18, "F")
         self.set_y(4)
         self.set_font("Helvetica", "B", 11)
         self.set_text_color(*INDIGO)
-        self.cell(0, 10, "Health AI  |  Security Audit Report", align="L")
+        self.cell(0, 10, f"Health AI  |  {self._header_title}", align="L")
         self.set_text_color(*GRAY)
         self.set_font("Helvetica", "", 8)
         self.set_xy(0, 6)
@@ -342,10 +342,217 @@ def _parse_checklist_sections(text: str) -> list[tuple[str, list[str], list[list
     return results
 
 
+# ─── Stress Test PDF 生成 ─────────────────────────────────────────────────────
+
+def _parse_stress_scores(md: str) -> dict[str, int]:
+    """Parse five-dimension scores from stress test report markdown."""
+    scores: dict[str, int] = {}
+    dimension_map = {
+        "stability": "Stability",
+        "performance": "Performance",
+        "resource": "Resource",
+        "consistency": "Consistency",
+        "recovery": "Recovery",
+    }
+    for line in md.splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if all(re.match(r"^\s*:?-+:?\s*$", c) for c in cells):
+            continue
+        if len(cells) < 2:
+            continue
+        dim_raw = cells[0]
+        score_m = re.search(r"(\d+)/100", cells[1])
+        if not score_m:
+            continue
+        dim_clean = re.sub(r"\*+", "", dim_raw)
+        dim_clean = dim_clean.encode("ascii", errors="ignore").decode("ascii").strip().lower()
+        for key, mapped in dimension_map.items():
+            if key in dim_clean:
+                scores[mapped] = int(score_m.group(1))
+                break
+
+    # Parse overall score
+    overall_m = re.search(r"Overall Score[^\d]*(\d+)/100", md, re.I)
+    if overall_m:
+        scores["Overall"] = int(overall_m.group(1))
+    elif not scores.get("Overall"):
+        vals = [v for k, v in scores.items() if k != "Overall"]
+        if vals:
+            scores["Overall"] = round(sum(vals) / len(vals))
+
+    return scores
+
+
+def _parse_stress_metrics(md: str) -> dict[str, str]:
+    """Parse key performance metrics from the stress test summary."""
+    metrics: dict[str, str] = {}
+    m = re.search(r"(?:Total Runs|总次数):\s*(\d+)", md)
+    if m:
+        metrics["Total Runs"] = m.group(1)
+    m = re.search(r"(?:Successes|成功次数):\s*(\d+)\s*\(([^)]+)\)", md)
+    if m:
+        metrics["Successes"] = m.group(1)
+        metrics["Success Rate"] = m.group(2).strip()
+    m = re.search(r"(?:Avg Duration|平均耗时):\s*([\d.]+)s", md)
+    if m:
+        metrics["Avg Duration"] = m.group(1) + "s"
+    m = re.search(r"(?:P95 Duration|P95\s*耗时):\s*([\d.]+)s", md)
+    if m:
+        metrics["P95 Duration"] = m.group(1) + "s"
+    m = re.search(r"(?:Test Runs|测试轮次)\*?\*?:\s*(\d+)", md)
+    if m:
+        metrics["Test Runs"] = m.group(1)
+    m = re.search(r"(?:Concurrency|并发度)\*?\*?:\s*(\d+)", md)
+    if m:
+        metrics["Concurrency"] = m.group(1)
+    m = re.search(r"Command:\s*`([^`]+)`", md)
+    if m:
+        metrics["Command"] = m.group(1)
+    return metrics
+
+
+def _generate_stress_pdf(md: str, out_path: Path) -> None:
+    """Generate a professional PDF for a Stress Test report."""
+    pdf = AuditPDF(header_title="Stress Test Report")
+    pdf.add_page()
+
+    # ── Cover block ──
+    pdf.set_fill_color(*NAVY)
+    pdf.rect(20, 22, 170, 36, "F")
+    pdf.set_fill_color(*INDIGO)
+    pdf.rect(20, 22, 4, 36, "F")
+
+    pdf.set_xy(26, 26)
+    pdf.set_font("Helvetica", "B", 20)
+    pdf.set_text_color(*WHITE)
+    pdf.cell(0, 12, "Skill Stress Test Report", ln=True)
+
+    gen_match = re.search(r"Generated[：:]\s*(\S+)", md)
+    gen_date = gen_match.group(1)[:19].replace("T", "  ") if gen_match else ""
+    pdf.set_x(26)
+    pdf.set_font("Helvetica", "", 8.5)
+    pdf.set_text_color(*LIGHT_GRAY)
+    pdf.cell(0, 6, f"Generated:  {gen_date}", ln=True)
+
+    fn_match = re.search(r"file_name.*?:\s*(.+)", md, re.I)
+    badge_text = fn_match.group(1).strip() if fn_match else ""
+    if badge_text:
+        pdf.set_x(26)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(*INDIGO)
+        pdf.cell(0, 7, f"[ {badge_text} ]")
+    pdf.set_y(66)
+
+    # ── Five-Dimension Scores ──
+    scores = _parse_stress_scores(md)
+    if scores:
+        pdf.section_title("Five-Dimension Scores")
+        overall = scores.pop("Overall", None)
+        if overall is not None:
+            color = score_color(overall)
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_text_color(*color)
+            pdf.cell(0, 7, f"Overall Score: {overall}/100  ({score_label(overall)})", ln=True)
+            pdf.ln(2)
+        if scores:
+            pdf.score_cards(scores)
+        pdf.set_font("Helvetica", "", 7.5)
+        pdf.set_text_color(*GRAY)
+        pdf.cell(0, 5, "80-100 = Excellent   60-79 = Good   40-59 = Fair   <40 = Needs Work", ln=True)
+        pdf.ln(3)
+
+    # ── Test Configuration ──
+    metrics = _parse_stress_metrics(md)
+    config_keys = ["Test Runs", "Concurrency", "Command"]
+    config_items = [(k, metrics[k]) for k in config_keys if k in metrics]
+    if config_items:
+        pdf.section_title("Test Configuration")
+        for label, value in config_items:
+            pdf.set_font("Helvetica", "B", 9.5)
+            pdf.set_text_color(*NAVY)
+            pdf.cell(40, 6, _safe(label + ":"))
+            pdf.set_font("Helvetica", "", 9.5)
+            pdf.set_text_color(*TEXT_DARK)
+            pdf.cell(0, 6, _safe(value), ln=True)
+        pdf.ln(3)
+
+    # ── Performance Metrics ──
+    perf_keys = ["Success Rate", "Avg Duration", "P95 Duration", "Total Runs", "Successes"]
+    perf_items = {k: metrics[k] for k in perf_keys if k in metrics}
+    if perf_items:
+        pdf.section_title("Performance Metrics")
+        # Render as a small table
+        headers = list(perf_items.keys())
+        rows = [list(perf_items.values())]
+        n = len(headers)
+        widths = [170 / n] * n
+        pdf.draw_table(headers, rows, widths)
+
+    # ── Failure Samples ──
+    failure_lines = re.findall(r"- Run #(\d+) exit (\d+), duration ([\d.]+)s", md)
+    if failure_lines:
+        pdf.section_title("Failure Details")
+        headers = ["Run #", "Exit Code", "Duration"]
+        rows = [[f"#{r}", code, dur + "s"] for r, code, dur in failure_lines]
+        pdf.draw_table(headers, rows, [30, 40, 100])
+
+    # ── Assessment ──
+    total_runs = int(metrics.get("Total Runs", "0") or "0")
+    successes = int(metrics.get("Successes", "0") or "0")
+    failures = total_runs - successes
+    all_scores = list(scores.values()) + ([overall] if overall is not None else [])
+    low_scores = [s for s in all_scores if s < 80]
+
+    pdf.section_title("Assessment")
+    if not low_scores and failures == 0:
+        pdf.set_font("Helvetica", "", 9.5)
+        pdf.set_text_color(*GREEN_SOFT)
+        pdf.multi_cell(0, 5.5, _safe(
+            "All dimensions scored 80 or above with zero failures. "
+            "The skill demonstrates excellent stability and performance under stress testing conditions."
+        ))
+    else:
+        recs = []
+        if failures > 0:
+            recs.append(f"{failures} failure(s) detected out of {total_runs} runs -- review failure logs for root cause.")
+        for s_name, s_val in scores.items():
+            if s_val < 80:
+                recs.append(f"{s_name} score is {s_val}/100 (below 80) -- needs improvement.")
+        if overall is not None and overall < 80:
+            recs.append(f"Overall score is {overall}/100 -- consider addressing the issues above.")
+        for i, r in enumerate(recs, 1):
+            pdf.rec_item(r, i)
+    pdf.ln(3)
+
+    # ── Score Table (full) ──
+    score_block = _extract_between(md, "## Five-Dimension Scores", ["## ", "---"])
+    if not score_block:
+        score_block = _extract_between(md, "## 五维度评分", ["## ", "---"])
+    if score_block:
+        score_h, score_rows = _parse_table(score_block)
+        if score_h and score_rows:
+            pdf.section_title("Score Breakdown")
+            n = len(score_h)
+            widths = [170 / n] * n
+            if n == 3:
+                widths = [60, 40, 70]
+            pdf.draw_table(score_h, score_rows, widths)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    pdf.output(str(out_path))
+
+
 # ─── 主入口 ───────────────────────────────────────────────────────────────────
 
 def generate_pdf(md_path: Path, out_path: Path) -> None:
     md = md_path.read_text(encoding="utf-8")
+
+    # Detect report type and dispatch to the appropriate renderer
+    if "Stress Lab" in md or "Stress Summary" in md or "Five-Dimension Scores" in md or "五维度评分" in md:
+        _generate_stress_pdf(md, out_path)
+        return
 
     pdf = AuditPDF()
     pdf.add_page()
