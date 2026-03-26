@@ -455,6 +455,8 @@ class TaskManager:
         "scripts/run_cli.py",
         "scripts/main.py",
         "scripts/run.py",
+        "scripts/audit_skill.py",
+        "scripts/audit_scan.py",
         "main.py",
         "run.py",
         "__main__.py",
@@ -470,17 +472,26 @@ class TaskManager:
             if (skill_dir / candidate).is_file():
                 return f"python3 {{skill}}/{candidate}"
 
-        # 2. Fallback: if scripts/ has exactly one .py file, use it
+        # 2. Fallback: pick the first .py in scripts/
         scripts_dir = skill_dir / "scripts"
         if scripts_dir.is_dir():
-            py_files = [f for f in scripts_dir.iterdir() if f.suffix == ".py"]
-            if len(py_files) == 1:
+            py_files = sorted(f for f in scripts_dir.iterdir() if f.suffix == ".py")
+            if py_files:
                 return f"python3 {{skill}}/scripts/{py_files[0].name}"
 
-        # 3. Fallback: if root has exactly one .py file, use it
-        root_py = [f for f in skill_dir.iterdir() if f.is_file() and f.suffix == ".py"]
-        if len(root_py) == 1:
+        # 3. Fallback: pick the first .py in root (excluding __init__.py)
+        root_py = sorted(
+            f for f in skill_dir.iterdir()
+            if f.is_file() and f.suffix == ".py" and f.name != "__init__.py"
+        )
+        if root_py:
             return f"python3 {{skill}}/{root_py[0].name}"
+
+        # 4. Deep fallback: recursively find any .py file
+        all_py = sorted(skill_dir.rglob("*.py"))
+        if all_py:
+            rel = all_py[0].relative_to(skill_dir)
+            return f"python3 {{skill}}/{rel}"
 
         return None
 
@@ -530,14 +541,21 @@ class TaskManager:
 
         # Resolve skill directory
         skill_dir = self._find_skill_dir(code_dir, params)
+        print(f"[StressLab] skill_dir = {skill_dir}")
+        if skill_dir.exists():
+            print(f"[StressLab] skill_dir contents: {list(skill_dir.iterdir())}")
 
         # Use provided command or auto-detect entry point
         command = params.get("command")
         if not command:
             entry = self._detect_skill_entry(skill_dir)
+            print(f"[StressLab] auto-detected entry: {entry}")
             if entry:
                 command = entry
             else:
+                # List what we found for debugging
+                all_files = list(skill_dir.rglob("*")) if skill_dir.exists() else []
+                print(f"[StressLab] No entry found. All files: {all_files[:20]}")
                 raise ValueError(
                     "No executable entry point found in the uploaded Skill package. "
                     "Expected a Python script in scripts/ or root directory."
