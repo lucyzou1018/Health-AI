@@ -637,21 +637,50 @@ class TaskManager:
             successes = metrics.get('successes', runs)
             success_rate = successes / runs if runs > 0 else 1.0
             failures = runs - successes
-            
-            # Stability: based on success rate
+            failure_rate = failures / runs if runs > 0 else 0.0
+
+            # Stability: based on success rate (linear)
             stability_score = int(success_rate * 100)
-            
-            # Performance: based on avg duration (lower is better, <0.1s = 100, >1s = 0)
-            performance_score = max(0, min(100, int(100 - (avg_duration - 0.1) * 100)))
-            
-            # Resource: assume good if low failures
-            resource_score = 90 if failures == 0 else max(0, 90 - failures * 10)
-            
+
+            # Performance: based on avg duration with generous thresholds
+            # <=1s → 100, 1-10s → 90-60, 10-30s → 60-40, 30-60s → 40-20, >60s → 20
+            if avg_duration <= 1:
+                performance_score = 100
+            elif avg_duration <= 10:
+                performance_score = int(90 - (avg_duration - 1) * (30 / 9))  # 90→60
+            elif avg_duration <= 30:
+                performance_score = int(60 - (avg_duration - 10) * (20 / 20))  # 60→40
+            elif avg_duration <= 60:
+                performance_score = int(40 - (avg_duration - 30) * (20 / 30))  # 40→20
+            else:
+                performance_score = max(10, int(20 - (avg_duration - 60) * 0.1))
+
+            # Resource: based on failure rate (tolerant)
+            if failure_rate == 0:
+                resource_score = 90
+            elif failure_rate <= 0.1:
+                resource_score = 80
+            elif failure_rate <= 0.3:
+                resource_score = 60
+            elif failure_rate <= 0.5:
+                resource_score = 40
+            else:
+                resource_score = max(10, int(40 - failure_rate * 30))
+
             # Consistency: based on success rate
             consistency_score = stability_score
-            
-            # Recovery: 100 if no failures, lower if failures
-            recovery_score = 100 if failures == 0 else max(0, 100 - failures * 20)
+
+            # Recovery: based on failure rate (tolerant)
+            if failures == 0:
+                recovery_score = 100
+            elif failure_rate <= 0.1:
+                recovery_score = 85
+            elif failure_rate <= 0.3:
+                recovery_score = 65
+            elif failure_rate <= 0.5:
+                recovery_score = 45
+            else:
+                recovery_score = max(10, int(45 - failure_rate * 35))
         
         # Calculate overall score
         overall_score = int((stability_score + performance_score + resource_score + consistency_score + recovery_score) / 5)
