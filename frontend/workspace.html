@@ -86,7 +86,6 @@
 
     <!-- Context Banner -->
     <section id="context-banner">
-      <div class="cb-badge" id="cb-badge">Security Audit</div>
       <h3 id="current-skill-title">Skill Security Audit</h3>
       <p id="current-skill-desc">One-click comprehensive scan for Skill security risks — intelligently detects permission vulnerabilities and configuration issues, outputs a multi-dimensional health score.</p>
     </section>
@@ -421,9 +420,7 @@
         var d = TAB_DATA[tab];
         if (!d) return;
 
-        // Tab badge (cb-badge) + panel size badge + upload subtitle
-        var badge = document.getElementById('cb-badge');
-        if (badge) badge.textContent = d.badge;
+        // Panel size badge + upload subtitle
         var sizeBadge = document.getElementById('panel-size-badge');
         if (sizeBadge) sizeBadge.textContent = d.badgeText;
         var subtitle = document.getElementById('upload-subtitle');
