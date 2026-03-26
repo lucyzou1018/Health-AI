@@ -196,16 +196,8 @@ class TaskManager:
                 self._copy_code(Path(code_path), input_dir)
             if upload_id:
                 self._extract_upload(upload_id, input_dir)
-            # Security scan for stress test uploads
-            if skill_type == "skill-stress-lab":
-                scan_warnings = self._scan_upload_security(input_dir)
-                if scan_warnings:
-                    msg = (
-                        "This Skill contains high-risk operations and is not eligible "
-                        "for stress testing. Please resolve the security issues before retrying."
-                    )
-                    self._set_task_state(task_id, status="failed", message=msg)
-                    raise ValueError(msg)
+            # Security check for stress test is now handled by the Security Audit
+            # pre-check inside _run_stress_lab (score >= 96 required).
         except Exception as exc:
             self._set_task_state(task_id, status="failed", message=str(exc))
             raise
