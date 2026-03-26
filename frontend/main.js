@@ -7,8 +7,8 @@ const PARAM_SCHEMA = {
   ],
   "skill-stress-lab": [
     // command template and workdir use default values, not shown in UI
-    { id: "runs", label: "Runs", type: "number", placeholder: "10", default: "10", min: 1, max: 100 },
-    { id: "concurrency", label: "Concurrency", type: "number", placeholder: "3", default: "3", min: 1, max: 100 }
+    { id: "runs", label: "Runs", type: "number", placeholder: "Enter 1 – 100", default: "10", min: 1, max: 100, hint: "Integer between 1 and 100" },
+    { id: "concurrency", label: "Concurrency", type: "number", placeholder: "Enter 1 – 100", default: "3", min: 1, max: 100, hint: "Integer between 1 and 100" }
   ]
 };
 
@@ -444,6 +444,15 @@ function renderParamFields() {
       }
     }
     
+    // Add hint text below number fields (e.g. "Integer between 1 and 100")
+    if (field.hint) {
+      const hint = document.createElement("span");
+      hint.className = "field-hint";
+      hint.textContent = field.hint;
+      hint.style.cssText = "display:block;font-size:11px;color:var(--text-tertiary,#64748b);margin-top:4px;opacity:0.8;";
+      wrapper.appendChild(hint);
+    }
+
     // Add event listener to update button state on value change
     input.addEventListener("input", function() {
       updateRunButtonState();
