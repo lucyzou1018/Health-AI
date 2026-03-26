@@ -545,19 +545,16 @@ class TaskManager:
         if skill_dir.exists():
             print(f"[StressLab] skill_dir contents: {list(skill_dir.iterdir())}")
 
-        # Use provided command or auto-detect entry point
+        # Build stress test command.
+        # Always use audit_skill.py to run concurrent security audits against the
+        # uploaded Skill.  Individual skill scripts require bespoke arguments
+        # (--input, --chain, --side …) that we cannot guess, so a generic
+        # security-audit scan is the only universally runnable workload.
         command = params.get("command")
         if not command:
-            entry = self._detect_skill_entry(skill_dir)
-            print(f"[StressLab] auto-detected entry: {entry}")
-            if entry:
-                command = entry
-            else:
-                # No executable script found — use Security Audit as the stress command.
-                # This tests how the skill performs under concurrent audit scans.
-                audit_script = self.repo_root / "skills" / "skill-security-audit" / "scripts" / "audit_skill.py"
-                print(f"[StressLab] No entry script, falling back to audit_skill.py")
-                command = f"python3 {audit_script} --skill-path {{skill}}"
+            audit_script = self.repo_root / "skills" / "skill-security-audit" / "scripts" / "audit_skill.py"
+            command = f"python3 {audit_script} --skill-path {{skill}}"
+            print(f"[StressLab] using audit_skill.py as stress command")
 
         runs = max(1, min(100, int(params.get("runs", 10))))
         concurrency = max(1, min(100, int(params.get("concurrency", 1))))
