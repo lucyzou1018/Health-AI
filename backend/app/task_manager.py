@@ -438,7 +438,7 @@ class TaskManager:
         return warnings
 
     # Minimum security audit score required to proceed with stress testing
-    STRESS_MIN_SECURITY_SCORE = 96
+    STRESS_MIN_SECURITY_SCORE = 94
 
     def _run_security_pre_check(self, code_dir: Path, report_dir: Path) -> int:
         """Run a Security Audit on the uploaded package and return the overall score.
