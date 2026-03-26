@@ -7,8 +7,8 @@ const PARAM_SCHEMA = {
   ],
   "skill-stress-lab": [
     // command template and workdir use default values, not shown in UI
-    { id: "runs", label: "Runs", type: "number", placeholder: "10", default: "10" },
-    { id: "concurrency", label: "Concurrency", type: "number", placeholder: "3", default: "3" }
+    { id: "runs", label: "Runs", type: "number", placeholder: "10", default: "10", min: 1, max: 100 },
+    { id: "concurrency", label: "Concurrency", type: "number", placeholder: "3", default: "3", min: 1, max: 100 }
   ]
 };
 
@@ -261,8 +261,8 @@ function updateRunButtonState() {
       const runs = parseInt(runsInput.value, 10);
       const concurrency = parseInt(concurrencyInput.value, 10);
       
-      // Validate: must be positive integers > 0
-      if (isNaN(runs) || runs <= 0 || isNaN(concurrency) || concurrency <= 0) {
+      // Validate: must be integers between 1 and 100
+      if (isNaN(runs) || runs < 1 || runs > 100 || isNaN(concurrency) || concurrency < 1 || concurrency > 100) {
         hasValidParams = false;
       }
     } else {
@@ -396,7 +396,8 @@ function renderParamFields() {
       
       // For number fields, restrict to positive integers only
       if (field.type === "number") {
-        input.min = "1";
+        input.min = field.min !== undefined ? String(field.min) : "1";
+        input.max = field.max !== undefined ? String(field.max) : "";
         input.step = "1";
         // Prevent non-numeric characters, decimal points, and minus sign
         input.addEventListener("keydown", function(e) {
@@ -422,8 +423,10 @@ function renderParamFields() {
           const pastedText = (e.clipboardData || window.clipboardData).getData("text");
           const cleanedText = pastedText.replace(/[^0-9]/g, "");
           if (cleanedText) {
-            const num = parseInt(cleanedText, 10);
+            let num = parseInt(cleanedText, 10);
             if (num > 0) {
+              const maxVal = field.max !== undefined ? field.max : Infinity;
+              if (num > maxVal) num = maxVal;
               input.value = num;
               updateRunButtonState();
             }

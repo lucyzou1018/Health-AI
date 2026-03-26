@@ -196,10 +196,21 @@ class TaskManager:
                 self._copy_code(Path(code_path), input_dir)
             if upload_id:
                 self._extract_upload(upload_id, input_dir)
+            # Security scan for stress test uploads
+            if skill_type == "skill-stress-lab":
+                scan_warnings = self._scan_upload_security(input_dir)
+                if scan_warnings:
+                    details = "; ".join(scan_warnings[:5])
+                    msg = (
+                        f"Security scan failed — this package cannot be stress tested. "
+                        f"Found {len(scan_warnings)} issue(s): {details}"
+                    )
+                    self._set_task_state(task_id, status="failed", message=msg)
+                    raise ValueError(msg)
         except Exception as exc:
             self._set_task_state(task_id, status="failed", message=str(exc))
             raise
-        self._set_task_state(task_id, status="queued", message="已加入执行队列")
+        self._set_task_state(task_id, status="queued", message="Task queued")
         self.executor.submit(self._execute_task, task_id, workspace, input_dir)
         return self._snapshot(record)
 
@@ -372,6 +383,69 @@ class TaskManager:
             "message": "合约漏洞扫描完成",
         }
 
+    # -------------------- upload security scan --------------------
+    # Dangerous file extensions that should not be present in stress test packages
+    DANGEROUS_EXTENSIONS = {
+        ".sh", ".bash", ".exe", ".bat", ".cmd", ".ps1", ".vbs", ".vbe",
+        ".msi", ".dll", ".com", ".scr", ".pif", ".wsf", ".wsh", ".cpl",
+    }
+
+    # Suspicious code patterns that indicate malicious intent
+    SUSPICIOUS_PATTERNS = [
+        (rb"rm\s+-rf\s+/", "destructive command: rm -rf /"),
+        (rb"curl\s+.*\|\s*(?:ba)?sh", "remote code execution: curl | sh"),
+        (rb"wget\s+.*\|\s*(?:ba)?sh", "remote code execution: wget | sh"),
+        (rb"os\.system\s*\(", "dangerous call: os.system()"),
+        (rb"subprocess\.(?:call|run|Popen)\s*\(", "dangerous call: subprocess"),
+        (rb"eval\s*\(\s*compile", "dangerous call: eval(compile(...))"),
+        (rb"/dev/tcp/", "reverse shell pattern: /dev/tcp"),
+        (rb"bash\s+-i\s+>&\s*/dev/tcp", "reverse shell pattern"),
+        (rb"nc\s+-[elp]", "netcat listener/reverse shell"),
+        (rb"import\s+ctypes", "low-level system access: ctypes"),
+        (rb"__import__\s*\(\s*['\"]os['\"]\s*\)", "obfuscated import: os"),
+    ]
+
+    def _scan_upload_security(self, input_dir: Path) -> list[str]:
+        """Scan extracted upload for dangerous files and malicious patterns.
+
+        Returns a list of human-readable warning strings.  An empty list
+        means no threats were found.
+        """
+        import re as _re
+
+        warnings: list[str] = []
+
+        for filepath in input_dir.rglob("*"):
+            if not filepath.is_file():
+                continue
+
+            rel = filepath.relative_to(input_dir)
+
+            # 1. Check dangerous file extensions
+            if filepath.suffix.lower() in self.DANGEROUS_EXTENSIONS:
+                warnings.append(f"Dangerous file detected: {rel} (type: {filepath.suffix})")
+                continue  # no need to scan content
+
+            # 2. Check content of text-like files for suspicious patterns
+            if filepath.suffix.lower() in {
+                ".py", ".js", ".ts", ".rb", ".pl", ".php", ".java",
+                ".c", ".cpp", ".h", ".go", ".rs", ".lua", ".r",
+                ".yaml", ".yml", ".json", ".toml", ".ini", ".cfg",
+                ".txt", ".md", ".rst", "",
+            }:
+                try:
+                    content = filepath.read_bytes()[:50_000]  # first 50 KB
+                    for pattern, desc in self.SUSPICIOUS_PATTERNS:
+                        if _re.search(pattern, content):
+                            warnings.append(
+                                f"Suspicious pattern in {rel}: {desc}"
+                            )
+                            break  # one warning per file is enough
+                except (OSError, UnicodeDecodeError):
+                    pass
+
+        return warnings
+
     def _run_stress_lab(self, code_dir: Path, report_dir: Path, params: Dict[str, Any]) -> Dict[str, Any]:
         script = self.repo_root / "skills" / "skill-stress-lab" / "scripts" / "stress_runner.py"
         log_file = report_dir / "stress_runner.log"
@@ -382,8 +456,8 @@ class TaskManager:
         command = params.get("command")
         if not command:
             command = "python3 {skill}/scripts/security_preflight.py"
-        runs = int(params.get("runs", 10))
-        concurrency = int(params.get("concurrency", 1))
+        runs = max(1, min(100, int(params.get("runs", 10))))
+        concurrency = max(1, min(100, int(params.get("concurrency", 1))))
         cmd = [
             "python3",
             str(script),
