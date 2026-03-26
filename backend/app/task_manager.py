@@ -553,13 +553,11 @@ class TaskManager:
             if entry:
                 command = entry
             else:
-                # List what we found for debugging
-                all_files = list(skill_dir.rglob("*")) if skill_dir.exists() else []
-                print(f"[StressLab] No entry found. All files: {all_files[:20]}")
-                raise ValueError(
-                    "No executable entry point found in the uploaded Skill package. "
-                    "Expected a Python script in scripts/ or root directory."
-                )
+                # No executable script found — use Security Audit as the stress command.
+                # This tests how the skill performs under concurrent audit scans.
+                audit_script = self.repo_root / "skills" / "skill-security-audit" / "scripts" / "audit_skill.py"
+                print(f"[StressLab] No entry script, falling back to audit_skill.py")
+                command = f"python3 {audit_script} --skill-path {{skill}}"
 
         runs = max(1, min(100, int(params.get("runs", 10))))
         concurrency = max(1, min(100, int(params.get("concurrency", 1))))
