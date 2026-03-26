@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -507,31 +508,47 @@ class TaskManager:
                 return 0
         return 0
 
-    def _probe_entry_script(self, entry_cmd: str, skill_dir: Path) -> bool:
-        """Try running the entry script once without extra args.
+    # Patterns to detect mandatory arguments in Python source code
+    _RE_REQUIRED_TRUE = re.compile(r'add_argument\s*\([^)]*required\s*=\s*True', re.DOTALL)
+    _RE_POSITIONAL_ARG = re.compile(r'add_argument\s*\(\s*["\'](?!-)[^"\']+["\']')
+    # Patterns for manual validation: "if not args.xxx" → exit/return/error
+    _RE_MANUAL_REQUIRED = re.compile(
+        r'(?:if\s+not\s+args\.\w+|'                   # if not args.xxx
+        r'必须提供|must\s+provide|'                      # Chinese/English "must provide"
+        r'parser\.error\s*\(|'                          # parser.error(...)
+        r'(?:--\w[\w-]+)\s+is\s+required)',             # "--xxx is required"
+        re.IGNORECASE,
+    )
 
-        Returns True if the script exits with code 0 (no mandatory params needed),
-        False otherwise.
+    def _has_mandatory_args(self, script_path: Path) -> bool:
+        """Static analysis: check if a Python script has mandatory CLI arguments.
+
+        Scans the source code for:
+        1. argparse: add_argument(..., required=True)
+        2. argparse: add_argument("positional_arg") (no --)
+        3. Manual checks: "if not args.xxx", "必须提供", parser.error(...)
+        Returns True if mandatory arguments are found.
         """
-        import subprocess as _sp
-        # Replace {skill} placeholder with actual path
-        test_cmd = entry_cmd.replace("{skill}", str(skill_dir))
-        print(f"[StressLab] probing entry script: {test_cmd}")
         try:
-            result = _sp.run(
-                test_cmd, shell=True, capture_output=True, timeout=30,
-                cwd=str(self.repo_root),
-            )
-            print(f"[StressLab] probe exit code: {result.returncode}")
-            return result.returncode == 0
-        except Exception as exc:
-            print(f"[StressLab] probe failed: {exc}")
-            return False
+            source = script_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception:
+            return True  # Can't read → assume needs args
+
+        if self._RE_REQUIRED_TRUE.search(source):
+            print(f"[StressLab] {script_path.name}: found required=True")
+            return True
+        if self._RE_POSITIONAL_ARG.search(source):
+            print(f"[StressLab] {script_path.name}: found positional argument")
+            return True
+        if self._RE_MANUAL_REQUIRED.search(source):
+            print(f"[StressLab] {script_path.name}: found manual required check")
+            return True
+
+        print(f"[StressLab] {script_path.name}: no mandatory args detected")
+        return False
 
     def _run_stress_lab(self, code_dir: Path, report_dir: Path, params: Dict[str, Any]) -> Dict[str, Any]:
-        # ── Step 1: Check mandatory parameters ───────────────────────────
-        #   Detect the primary entry script and probe whether it can run
-        #   without any extra arguments (beyond Runs / Concurrency).
+        # ── Step 1: Check for mandatory parameters (static analysis) ─────
         skill_dir = self._find_skill_dir(code_dir, params)
         print(f"[StressLab] skill_dir = {skill_dir}")
 
@@ -543,10 +560,13 @@ class TaskManager:
                     "No executable entry point found in the uploaded Skill package. "
                     "Stress testing requires a runnable Python script."
                 )
-            print(f"[StressLab] primary entry: {entry}")
+            # Extract the actual file path from the command template
+            # e.g. "python3 {skill}/scripts/run_cli.py" → skill_dir / "scripts/run_cli.py"
+            rel_path = entry.replace("python3 {skill}/", "")
+            script_path = skill_dir / rel_path
+            print(f"[StressLab] checking entry script: {script_path}")
 
-            # Probe: can the script run without mandatory arguments?
-            if not self._probe_entry_script(entry, skill_dir):
+            if self._has_mandatory_args(script_path):
                 raise RuntimeError(
                     "This Skill requires additional input parameters (e.g. file paths "
                     "or addresses) beyond Runs and Concurrency. Automated stress testing "
