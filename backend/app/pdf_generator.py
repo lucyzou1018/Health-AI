@@ -394,27 +394,80 @@ def _parse_stress_scores(md: str) -> dict[str, int]:
 
 
 def _parse_stress_metrics(md: str) -> dict[str, str]:
-    """Parse key performance metrics from the stress test summary."""
+    """Parse key performance metrics from the stress test summary.
+
+    Supports both list format (- Key: Value) and table format (| Key | Value |).
+    """
     metrics: dict[str, str] = {}
-    m = re.search(r"(?:Total Runs|总次数):\s*(\d+)", md)
-    if m:
-        metrics["Total Runs"] = m.group(1)
-    m = re.search(r"(?:Successes|成功次数):\s*(\d+)\s*\(([^)]+)\)", md)
-    if m:
-        metrics["Successes"] = m.group(1)
-        metrics["Success Rate"] = m.group(2).strip()
-    m = re.search(r"(?:Avg Duration|平均耗时):\s*([\d.]+)s", md)
-    if m:
-        metrics["Avg Duration"] = m.group(1) + "s"
-    m = re.search(r"(?:P95 Duration|P95\s*耗时):\s*([\d.]+)s", md)
-    if m:
-        metrics["P95 Duration"] = m.group(1) + "s"
-    m = re.search(r"(?:Test Runs|测试轮次)\*?\*?:\s*(\d+)", md)
-    if m:
-        metrics["Test Runs"] = m.group(1)
-    m = re.search(r"(?:Concurrency|并发度)\*?\*?:\s*(\d+)", md)
-    if m:
-        metrics["Concurrency"] = m.group(1)
+
+    # ── Table format: parse from ## Test Configuration and ## Performance Metrics ──
+    for section_name in ["## Test Configuration", "## Performance Metrics"]:
+        block = _extract_between(md, section_name, ["## "])
+        if block:
+            for line in block.splitlines():
+                if not line.strip().startswith("|"):
+                    continue
+                cells = [c.strip() for c in line.strip("|").split("|")]
+                if len(cells) < 2:
+                    continue
+                if all(re.match(r"^\s*:?-+:?\s*$", c) for c in cells):
+                    continue
+                key = re.sub(r"\*+", "", cells[0]).strip()
+                val = re.sub(r"\*+", "", cells[1]).strip()
+                if not key or key.lower() in ("metric", "item", "value", "status"):
+                    continue
+                # Normalize key names
+                key_lower = key.lower()
+                if "test runs" in key_lower:
+                    metrics["Test Runs"] = val
+                elif "concurrency" in key_lower:
+                    metrics["Concurrency"] = val
+                elif "skill" in key_lower:
+                    metrics["Skill"] = val
+                elif "success rate" in key_lower:
+                    # e.g. "10/10 (100.0%)" → extract parts
+                    m = re.search(r"(\d+)/(\d+)\s*\(([^)]+)\)", val)
+                    if m:
+                        metrics["Total Runs"] = m.group(2)
+                        metrics["Successes"] = m.group(1)
+                        metrics["Success Rate"] = m.group(3).strip()
+                elif "avg duration" in key_lower:
+                    metrics["Avg Duration"] = val
+                elif "p95 duration" in key_lower:
+                    metrics["P95 Duration"] = val
+                elif "min duration" in key_lower:
+                    metrics["Min Duration"] = val
+                elif "max duration" in key_lower:
+                    metrics["Max Duration"] = val
+                elif "std deviation" in key_lower:
+                    metrics["Std Deviation"] = val
+
+    # ── Fallback: list format (- Key: Value) ──
+    if "Total Runs" not in metrics:
+        m = re.search(r"(?:Total Runs|总次数):\s*(\d+)", md)
+        if m:
+            metrics["Total Runs"] = m.group(1)
+    if "Successes" not in metrics:
+        m = re.search(r"(?:Successes|成功次数):\s*(\d+)\s*\(([^)]+)\)", md)
+        if m:
+            metrics["Successes"] = m.group(1)
+            metrics["Success Rate"] = m.group(2).strip()
+    if "Avg Duration" not in metrics:
+        m = re.search(r"(?:Avg Duration|平均耗时):\s*([\d.]+)s", md)
+        if m:
+            metrics["Avg Duration"] = m.group(1) + "s"
+    if "P95 Duration" not in metrics:
+        m = re.search(r"(?:P95 Duration|P95\s*耗时):\s*([\d.]+)s", md)
+        if m:
+            metrics["P95 Duration"] = m.group(1) + "s"
+    if "Test Runs" not in metrics:
+        m = re.search(r"(?:Test Runs|测试轮次)\*?\*?:\s*(\d+)", md)
+        if m:
+            metrics["Test Runs"] = m.group(1)
+    if "Concurrency" not in metrics:
+        m = re.search(r"(?:Concurrency|并发度)\*?\*?:\s*(\d+)", md)
+        if m:
+            metrics["Concurrency"] = m.group(1)
     m = re.search(r"Command:\s*`([^`]+)`", md)
     if m:
         metrics["Command"] = m.group(1)
@@ -471,35 +524,57 @@ def _generate_stress_pdf(md: str, out_path: Path) -> None:
         pdf.cell(0, 5, "80-100 = Excellent   60-79 = Good   40-59 = Caution   <40 = Risk", ln=True)
         pdf.ln(3)
 
-    # ── Test Configuration ──
+    # ── Test Configuration (table) ──
     metrics = _parse_stress_metrics(md)
-    config_keys = ["Test Runs", "Concurrency", "Command"]
-    config_items = [(k, metrics[k]) for k in config_keys if k in metrics]
-    if config_items:
+    config_block = _extract_between(md, "## Test Configuration", ["## "])
+    config_h, config_rows = _parse_table(config_block)
+    if config_h and config_rows:
         pdf.section_title("Test Configuration")
-        for label, value in config_items:
-            pdf.set_font("Helvetica", "B", 9.5)
-            pdf.set_text_color(*NAVY)
-            pdf.cell(40, 6, _safe(label + ":"))
-            pdf.set_font("Helvetica", "", 9.5)
-            pdf.set_text_color(*TEXT_DARK)
-            pdf.cell(0, 6, _safe(value), ln=True)
-        pdf.ln(3)
+        clean_h = [re.sub(r"\*+", "", h).strip() for h in config_h]
+        clean_rows = [[re.sub(r"\*+", "", c).strip() for c in row] for row in config_rows]
+        n = len(clean_h)
+        widths = [60, 110] if n == 2 else [170 / n] * n
+        pdf.draw_table(clean_h, clean_rows, widths)
+    else:
+        # Fallback: old list format
+        config_keys = ["Test Runs", "Concurrency", "Command"]
+        config_items = [(k, metrics[k]) for k in config_keys if k in metrics]
+        if config_items:
+            pdf.section_title("Test Configuration")
+            headers = ["Item", "Value"]
+            rows = [[k, v] for k, v in config_items]
+            pdf.draw_table(headers, rows, [60, 110])
 
-    # ── Performance Metrics ──
-    perf_keys = ["Success Rate", "Avg Duration", "P95 Duration", "Total Runs", "Successes"]
-    perf_items = {k: metrics[k] for k in perf_keys if k in metrics}
-    if perf_items:
+    # ── Performance Metrics (table with Status) ──
+    perf_block = _extract_between(md, "## Performance Metrics", ["## "])
+    perf_h, perf_rows = _parse_table(perf_block)
+    if perf_h and perf_rows:
         pdf.section_title("Performance Metrics")
-        # Render as a small table
-        headers = list(perf_items.keys())
-        rows = [list(perf_items.values())]
-        n = len(headers)
-        widths = [170 / n] * n
-        pdf.draw_table(headers, rows, widths)
+        # Clean markdown bold from cells
+        clean_rows = []
+        for row in perf_rows:
+            clean_rows.append([re.sub(r"\*+", "", c).strip() for c in row])
+        clean_h = [re.sub(r"\*+", "", h).strip() for h in perf_h]
+        n = len(clean_h)
+        if n == 3:
+            widths = [60, 60, 50]
+        else:
+            widths = [170 / n] * n
+        pdf.draw_table(clean_h, clean_rows, widths)
+    else:
+        # Fallback: old format
+        perf_keys = ["Success Rate", "Avg Duration", "P95 Duration", "Total Runs", "Successes"]
+        perf_items = {k: metrics[k] for k in perf_keys if k in metrics}
+        if perf_items:
+            pdf.section_title("Performance Metrics")
+            headers = list(perf_items.keys())
+            rows = [list(perf_items.values())]
+            n = len(headers)
+            widths = [170 / n] * n
+            pdf.draw_table(headers, rows, widths)
 
     # ── Failure Samples ──
-    failure_lines = re.findall(r"- Run #(\d+) exit (\d+), duration ([\d.]+)s", md)
+    failure_lines = re.findall(r"Run #(\d+)[\s(]*exit (\d+)[,)]\s*(?:duration\s*)?([\d.]+)s", md)
     if failure_lines:
         pdf.section_title("Failure Details")
         headers = ["Run #", "Exit Code", "Duration"]
@@ -553,7 +628,9 @@ def _generate_stress_pdf(md: str, out_path: Path) -> None:
                 clean_rows.append(cleaned)
             n = len(score_h)
             widths = [170 / n] * n
-            if n == 3:
+            if n == 4:
+                widths = [50, 30, 35, 55]
+            elif n == 3:
                 widths = [60, 40, 70]
             pdf.draw_table(score_h, clean_rows, widths)
 
