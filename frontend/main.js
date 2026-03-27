@@ -147,7 +147,7 @@ const FINAL_STATUSES = new Set(["completed", "failed"]);
 // 各 tab 的文件大小上限 (MB)
 const MAX_FILE_SIZES = {
   "skill-security-audit":    10,
-  "multichain-contract-vuln": 50,
+  "multichain-contract-vuln": 10,
   "skill-stress-lab":         10,
 };
 
@@ -964,21 +964,94 @@ function renderReportPreview(task) {
     });
 }
 
+// Build contract audit score cards — new format (6 dimension scores)
+function buildContractAuditSummary(text) {
+  // Parse new 5-dimension format (per CONTRACT_AUDIT_GUIDE.md)
+  const scores = {};
+  for (const line of text.split(/\r?\n/)) {
+    if (/Overall Security/.test(line)) {
+      const m = line.match(/\*?\*?(\d+)\/100/);
+      if (m) scores['Overall'] = parseInt(m[1]);
+    }
+    if (/\|\s*[^\|]*Access Control/.test(line)) {
+      const m = line.match(/Access Control[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+      if (m) scores['Access'] = parseInt(m[1]);
+    }
+    if (/\|\s*[^\|]*Financial Security/.test(line)) {
+      const m = line.match(/Financial Security[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+      if (m) scores['Financial'] = parseInt(m[1]);
+    }
+    if (/\|\s*[^\|]*Randomness.*Oracle/.test(line)) {
+      const m = line.match(/Randomness[^\|]*Oracle[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+      if (m) scores['Randomness'] = parseInt(m[1]);
+    }
+    if (/\|\s*[^\|]*DoS Resistance/.test(line)) {
+      const m = line.match(/DoS Resistance[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+      if (m) scores['DoS'] = parseInt(m[1]);
+    }
+    if (/\|\s*[^\|]*Business Logic/.test(line)) {
+      const m = line.match(/Business Logic[^\|]*\|\s*\*?\*?(\d+)\/100/i);
+      if (m) scores['Logic'] = parseInt(m[1]);
+    }
+  }
+
+  const dims = [
+    { key: 'Overall',    icon: '📊', label: 'Overall' },
+    { key: 'Access',     icon: '🔐', label: 'Access Control' },
+    { key: 'Financial',  icon: '💰', label: 'Financial Security' },
+    { key: 'Randomness', icon: '🎲', label: 'Randomness & Oracle' },
+    { key: 'DoS',        icon: '⚡', label: 'DoS Resistance' },
+    { key: 'Logic',      icon: '🛡️', label: 'Business Logic' },
+  ];
+
+  // Contract Audit uses guide thresholds: 90/70/50 (not 80/60/40 used elsewhere)
+  function getScoreClass(s) {
+    if (s >= 90) return 'low';    // green  — Excellent
+    if (s >= 70) return 'total';  // blue   — Good
+    if (s >= 50) return 'medium'; // yellow — Caution
+    return 'high';                // red    — Risk
+  }
+
+  let html = `<div class="report-stats-cards report-stats-cards--6">`;
+  for (const d of dims) {
+    const s = scores[d.key] ?? 0;
+    html += `<div class="stat-card ${getScoreClass(s)}">`;
+    html += `<span class="stat-number">${s}</span>`;
+    html += `<span class="stat-label"><span class="stat-icon">${d.icon}</span>${d.label}</span>`;
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  // Score legend (contract audit thresholds differ from security audit)
+  html += `<div style="margin-top:8px;padding:8px 12px;background:rgba(99,102,241,0.1);border-radius:6px;font-size:12px;color:#94a3b8;">`;
+  html += `Score: 90-100 = Excellent 🟢 | 70-89 = Good 🔵 | 50-69 = Caution 🟡 | &lt;50 = Risk 🔴`;
+  html += `</div>`;
+
+  return html;
+}
+
 function buildReportSummary(text) {
   if (!text) return "";
+
+  // Detect new-format contract audit report (has dimension score table)
+  if (/\|\s*[^\|]*Access Control/.test(text)) {
+    return buildContractAuditSummary(text);
+  }
+
+  // Legacy format: show 4 severity count cards
   const detectorSummaries = extractDetectorSummaries(text);
   if (!detectorSummaries.length) return "";
-  
+
   // 按严重程度分组
   const highRisk = ['arbitrary-send-eth', 'reentrancy', 'unchecked-transfer', 'delegatecall'];
   const mediumRisk = ['divide-before-multiply', 'incorrect-equality', 'timestamp', 'low-level-calls'];
-  
+
   const highFindings = detectorSummaries.filter(f => highRisk.some(r => f.name.toLowerCase().includes(r)));
   const mediumFindings = detectorSummaries.filter(f => mediumRisk.some(r => f.name.toLowerCase().includes(r)));
   const otherFindings = detectorSummaries.filter(f => !highFindings.includes(f) && !mediumFindings.includes(f));
 
   let html = "";
-  
+
   // 统计卡片
   html += `<div class="report-stats-cards">`;
   html += `<div class="stat-card high"><span class="stat-number">${highFindings.length}</span><span class="stat-label">High Risk</span></div>`;

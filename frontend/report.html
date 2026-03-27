@@ -663,8 +663,48 @@
 
         // Default: contract audit report
         document.title = 'Contract Audit Report - Health AI';
-        const detectors = parseReport(reportText);
         const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown';
+
+        // ── New format: dimension score table ───────────────────────────────
+        if (/\|\s*[^\|]*Access Control/.test(reportText)) {
+          const scoreMap = {};
+          for (const line of reportText.split(/\r?\n/)) {
+            if (/Overall Security/.test(line)) { const m = line.match(/\*?\*?(\d+)\/100/); if (m) scoreMap['Overall'] = +m[1]; }
+            if (/Access Control/.test(line))   { const m = line.match(/Access Control[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Access'] = +m[1]; }
+            if (/Reentrancy/.test(line))        { const m = line.match(/Reentrancy[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Reentrancy'] = +m[1]; }
+            if (/Arithmetic/.test(line))        { const m = line.match(/Arithmetic[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Arithmetic'] = +m[1]; }
+            if (/External Calls/.test(line))    { const m = line.match(/External Calls[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['External'] = +m[1]; }
+            if (/Code Quality/.test(line))      { const m = line.match(/Code Quality[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Quality'] = +m[1]; }
+          }
+          function scoreClass(s) {
+            if (s >= 80) return 'low'; if (s >= 60) return 'total'; if (s >= 40) return 'medium'; return 'high';
+          }
+          const dims = [
+            { key:'Overall',    icon:'📊', label:'Overall' },
+            { key:'Access',     icon:'🔒', label:'Access Control' },
+            { key:'Reentrancy', icon:'🔄', label:'Reentrancy' },
+            { key:'Arithmetic', icon:'🔢', label:'Arithmetic' },
+            { key:'External',   icon:'📞', label:'External Calls' },
+            { key:'Quality',    icon:'📋', label:'Code Quality' },
+          ];
+          let html = '';
+          html += '<div class="report-header"><h1>📋 Contract Audit Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
+          html += '<div class="score-cards-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0;">';
+          for (const d of dims) {
+            const s = scoreMap[d.key] ?? 0;
+            html += `<div class="risk-card ${scoreClass(s)}" style="text-align:center;padding:16px;border-radius:8px;">`;
+            html += `<div class="risk-number" style="font-size:2rem;font-weight:700;">${s}</div>`;
+            html += `<div class="risk-label">${d.icon} ${d.label}</div></div>`;
+          }
+          html += '</div>';
+          html += '<div style="margin-bottom:20px;padding:8px 12px;background:rgba(99,102,241,0.1);border-radius:6px;font-size:12px;color:#94a3b8;text-align:center;">Score: 80-100 = Excellent 🟢 &nbsp;|&nbsp; 60-79 = Good 🔵 &nbsp;|&nbsp; 40-59 = Caution 🟡 &nbsp;|&nbsp; &lt;40 = Risk 🔴</div>';
+          html += '<div class="issues-section"><div class="issues-header">📄 Full Report</div><div style="padding:16px 20px;"><div class="raw-report">' + markdownToHtml(reportText) + '</div></div></div>';
+          container.innerHTML = html;
+          return;
+        }
+
+        // ── Legacy format: severity count cards ─────────────────────────────
+        const detectors = parseReport(reportText);
 
         if (detectors.length === 0) {
           container.innerHTML = '<div class="error">⚠️ No issues found in report. <a href="' + API_BASE + '/api/tasks/' + taskId + '/report" target="_blank">View raw report</a></div>';
@@ -687,7 +727,7 @@
         if (medium.length > 0) html += renderCategory('medium', '🟡', medium);
         if (low.length > 0) html += renderCategory('low', '🟢', low);
         html += '</div>';
-        
+
         container.innerHTML = html;
         
         document.querySelectorAll('.category-header').forEach(header => {

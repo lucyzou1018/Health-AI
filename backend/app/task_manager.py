@@ -340,11 +340,33 @@ class TaskManager:
         }
 
     def _run_contract_audit(self, code_dir: Path, report_dir: Path, params: Dict[str, Any]) -> Dict[str, Any]:
+        # ── 文件数上限校验（仅适用于上传包，evm-address 模式跳过）────────────────
+        if not params.get("evmAddress"):
+            # 只统计主要合约文件（.sol/.vy/.rs）
+            # 排除 macOS zip 自动生成的 __MACOSX 元数据目录和 ._ 前缀文件
+            _CONTRACT_EXTS = {".sol", ".vy", ".rs"}
+            _MAX_CONTRACT_FILES = 10
+            _all_files = [
+                f for f in code_dir.rglob("*")
+                if f.is_file()
+                and f.suffix.lower() in _CONTRACT_EXTS
+                and "__MACOSX" not in f.parts
+                and not f.name.startswith("._")
+            ]
+            if len(_all_files) > _MAX_CONTRACT_FILES:
+                raise RuntimeError(
+                    f"ZIP package contains {len(_all_files)} contract files, "
+                    f"exceeding the {_MAX_CONTRACT_FILES}-file limit. "
+                    f"Please reduce the number of files and re-upload."
+                )
+
         script = self.repo_root / "skills" / "multichain-contract-vuln" / "scripts" / "run_cli.py"
         report_md = report_dir / "contract_audit.md"
         bundle_md = report_dir / "contract_sources.md"
         log_file = report_dir / "contract_audit.log"
-        cmd = ["python3", str(script), "--report", str(report_md), "--bundle", str(bundle_md), "--auto-static"]
+        ai_model = os.environ.get("SKILL_AUDIT_AI_MODEL", "gpt-4o-mini")
+        cmd = ["python3", str(script), "--report", str(report_md),
+               "--ai-model", ai_model]
         input_path = params.get("input") or str(code_dir)
         if params.get("evmAddress"):
             cmd.extend(["--evm-address", str(params["evmAddress"])])
@@ -356,8 +378,6 @@ class TaskManager:
             cmd.extend(["--chain", str(params["chain"])])
         if params.get("scope"):
             cmd.extend(["--scope", str(params["scope"])])
-        if params.get("runAnchor"):
-            cmd.append("--run-anchor")
         env: Dict[str, str] = {}
         if params.get("etherscanApiKey"):
             env["ETHERSCAN_API_KEY"] = str(params["etherscanApiKey"])

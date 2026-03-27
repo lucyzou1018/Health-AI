@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Command-line helper for the multichain-contract-vuln skill.
 
-Features (initial version):
-- Auto-generate Markdown audit report skeleton for EVM/Solana scopes
-- For EVM projects, optionally run Slither and summarize detector findings
-- For Solana projects, optionally run cargo/anchor commands and capture logs
+Performs AI-powered smart contract security audit:
+- Collects source files from the uploaded package (max 10 files)
+- Analyzes each file individually via LLM
+- Aggregates findings into 5-dimension scores (per CONTRACT_AUDIT_GUIDE.md)
+- Generates a structured Markdown report
 """
 
 from __future__ import annotations
@@ -13,23 +14,51 @@ import argparse
 import datetime as dt
 import json
 import os
-import shutil
-import subprocess
+import re
 import sys
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib import error as urlerror, request as urlrequest
 
-SEVERITY_ORDER = ["Critical", "High", "Medium", "Low", "Informational"]
+# ── Dimension definitions (per CONTRACT_AUDIT_GUIDE.md) ──────────────────────
+
+_DIM_KEYS = (
+    "accessControl",
+    "financialSecurity",
+    "randomnessOracle",
+    "dosResistance",
+    "businessLogic",
+)
+_DIM_LABELS = {
+    "accessControl":     "🔐 Access Control",
+    "financialSecurity": "💰 Financial Security",
+    "randomnessOracle":  "🎲 Randomness & Oracle",
+    "dosResistance":     "⚡ DoS Resistance",
+    "businessLogic":     "🛡️ Business Logic",
+}
+_DIM_SCORE_KEYS = {
+    "accessControl":     "access",
+    "financialSecurity": "financial",
+    "randomnessOracle":  "randomness",
+    "dosResistance":     "dos",
+    "businessLogic":     "logic",
+}
+
+# Supported contract source extensions
+SOURCE_EXTS = {".sol", ".vy", ".rs", ".ts", ".tsx", ".js"}
+MAX_FILES      = 10
+MAX_FILE_CHARS = 8000
+
 ETHERSCAN_DOMAINS = {
     "mainnet": "api.etherscan.io",
-    "goerli": "api-goerli.etherscan.io",
+    "goerli":  "api-goerli.etherscan.io",
     "sepolia": "api-sepolia.etherscan.io",
 }
 CHAIN_IDS = {"mainnet": 1, "goerli": 5, "sepolia": 11155111}
-SOURCE_EXTS = {".sol", ".vy", ".rs", ".ts", ".tsx", ".js", ".toml", ".json"}
 
+
+# ── Utility helpers ───────────────────────────────────────────────────────────
 
 def slugify(name: str) -> str:
     return "-".join(
@@ -47,15 +76,9 @@ def detect_chain(input_path: Path, explicit: str | None) -> str:
     return "evm"
 
 
-def run_cmd(cmd: List[str], cwd: Path | None = None) -> Tuple[int, str, str]:
-    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd)
-    return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
-
-
 def _sanitize_relative_path(rel_path: str) -> Path:
     cleaned = rel_path.replace("\\", "/").lstrip("/")
     path = Path(cleaned)
-    # 防止 .. 逃逸
     sanitized = Path()
     for part in path.parts:
         if part in {"..", ""}:
@@ -96,7 +119,8 @@ def fetch_from_etherscan(address: str, network: str, api_key: str | None) -> Dic
         return {}
     domain = ETHERSCAN_DOMAINS.get(network, ETHERSCAN_DOMAINS["mainnet"])
     url = (
-        f"https://{domain}/api?module=contract&action=getsourcecode&address={address}&apikey={api_key}"
+        f"https://{domain}/api?module=contract&action=getsourcecode"
+        f"&address={address}&apikey={api_key}"
     )
     try:
         with urlrequest.urlopen(url, timeout=15) as resp:
@@ -114,12 +138,10 @@ def fetch_from_etherscan(address: str, network: str, api_key: str | None) -> Dic
 
 def fetch_from_sourcify(address: str, network: str) -> Dict[str, str]:
     chain_id = CHAIN_IDS.get(network, 1)
-    buckets = ["full_match", "partial_match"]
-    for bucket in buckets:
+    for bucket in ("full_match", "partial_match"):
         base = f"https://repo.sourcify.dev/contracts/{bucket}/{chain_id}/{address}/"
-        metadata_url = base + "metadata.json"
         try:
-            with urlrequest.urlopen(metadata_url, timeout=15) as resp:
+            with urlrequest.urlopen(base + "metadata.json", timeout=15) as resp:
                 metadata = json.loads(resp.read().decode("utf-8"))
         except Exception:
             continue
@@ -129,72 +151,62 @@ def fetch_from_sourcify(address: str, network: str) -> Dict[str, str]:
         result: Dict[str, str] = {}
         for rel, meta in sources.items():
             content = meta.get("content") if isinstance(meta, dict) else None
-            if not content:
-                continue
-            result[str(_sanitize_relative_path(rel))] = content
+            if content:
+                result[str(_sanitize_relative_path(rel))] = content
         if result:
             return result
     return {}
 
 
-def download_onchain_sources(address: str, network: str, api_key: str | None) -> Tuple[Path | None, str | None]:
+def download_onchain_sources(
+    address: str, network: str, api_key: str | None
+) -> Tuple[Optional[Path], Optional[str]]:
     normalized = address.strip()
     if not normalized.startswith("0x"):
         normalized = "0x" + normalized
     normalized = normalized.lower()
     tmp_root = Path(tempfile.mkdtemp(prefix="multichain-evm-"))
     dest_dir = tmp_root / normalized.replace("0x", "")
-    etherscan_sources = fetch_from_etherscan(normalized, network, api_key)
-    sources = etherscan_sources or fetch_from_sourcify(normalized, network)
+    sources = fetch_from_etherscan(normalized, network, api_key) or fetch_from_sourcify(normalized, network)
     if not sources:
         return None, None
     for rel, content in sources.items():
         path = dest_dir / _sanitize_relative_path(rel)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
-    return dest_dir, f"链上地址 {normalized} 的源码已下载到 {dest_dir}"
+    return dest_dir, f"On-chain source downloaded: {normalized}"
 
 
 def _collect_source_files(target: Path) -> List[Path]:
+    """Collect contract source files, prioritising .sol/.vy/.rs, then others.
+
+    Excludes macOS zip metadata: __MACOSX directories and ._ prefixed files.
+    """
     if target.is_file():
         return [target]
-    files: List[Path] = []
+    primary: List[Path] = []
+    secondary: List[Path] = []
     for ext in SOURCE_EXTS:
-        files.extend(sorted(target.rglob(f"*{ext}")))
-    return files[:100]
-
-
-def bundle_sources(target: Path, bundle_path: Path) -> Optional[str]:
-    sources = _collect_source_files(target)
-    if not sources:
-        return None
-    bundle_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(bundle_path, "w", encoding="utf-8") as fh:
-        fh.write("# Contract Sources Bundle\n\n")
-        for path in sources:
-            try:
-                text = path.read_text(encoding="utf-8", errors="ignore")
-            except Exception:
+        for f in sorted(target.rglob(f"*{ext}")):
+            # Skip macOS zip metadata files
+            if "__MACOSX" in f.parts or f.name.startswith("._"):
                 continue
-            language = path.suffix.lstrip('.') or 'txt'
-            fh.write(f"## {path}\n")
-            fh.write(f"```{language}\n{text}\n```\n\n")
-    return f"源码聚合文件：{bundle_path}（共 {len(sources)} 个文件）"
+            if ext in {".sol", ".vy", ".rs"}:
+                primary.append(f)
+            else:
+                secondary.append(f)
+    combined = primary + secondary
+    return combined[:MAX_FILES]
 
 
 def _resolve_project_path(target: Path) -> Tuple[Path, Optional[str]]:
     if target.is_file():
         return target, None
     current = target
-    markers = {"foundry.toml", "Anchor.toml"}
     visited = 0
     while current.is_dir():
-        if any((current / marker).exists() for marker in markers):
-            if current != target:
-                return current, f"自动定位项目根目录：{current}"
-            return current, None
         entries = list(current.iterdir())
-        dirs = [p for p in entries if p.is_dir()]
+        dirs  = [p for p in entries if p.is_dir()]
         files = [p for p in entries if p.is_file()]
         if files or len(dirs) != 1:
             break
@@ -202,123 +214,354 @@ def _resolve_project_path(target: Path) -> Tuple[Path, Optional[str]]:
         if visited > 4:
             break
         current = dirs[0]
-    return target, None
+    return current, None
 
 
-def _prepare_foundry_project(target: Path) -> List[str]:
-    project_dir = target if target.is_dir() else target.parent
-    foundry_toml = project_dir / "foundry.toml"
-    if not foundry_toml.exists():
-        return []
+# ── Scoring & verdict helpers ─────────────────────────────────────────────────
 
-    notes: List[str] = []
-    git_dir = project_dir / ".git"
-    if not git_dir.exists():
-        code, out, err = run_cmd(["git", "init"], cwd=project_dir)
-        if code == 0:
-            notes.append("检测到 Foundry 项目但缺少 .git，已自动执行 git init 以便 forge install。")
-        else:
-            notes.append(f"❌ git init 失败：{err or out}")
-            return notes
+def _badge(score: int) -> str:
+    """Per CONTRACT_AUDIT_GUIDE.md thresholds: 90-100 Excellent, 70-89 Good, 50-69 Caution, <50 Risk."""
+    if score >= 90: return "🟢 Excellent"
+    if score >= 70: return "🔵 Good"
+    if score >= 50: return "🟡 Caution"
+    return "🔴 Risk"
 
-    deps = {
-        "openzeppelin-contracts": "OpenZeppelin/openzeppelin-contracts",
-        "forge-std": "foundry-rs/forge-std",
+
+def _risk_level_label(score: int) -> str:
+    if score >= 90: return "🟢 Low Risk"
+    if score >= 70: return "🔵 Medium-Low Risk"
+    if score >= 50: return "🟡 Medium Risk"
+    return "🔴 High Risk"
+
+
+def _verdict_from_aggregate(critical_findings: List[str], overall: int) -> str:
+    """Per CONTRACT_AUDIT_GUIDE.md: critical → REJECT, ≥70 → SAFE, 50-69 → CAUTION, <50 → REJECT."""
+    if critical_findings:
+        return "REJECT"
+    if overall >= 70:
+        return "SAFE"
+    if overall >= 50:
+        return "CAUTION"
+    return "REJECT"
+
+
+# ── LLM prompt (per CONTRACT_AUDIT_GUIDE.md template) ────────────────────────
+
+_LLM_SYSTEM = (
+    "You are an expert smart contract security auditor. "
+    "Analyze the provided source code thoroughly for security vulnerabilities. "
+    "Always respond with valid JSON only — no markdown fences, no commentary."
+)
+
+_LLM_PROMPT_TMPL = """\
+你是一名资深智能合约安全审计专家。请对以下合约进行全面安全审计，并按照 5 个维度输出评分和具体风险项。
+
+**合约信息：**
+- 文件名：{filename}
+- 链类型：{chain_type}
+- 代码：
+```
+{source_code}
+```
+
+**审计要求：**
+1. 按照以下 5 个维度进行评分（每个维度 0-100 分，100 分表示无风险）：
+   - accessControl（访问控制）：权限管理、身份验证、owner检查、modifier完整性
+   - financialSecurity（资金安全）：重入攻击、整数溢出/下溢、资金锁定、提现逻辑、余额检查
+   - randomnessOracle（随机数与预言机）：弱随机数、区块属性依赖、预言机操纵、时间戳依赖
+   - dosResistance（拒绝服务）：Gas限制、循环炸弹、外部调用失败、数组无界增长
+   - businessLogic（业务逻辑）：状态不一致、条件竞争、前置运行、闪电贷攻击、逻辑漏洞
+
+2. 对每个维度列出发现的具体风险项（如果有）
+
+3. criticalFindings 只包含可直接导致资金损失或合约失效的漏洞
+
+**评分标准：90-100=优秀，70-89=良好，50-69=需改进，<50=高风险**
+
+**严格按以下 JSON 格式输出，不要包含任何其他文字：**
+{{
+  "filename": "{filename}",
+  "overallScore": <综合评分 0-100>,
+  "dimensions": {{
+    "accessControl":    {{"score": <0-100>, "findings": ["风险描述1", "风险描述2"]}},
+    "financialSecurity":{{"score": <0-100>, "findings": []}},
+    "randomnessOracle": {{"score": <0-100>, "findings": []}},
+    "dosResistance":    {{"score": <0-100>, "findings": []}},
+    "businessLogic":    {{"score": <0-100>, "findings": []}}
+  }},
+  "criticalFindings": ["严重漏洞描述（如无则为空数组）"],
+  "recommendation": "总体建议（1-2句话）"
+}}
+"""
+
+
+# ── LLM analysis ─────────────────────────────────────────────────────────────
+
+def _analyze_file_with_llm(filename: str, code: str, model: str, chain: str) -> Dict:
+    """Analyze a single contract file using LLM with three-path fallback.
+
+    Paths tried in order:
+      1. Chat Completions  (gpt-4o / grok / most models)
+      2. Legacy Completions (codex / instruct models)
+      3. Responses API      (gpt-4.1 / o-series / SDK v2 new models)
+    """
+    _empty: Dict = {
+        "overallScore": 100,
+        "hasRisk": False,
+        "dimensionScores":   {k: 100 for k in _DIM_KEYS},
+        "dimensionFindings": {k: []  for k in _DIM_KEYS},
+        "criticalFindings":  [],
+        "recommendation":    "",
     }
-    for folder, repo in deps.items():
-        dest = project_dir / "lib" / folder
-        has_files = dest.exists() and any(dest.iterdir())
-        if has_files:
-            continue
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        code, out, err = run_cmd([
-            "git",
-            "clone",
-            f"https://github.com/{repo}.git",
-            str(dest),
-        ], cwd=project_dir)
-        if code == 0:
-            notes.append(f"已自动下载依赖 {repo} → lib/{folder}")
+    _err = lambda msg: {**_empty, "status": "error", "reason": msg, "filename": filename}
+
+    try:
+        from openai import OpenAI
+    except ImportError:
+        return _err("openai package missing: pip install openai")
+
+    openai_key = os.getenv("OPENAI_API_KEY", "")
+    xai_key    = os.getenv("XAI_API_KEY", "")
+    if not openai_key and not xai_key:
+        return _err("No API key configured (OPENAI_API_KEY or XAI_API_KEY)")
+
+    use_xai = bool(xai_key) and not openai_key
+    client_kwargs: Dict = {"api_key": xai_key if use_xai else openai_key}
+    if use_xai:
+        client_kwargs["base_url"] = "https://api.x.ai/v1"
+        if not model or not model.startswith("grok"):
+            model = "grok-3-mini"
+    elif not model:
+        model = "gpt-4o-mini"
+
+    # Determine language label for the prompt
+    ext = Path(filename).suffix.lower()
+    lang_map = {".sol": "EVM (Solidity)", ".vy": "EVM (Vyper)", ".rs": "Solana (Rust)"}
+    chain_type = lang_map.get(ext, chain.upper())
+
+    # Truncate code if needed
+    code_snippet = code[:MAX_FILE_CHARS]
+    if len(code) > MAX_FILE_CHARS:
+        code_snippet += f"\n\n... [{len(code) - MAX_FILE_CHARS} chars truncated] ..."
+
+    system_prompt = _LLM_SYSTEM
+    user_prompt   = _LLM_PROMPT_TMPL.format(
+        filename=filename,
+        chain_type=chain_type,
+        source_code=code_snippet,
+    )
+    client = OpenAI(**client_kwargs)
+
+    def _parse_raw(raw: str) -> Optional[Dict]:
+        """Parse and validate LLM JSON response into internal format."""
+        m = re.search(r'\{[\s\S]+\}', raw)
+        if not m:
+            return None
+        try:
+            parsed = json.loads(m.group())
+        except json.JSONDecodeError:
+            return None
+
+        dim_scores:   Dict[str, int]        = {}
+        dim_findings: Dict[str, List[str]]  = {}
+
+        dims_data = parsed.get("dimensions", {})
+        for k in _DIM_KEYS:
+            dim_entry = dims_data.get(k, {})
+            if isinstance(dim_entry, dict):
+                raw_score = dim_entry.get("score", 100)
+                raw_finds = dim_entry.get("findings", [])
+            else:
+                raw_score = 100
+                raw_finds = []
+            dim_scores[k]   = max(0, min(100, int(raw_score)))
+            dim_findings[k] = [str(f).strip() for f in raw_finds if f]
+
+        # overallScore from LLM, fallback to average of dimensions
+        overall_raw = parsed.get("overallScore")
+        if isinstance(overall_raw, (int, float)):
+            overall = max(0, min(100, int(overall_raw)))
         else:
-            notes.append(f"❌ 下载 {repo} 失败：{err or out}")
-    return notes
+            overall = sum(dim_scores.values()) // len(_DIM_KEYS)
 
+        critical = [str(f).strip() for f in parsed.get("criticalFindings", []) if f]
+        recommendation = str(parsed.get("recommendation", "")).strip()
+        has_risk = bool(critical) or any(s < 70 for s in dim_scores.values())
 
-def run_slither(target: Path, json_path: Path, slither_bin: str | None = None) -> Tuple[bool, str]:
-    binary = slither_bin or shutil.which("slither")
-    if not binary:
-        return False, "Slither 未安装（请先 pip install slither-analyzer）"
+        return {
+            "status":           "ok",
+            "filename":         filename,
+            "overallScore":     overall,
+            "hasRisk":          has_risk,
+            "dimensionScores":  dim_scores,
+            "dimensionFindings":dim_findings,
+            "criticalFindings": critical,
+            "recommendation":   recommendation,
+        }
 
-    cmd = [binary, str(target), "--json", str(json_path)]
-    code, out, err = run_cmd(cmd, cwd=target.parent if target.is_file() else target)
-    if code != 0:
-        return False, f"Slither 执行失败 (exit {code})\nSTDOUT:\n{out}\nSTDERR:\n{err}"
-    return True, out or "Slither 执行完成"
-
-
-def parse_slither(json_path: Path) -> Dict:
-    if not json_path.exists():
-        return {"findings": [], "summary": {}}
-    with open(json_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    detectors = data.get("results", {}).get("detectors", [])
-    findings = []
-    summary: Dict[str, int] = {k: 0 for k in SEVERITY_ORDER}
-    for detector in detectors:
-        impact = detector.get("impact", "Informational").title()
-        if impact not in summary:
-            summary[impact] = 0
-        summary[impact] += 1
-        findings.append(
-            {
-                "check": detector.get("check", "unknown"),
-                "impact": impact,
-                "confidence": detector.get("confidence"),
-                "description": detector.get("description", ""),
-                "elements": detector.get("elements", []),
-            }
-        )
-    return {"findings": findings, "summary": summary}
-
-
-def summarize_findings(findings: List[Dict]) -> str:
-    if not findings:
-        return "未检出 Slither 漏洞（请手动复核业务逻辑）。"
-    lines = []
-    for idx, finding in enumerate(findings, 1):
-        elements = finding.get("elements") or []
-        signatures = ", ".join(
-            sorted(
-                {
-                    elem.get("name") or elem.get("type", "")
-                    for elem in elements
-                    if isinstance(elem, dict)
-                }
+    def _call_responses_api() -> Optional[str]:
+        """Responses API — SDK v2 endpoint for gpt-4.1 / o-series models."""
+        try:
+            resp = client.responses.create(
+                model=model,
+                instructions=system_prompt,
+                input=user_prompt,
             )
+            if hasattr(resp, "output_text"):
+                return (resp.output_text or "").strip()
+            if hasattr(resp, "output") and resp.output:
+                item = resp.output[0]
+                if hasattr(item, "content") and item.content:
+                    return (item.content[0].text or "").strip()
+        except Exception:
+            pass
+        return None
+
+    # ── Path 1: Chat Completions ──────────────────────────────────────────────
+    try:
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_prompt},
+            ],
+            temperature=0,
         )
-        lines.append(
-            f"### {idx}. [{finding['impact']}] {finding['check']}\n"
-            f"- **描述**：{finding.get('description', '').strip()}\n"
-            f"- **命中位置**：{signatures or 'N/A'}\n"
-            f"- **置信度**：{finding.get('confidence', 'Unknown')}\n"
-        )
-    return "\n".join(lines)
+        raw = (resp.choices[0].message.content or "").strip()
+        result = _parse_raw(raw)
+        return result if result else {**_empty, "status": "ok", "filename": filename}
+
+    except Exception as chat_exc:
+        chat_err = str(chat_exc)
+
+        # ── Path 2: Legacy Completions (codex / instruct models) ─────────────
+        if "not a chat model" in chat_err or "v1/completions" in chat_err:
+            try:
+                legacy = client.completions.create(
+                    model=model,
+                    prompt=system_prompt + "\n\n" + user_prompt,
+                    max_tokens=1024,
+                    temperature=0,
+                )
+                raw = (legacy.choices[0].text or "").strip()
+                result = _parse_raw(raw)
+                if result:
+                    return result
+            except Exception:
+                pass
+
+            # ── Path 3: Responses API (gpt-4.1 / o-series) ───────────────────
+            raw = _call_responses_api()
+            if raw is not None:
+                result = _parse_raw(raw)
+                return result if result else {**_empty, "status": "ok", "filename": filename}
+
+            return _err(
+                f"Model '{model}' is not supported by any available API endpoint. "
+                f"Please check your SKILL_AUDIT_AI_MODEL configuration."
+            )
+
+        # ── Chat Completions failed with another error, try Responses API ─────
+        raw = _call_responses_api()
+        if raw is not None:
+            result = _parse_raw(raw)
+            return result if result else {**_empty, "status": "ok", "filename": filename}
+
+        return _err(f"[model={model}] {chat_err}")
 
 
-def run_solana_checks(target: Path, run_anchor: bool) -> List[str]:
-    logs = []
-    cargo = shutil.which("cargo")
-    if cargo:
-        code, out, err = run_cmd([cargo, "clippy", "--", "-D", "warnings"], cwd=target)
-        tag = "cargo clippy"
-        logs.append(f"`{tag}` exit {code}\nSTDOUT:\n{out}\nSTDERR:\n{err}\n")
-    if run_anchor and (target / "Anchor.toml").exists():
-        anchor = shutil.which("anchor")
-        if anchor:
-            code, out, err = run_cmd([anchor, "test", "--skip-build"], cwd=target)
-            tag = "anchor test"
-            logs.append(f"`{tag}` exit {code}\nSTDOUT:\n{out}\nSTDERR:\n{err}\n")
-    return logs
+def _aggregate_llm_results(file_results: List[Dict]) -> Dict:
+    """Aggregate per-file LLM results.
+
+    Strategy (conservative):
+    - Take minimum dimension score across all files (worst case wins)
+    - overall = average of min dimension scores
+    - Collect all criticalFindings with file attribution
+    """
+    min_scores: Dict[str, int] = {k: 100 for k in _DIM_KEYS}
+    all_critical: List[str] = []
+
+    ok_results = [r for r in file_results if r.get("status") == "ok"]
+
+    for result in ok_results:
+        for k in _DIM_KEYS:
+            s = result["dimensionScores"].get(k, 100)
+            min_scores[k] = min(min_scores[k], s)
+        fname = result.get("filename", "unknown")
+        for cf in result.get("criticalFindings", []):
+            all_critical.append(f"**{fname}** — {cf}")
+
+    # Build final score dict
+    scores: Dict[str, int] = {}
+    for dim_key, score_key in _DIM_SCORE_KEYS.items():
+        scores[score_key] = min_scores[dim_key]
+    scores["overall"] = sum(min_scores.values()) // len(_DIM_KEYS) if min_scores else 100
+
+    verdict = _verdict_from_aggregate(all_critical, scores["overall"])
+    return {
+        "scores":           scores,
+        "criticalFindings": all_critical,
+        "verdict":          verdict,
+    }
+
+
+# ── Report generation ─────────────────────────────────────────────────────────
+
+def _build_per_file_section(file_results: List[Dict]) -> List[str]:
+    """Build per-file analysis sections per CONTRACT_AUDIT_GUIDE.md format."""
+    lines: List[str] = []
+    for result in file_results:
+        fname = result.get("filename", "unknown")
+        lines.append(f"\n### 📄 {fname}")
+
+        if result.get("status") != "ok":
+            lines.append(f"\n> ⚠️ Analysis error: {result.get('reason', 'unknown error')}")
+            lines.append("")
+            continue
+
+        overall  = result.get("overallScore", 100)
+        has_risk = result.get("hasRisk", False)
+        lines.append(f"\n**Overall Score:** {overall}/100 &nbsp;|&nbsp; **Risk Level:** {_risk_level_label(overall)}")
+        lines.append("")
+
+        # Dimension score summary table
+        lines.append("#### Dimension Scores")
+        lines.append("")
+        lines.append("| Dimension | Score | Findings |")
+        lines.append("| --- | :---: | --- |")
+        dim_scores   = result.get("dimensionScores",   {})
+        dim_findings = result.get("dimensionFindings", {})
+        for k in _DIM_KEYS:
+            sc = dim_scores.get(k, 100)
+            fc = len(dim_findings.get(k, []))
+            f_str = f"{fc} issue{'s' if fc != 1 else ''}" if fc > 0 else "—"
+            lines.append(f"| {_DIM_LABELS[k]} | {sc}/100 | {f_str} |")
+        lines.append("")
+
+        # Per-dimension details
+        for k in _DIM_KEYS:
+            sc       = dim_scores.get(k, 100)
+            findings = dim_findings.get(k, [])
+            status   = "✅ Pass" if sc >= 90 and not findings else "❌ Risk Detected"
+            lines.append(f"#### {_DIM_LABELS[k]}")
+            lines.append(f"**Score:** {sc}/100 &nbsp;|&nbsp; **Status:** {status}")
+            if findings:
+                lines.append("")
+                lines.append("**Findings:**")
+                for f in findings:
+                    lines.append(f"- {f}")
+            lines.append("")
+
+        # Recommendation
+        rec = result.get("recommendation", "")
+        if rec:
+            lines.append("#### 💡 Recommendation")
+            lines.append(rec)
+            lines.append("")
+
+        lines.append("---")
+
+    return lines
 
 
 def build_report(
@@ -326,126 +569,222 @@ def build_report(
     chain: str,
     target: Path,
     report_path: Path,
-    slither_data: Dict | None,
-    solana_logs: List[str] | None,
+    llm_file_results: List[Dict],
     extra_notes: List[str],
-):
+    model: str = "",
+) -> Path:
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    timestamp = dt.datetime.now(dt.timezone.utc).isoformat()
+    timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y/%m/%d %H:%M:%S UTC")
 
-    summary_lines = []
-    if slither_data:
-        for sev in SEVERITY_ORDER:
-            count = slither_data["summary"].get(sev, 0)
-            summary_lines.append(f"{sev}: {count}")
+    aggregated      = _aggregate_llm_results(llm_file_results)
+    scores          = aggregated["scores"]
+    verdict         = aggregated["verdict"]
+    critical_list   = aggregated["criticalFindings"]
+
+    if verdict == "SAFE":
+        v_icon, v_label = "✅", "SAFE TO DEPLOY"
+    elif verdict == "CAUTION":
+        v_icon, v_label = "⚠️", "CAUTION — REVIEW REQUIRED"
     else:
-        summary_lines.append("自动化摘要：暂无（请参照手动检查清单）")
+        v_icon, v_label = "❌", "REJECT — HIGH RISK DETECTED"
 
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.write(
-            f"# {scope} Multichain Audit Report\n\n"
-            f"生成时间：{timestamp}\n\n"
-            f"## 范围概况\n- 目标：{Path(target).name}\n- 链别：{chain.upper()}\n- 工具：multichain-contract-vuln CLI (v0.1)\n\n"
-        )
-        f.write("## 自动化摘要\n" + "\\n".join(summary_lines) + "\n\n")
+    ok_count = sum(1 for r in llm_file_results if r.get("status") == "ok")
 
-        if slither_data:
-            f.write("## Slither 检测详情\n")
-            f.write(summarize_findings(slither_data["findings"]))
-            f.write("\n\n")
+    lines: List[str] = [
+        f"# {scope} Contract Audit Report",
+        "",
+        f"**Scanned:** {timestamp}  ",
+        f"**Chain:** {chain.upper()}  ",
+        f"**Files Analyzed:** {ok_count}/{len(llm_file_results)}  ",
+        "**Analysis Method:** AI Semantic Analysis  ",
+        f"**Model:** {model or 'N/A'}",
+        "",
+        "## Security Verdict",
+        f"### {v_icon} {v_label}",
+        "",
+        "---",
+        "",
+        "## 📊 Risk Scores",
+        "",
+        "| Dimension | Score | Rating |",
+        "| --- | :---: | --- |",
+        f"| 🏆 **Overall Security** | **{scores['overall']}/100** | **{_badge(scores['overall'])}** |",
+        f"| 🔐 Access Control      | {scores['access']}/100     | {_badge(scores['access'])} |",
+        f"| 💰 Financial Security  | {scores['financial']}/100  | {_badge(scores['financial'])} |",
+        f"| 🎲 Randomness & Oracle | {scores['randomness']}/100 | {_badge(scores['randomness'])} |",
+        f"| ⚡ DoS Resistance      | {scores['dos']}/100        | {_badge(scores['dos'])} |",
+        f"| 🛡️ Business Logic      | {scores['logic']}/100      | {_badge(scores['logic'])} |",
+        "",
+        "> Score legend: 90–100 = Excellent | 70–89 = Good | 50–69 = Caution | <50 = Risk",
+        "",
+        "---",
+        "",
+        "## 🚨 Critical Findings",
+        "",
+    ]
 
-        if solana_logs:
-            f.write("## Solana 命令输出\n")
-            for log in solana_logs:
-                f.write(log + "\n")
+    if critical_list:
+        for i, cf in enumerate(critical_list, 1):
+            lines.append(f"{i}. {cf}")
+    else:
+        lines.append("✅ No critical vulnerabilities found.")
 
-        if extra_notes:
-            f.write("## 附加说明\n")
-            for note in extra_notes:
-                f.write(f"- {note}\n")
+    lines += [
+        "",
+        "---",
+        "",
+        "## 📄 Per-File Analysis",
+        f"*{len(llm_file_results)} file(s) analyzed by AI*",
+        "",
+    ]
 
+    lines += _build_per_file_section(llm_file_results)
+
+    # Audit summary table
+    lines += [
+        "",
+        "## 📋 Audit Summary",
+        "",
+        "### File Risk Distribution",
+        "",
+        "| File | Score | Risk Level | Critical Issues |",
+        "| --- | :---: | --- | :---: |",
+    ]
+    for result in llm_file_results:
+        fname = result.get("filename", "unknown")
+        if result.get("status") != "ok":
+            lines.append(f"| {fname} | — | ⚠️ Analysis Error | — |")
+            continue
+        ov  = result.get("overallScore", 100)
+        cfc = len(result.get("criticalFindings", []))
+        lines.append(f"| {fname} | {ov}/100 | {_risk_level_label(ov)} | {cfc} |")
+
+    # Overall recommendation
+    recs = [
+        r.get("recommendation", "").strip()
+        for r in llm_file_results
+        if r.get("status") == "ok" and r.get("recommendation", "").strip()
+    ]
+    lines += ["", "### Overall Recommendation", ""]
+    if recs:
+        for rec in recs:
+            lines.append(f"- {rec}")
+    else:
+        lines.append("No specific recommendations.")
+
+    lines += [
+        "",
+        "---",
+        "",
+        "## Scope Overview",
+        f"- **Target**: {Path(target).name}",
+        f"- **Chain**: {chain.upper()}",
+        f"- **Files analyzed**: {ok_count}",
+        "- **Tool**: multichain-contract-vuln CLI + AI Semantic Analysis",
+        "",
+    ]
+
+    if extra_notes:
+        lines += ["## Additional Notes", ""]
+        for note in extra_notes:
+            lines.append(f"- {note}")
+        lines.append("")
+
+    lines += [
+        "---",
+        "",
+        "*Disclaimer: This report is generated by AI semantic analysis and does not replace human audit. "
+        "A comprehensive manual audit is recommended before production deployment.*",
+    ]
+
+    report_path.write_text("\n".join(lines), encoding="utf-8")
     return report_path
 
 
+# ── Entry point ───────────────────────────────────────────────────────────────
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="multichain-contract-vuln CLI helper")
-    parser.add_argument("--input", help="待分析的合约文件或目录")
-    parser.add_argument("--evm-address", help="链上 EVM 合约地址（自动下载源码）")
-    parser.add_argument("--network", default="mainnet", help="EVM 网络：mainnet/goerli/sepolia，默认 mainnet")
-    parser.add_argument("--etherscan-api-key", help="Etherscan API Key（默认读取环境变量）")
-    parser.add_argument("--chain", choices=["evm", "solana"], help="目标链别")
-    parser.add_argument("--scope", help="报告名称/前缀，默认取输入目录名")
-    parser.add_argument(
-        "--report",
-        help="输出 Markdown 路径（默认 reports/<scope>-multichain-audit.md）",
-    )
-    parser.add_argument("--slither-bin", help="自定义 slither 可执行路径")
-    parser.add_argument("--auto-static", action="store_true", help="启用本地静态分析（默认关闭，以便改用 AI 审计）")
-    parser.add_argument("--run-anchor", action="store_true", help="Solana 项目额外执行 anchor test（需同时开启 --auto-static）")
-    parser.add_argument("--bundle", type=Path, help="把源码聚合输出到 Markdown，便于 AI 审计")
+    parser = argparse.ArgumentParser(description="multichain-contract-vuln AI audit CLI")
+    parser.add_argument("--input",             help="Contract file or directory to analyze")
+    parser.add_argument("--evm-address",       help="On-chain EVM contract address (auto-download source)")
+    parser.add_argument("--network",           default="mainnet",
+                        help="EVM network: mainnet/goerli/sepolia (default: mainnet)")
+    parser.add_argument("--etherscan-api-key", help="Etherscan API Key (or set ETHERSCAN_API_KEY)")
+    parser.add_argument("--chain",             choices=["evm", "solana"], help="Chain type")
+    parser.add_argument("--scope",             help="Report name prefix (default: directory name)")
+    parser.add_argument("--report",            help="Output Markdown path")
+    parser.add_argument("--ai-model",          help="LLM model (default: SKILL_AUDIT_AI_MODEL env var)")
     args = parser.parse_args()
 
     notes: List[str] = []
-    target: Path | None = None
+    target: Optional[Path] = None
+
     if args.input:
         target = Path(args.input).expanduser().resolve()
         if not target.exists():
-            print(f"输入路径不存在：{target}", file=sys.stderr)
+            print(f"Input path does not exist: {target}", file=sys.stderr)
             return 1
     elif args.evm_address:
         api_key = args.etherscan_api_key or os.getenv("ETHERSCAN_API_KEY")
-        fetched_dir, fetch_note = download_onchain_sources(args.evm_address, args.network.lower(), api_key)
+        fetched_dir, fetch_note = download_onchain_sources(
+            args.evm_address, args.network.lower(), api_key
+        )
         if not fetched_dir:
-            print("❌ 无法从链上获取源码（请确认地址已验证或配置 Etherscan/Sourcify）", file=sys.stderr)
+            print("❌ Failed to download on-chain source (verify address or configure Etherscan/Sourcify)", file=sys.stderr)
             return 1
         target = fetched_dir
         if fetch_note:
             notes.append(fetch_note)
     else:
-        print("必须提供 --input 或 --evm-address", file=sys.stderr)
+        print("Must provide --input or --evm-address", file=sys.stderr)
         return 1
 
     chain_hint = args.chain or ("evm" if args.evm_address else None)
-    chain = detect_chain(target, chain_hint)
-    resolved_target, root_note = _resolve_project_path(target)
-    if root_note:
-        notes.append(root_note)
-    target = resolved_target
+    chain  = detect_chain(target, chain_hint)
+    target, _ = _resolve_project_path(target)
 
     scope = args.scope or slugify(target.stem if target.is_file() else target.name)
-    report_path = Path(args.report).expanduser().resolve() if args.report else Path.cwd() / "reports" / f"{scope}-multichain-audit.md"
-    bundle_path = (
-        Path(args.bundle).expanduser().resolve()
-        if args.bundle
-        else Path.cwd() / "reports" / f"{scope}-sources.md"
+    report_path = (
+        Path(args.report).expanduser().resolve()
+        if args.report
+        else Path.cwd() / "reports" / f"{scope}-contract-audit.md"
     )
 
-    slither_data = None
-    solana_logs: List[str] | None = None
+    model = args.ai_model or os.getenv("SKILL_AUDIT_AI_MODEL", "gpt-4o-mini")
 
-    bundle_note = bundle_sources(target, bundle_path)
-    if bundle_note:
-        notes.append(bundle_note)
-    else:
-        notes.append("未生成源码聚合（未检测到支持的源码后缀）")
+    # ── Collect source files ──────────────────────────────────────────────────
+    source_files = _collect_source_files(target)
+    if not source_files:
+        print("❌ No supported source files found in the uploaded package.", file=sys.stderr)
+        return 1
 
-    if chain == "evm":
-        notes.extend(_prepare_foundry_project(target))
-        json_path = report_path.with_suffix(".slither.json")
-        ok, message = run_slither(target, json_path, args.slither_bin)
-        if ok:
-            slither_data = parse_slither(json_path)
-        else:
-            notes.append(message)
-        if not slither_data or not slither_data["findings"]:
-            notes.append("Slither 未检出高危项，请继续根据 checklist 手动审计。")
-    else:
-        solana_logs = run_solana_checks(target if target.is_dir() else target.parent, args.run_anchor)
-        if not solana_logs:
-            notes.append("未运行 cargo/anchor 命令（可能未安装相关工具）。")
+    print(f"[ContractAudit] Found {len(source_files)} file(s) to analyze with model={model}")
 
-    report_file = build_report(scope, chain, target, report_path, slither_data, solana_logs, notes)
-    print(f"✅ 报告已生成：{report_file}")
+    # ── Analyze each file with LLM ────────────────────────────────────────────
+    llm_file_results: List[Dict] = []
+    for file_path in source_files:
+        try:
+            code = file_path.read_text(encoding="utf-8", errors="ignore")
+        except Exception as exc:
+            llm_file_results.append({
+                "status": "error", "reason": str(exc),
+                "filename": file_path.name,
+                "overallScore": 100,
+                "hasRisk": False,
+                "dimensionScores":   {k: 100 for k in _DIM_KEYS},
+                "dimensionFindings": {k: []  for k in _DIM_KEYS},
+                "criticalFindings":  [],
+                "recommendation":    "",
+            })
+            continue
+
+        print(f"[ContractAudit] Analyzing {file_path.name} ...")
+        result = _analyze_file_with_llm(file_path.name, code, model, chain)
+        llm_file_results.append(result)
+
+    # ── Generate report ───────────────────────────────────────────────────────
+    report_file = build_report(scope, chain, target, report_path, llm_file_results, notes, model)
+    print(f"✅ Report generated: {report_file}")
     return 0
 
 
