@@ -1124,12 +1124,14 @@ def _build_skill_bundle(paths: List[Path], max_files: int = 200) -> str:
     return "\n\n".join(collected)
 
 
-def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str) -> Dict[str, Any]:
-    """强制执行 AI 代码审查，返回各维度风险分（0-100）和综合风险等级。"""
+def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str, detail: bool = False) -> Dict[str, Any]:
+    """强制执行 AI 代码审查，返回各维度风险分（0-100）和综合风险等级。
+    detail=True 时额外要求 LLM 输出 findings 具体风险项列表。
+    """
     _EMPTY = {"status": "skipped", "reason": "no local skill paths",
               "hasRisk": False, "riskLevel": "none",
               "privacyRisk": 0, "privilegeRisk": 0, "integrityRisk": 0,
-              "dependencyRisk": 0, "stabilityRisk": 0}
+              "dependencyRisk": 0, "stabilityRisk": 0, "findings": []}
 
     paths = []
     for entry in skill_entries or []:
@@ -1163,6 +1165,11 @@ def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str) ->
         client = OpenAI(api_key=xai_key, base_url="https://api.x.ai/v1")
         model_name = model if model.startswith("grok") else "grok-3-mini"
 
+    _findings_schema = (
+        ',\n  "findings": ["<one-line description of specific risk>", ...] '
+        '(up to 5 items; empty array [] if no risk found)'
+        if detail else ""
+    )
     system_prompt = (
         "You are a strict security auditor for AI agent skill packages. "
         "Analyze the provided skill files. "
@@ -1173,7 +1180,7 @@ def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str) ->
         '  "privilegeRisk": <integer 0-100>,\n'
         '  "integrityRisk": <integer 0-100>,\n'
         '  "dependencyRisk": <integer 0-100>,\n'
-        '  "stabilityRisk": <integer 0-100>\n'
+        f'  "stabilityRisk": <integer 0-100>{_findings_schema}\n'
         "}\n"
         "Risk scale: 0=clean, 1-30=low, 31-60=medium, 61-100=high. "
         "riskLevel must match the highest individual score range."
@@ -1195,6 +1202,8 @@ def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str) ->
         stability_r  = max(0, min(100, int(parsed.get("stabilityRisk",  0))))
         has_risk = risk_level != "none" or max(
             privacy_r, privilege_r, integrity_r, dependency_r, stability_r) > 0
+        raw_findings = parsed.get("findings", [])
+        findings = [str(f) for f in raw_findings if f] if isinstance(raw_findings, list) else []
         return {
             "status":         "ok",
             "model":          model_name,
@@ -1205,6 +1214,7 @@ def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str) ->
             "integrityRisk":  integrity_r,
             "dependencyRisk": dependency_r,
             "stabilityRisk":  stability_r,
+            "findings":       findings,
         }
 
     def _call_responses_api() -> Optional[str]:
@@ -1367,6 +1377,7 @@ def generate_report(
     extra_agents: Optional[List[Dict[str, Any]]] = None,
     scan_paths: Optional[List[str]] = None,
     ai_model: Optional[str] = None,
+    ai_detail: bool = False,
 ) -> Dict[str, Any]:
     """
     scan_paths: 原始输入目录列表（始终执行代码扫描，无论 SKILL.md 是否存在）。
@@ -1457,12 +1468,12 @@ def generate_report(
     # ── AI 代码审查（必检项，在评分前执行，结果会影响各维度得分）────────────────
     _model = ai_model or os.getenv("SKILL_AUDIT_AI_MODEL", "")
     report["aiReview"] = (
-        run_ai_review(skills, _model, "zh")
+        run_ai_review(skills, _model, "zh", detail=ai_detail)
         if _model
         else {"status": "skipped", "reason": "未配置 AI 模型（设置 SKILL_AUDIT_AI_MODEL 环境变量）",
               "hasRisk": False, "riskLevel": "none",
               "privacyRisk": 0, "privilegeRisk": 0, "integrityRisk": 0,
-              "dependencyRisk": 0, "stabilityRisk": 0}
+              "dependencyRisk": 0, "stabilityRisk": 0, "findings": []}
     )
 
     # Derive all five dimension scores directly from checklist findings so every
@@ -1630,9 +1641,11 @@ def _compute_checklist_scores(report: Dict[str, Any]) -> Dict[str, int]:
         if "version"     not in cfg_keys_lower:  risk_failure += 10  # missing version
         if "description" not in cfg_keys_lower:  risk_failure += 5   # missing description
 
-    # ── 🤖 AI 代码审查扣分（各维度按 AI 风险分的 1/4 扣除，上限 25）──────────────
+    # ── 🤖 AI 代码审查扣分（仅 medium / high 风险触发，low 不扣分）──────────────
+    # riskLevel "low" 代表极轻微风险，不足以影响评分，避免所有维度均匀扣 1 分的假象。
     ai_review = report.get("aiReview") or {}
-    if ai_review.get("status") == "ok" and ai_review.get("hasRisk"):
+    _ai_risk_level = ai_review.get("riskLevel", "none")
+    if ai_review.get("status") == "ok" and _ai_risk_level in ("medium", "high"):
         risk_privacy   += min(25, ai_review.get("privacyRisk",    0) // 4)
         risk_privilege += min(25, ai_review.get("privilegeRisk",  0) // 4)
         risk_integrity += min(25, ai_review.get("integrityRisk",  0) // 4)
@@ -1703,7 +1716,7 @@ def save_report(report: Dict[str, Any], output: Path) -> None:
     _secure_write(output, payload)
 
 
-def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
+def to_markdown(report: Dict[str, Any], lang: str = "en", ai_detail: bool = False) -> str:
     """Render the audit report as a professional, checklist-driven Markdown document.
 
     Each security check is listed individually with a ✅ / ❌ / ⚠️ status so
@@ -2204,19 +2217,42 @@ def to_markdown(report: Dict[str, Any], lang: str = "en") -> str:
     lines += ["---", "", "## 🤖 AI Code Review", ""]
     ai_status = ai_review.get("status", "skipped")
     if ai_status == "ok":
+        # Risk Level 图标映射
+        _rl_icon = {"none": "🟢", "low": "🟡", "medium": "🟠", "high": "🔴"}
+        _rl = ai_review.get("riskLevel", "none").lower()
+        _rl_display = f"{_rl_icon.get(_rl, '⚪')} {_rl.capitalize()}"
+
         if ai_review.get("hasRisk"):
             lines += [
-                "| Check | Status |",
-                "| --- | :---: |",
-                "| AI Code Security Review | ⚠️ Risk Detected |",
+                "| Check | Status | Risk Level |",
+                "| --- | :---: | :---: |",
+                f"| AI Code Security Review | ⚠️ Risk Detected | {_rl_display} |",
                 "",
-                "> AI review identified potential security risks. Risk scores have been applied to the dimension scores above.",
             ]
+            if ai_detail:
+                # 开关打开：展示各维度风险分 + 具体风险项
+                lines += [
+                    "| Dimension | Risk Score |",
+                    "| --- | :---: |",
+                    f"| 🔏 Privacy | {ai_review.get('privacyRisk', 0)}/100 |",
+                    f"| 🔐 Privilege | {ai_review.get('privilegeRisk', 0)}/100 |",
+                    f"| 🛡️ Integrity | {ai_review.get('integrityRisk', 0)}/100 |",
+                    f"| 🔗 Dependency Risk | {ai_review.get('dependencyRisk', 0)}/100 |",
+                    f"| ✅ Stability | {ai_review.get('stabilityRisk', 0)}/100 |",
+                    "",
+                ]
+                findings = ai_review.get("findings") or []
+                if findings:
+                    lines.append("**Findings:**")
+                    for f in findings[:5]:
+                        lines.append(f"- {f}")
+                    lines.append("")
+            lines.append("> AI review identified potential security risks. Risk scores have been applied to the dimension scores above.")
         else:
             lines += [
-                "| Check | Status |",
-                "| --- | :---: |",
-                "| AI Code Security Review | ✅ Pass |",
+                "| Check | Status | Risk Level |",
+                "| --- | :---: | :---: |",
+                f"| AI Code Security Review | ✅ Pass | {_rl_display} |",
             ]
     elif ai_status == "error":
         lines.append(f"> ⚠️ AI review unavailable: {ai_review.get('reason', 'unknown')}")
@@ -2234,6 +2270,9 @@ def main() -> None:
     parser.add_argument("--lang", choices=["en", "zh"], default="en", help="Report language (default: en)")
     parser.add_argument("--ai-review", action="store_true", help="Send skill contents to an AI reviewer (requires OPENAI_API_KEY)")
     parser.add_argument("--ai-model", default=os.getenv("SKILL_AUDIT_AI_MODEL", "gpt-4o-mini"), help="Model to use when --ai-review is enabled")
+    parser.add_argument("--ai-detail", action="store_true",
+                        default=os.getenv("SKILL_AUDIT_AI_DETAIL", "").lower() in ("1", "true", "yes"),
+                        help="Show detailed AI review findings in report (env: SKILL_AUDIT_AI_DETAIL)")
     parser.add_argument("--skill-path", action="append", default=[], help="Local skill paths (file or directory)")
     parser.add_argument("--skill-url", action="append", default=[], help="Remote skill URLs")
     parser.add_argument("--agent-path", action="append", default=[], help="Local agent JSON files or openclaw.json excerpts")
@@ -2249,12 +2288,13 @@ def main() -> None:
         extra_agents=extra_agents,
         scan_paths=args.skill_path,
         ai_model=args.ai_model,
+        ai_detail=args.ai_detail,
     )
     if args.output:
         save_report(report, args.output)
         print(f"✅ JSON report saved to {args.output.name}")
     if args.markdown:
-        _secure_write(args.markdown, to_markdown(report, args.lang))
+        _secure_write(args.markdown, to_markdown(report, args.lang, args.ai_detail))
         print(f"✅ Markdown report saved to {args.markdown.name}")
     if not args.output and not args.markdown:
         print("Audit completed, but no output path was provided.")

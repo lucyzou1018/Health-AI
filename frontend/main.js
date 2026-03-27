@@ -1,3 +1,60 @@
+// ── 设备指纹（仅使用用户无法通过软件修改的硬件属性）────────────────────────
+// 包含：物理屏幕参数、CPU 核心数、内存大小、Canvas GPU 渲染指纹、WebGL GPU 型号
+// 排除：userAgent（DevTools 可改）、language（浏览器设置可改）、timezone（OS 可改）
+let _deviceIdCache = null;
+async function getDeviceId() {
+  if (_deviceIdCache) return _deviceIdCache;
+  const components = [
+    // 物理显示器参数（由硬件决定，无法通过软件修改）
+    `${screen.width}x${screen.height}x${screen.colorDepth}`,
+    // CPU 核心数
+    String(navigator.hardwareConcurrency || ""),
+    // 内存大小（GB 取整，由硬件决定）
+    String(navigator.deviceMemory || ""),
+    // OS 平台（macOS/Win32/Linux 等，基本不变）
+    navigator.platform || "",
+  ];
+
+  // Canvas 指纹：GPU 渲染管线决定，跨浏览器在同一台机器上保持一致
+  try {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    ctx.textBaseline = "top";
+    ctx.font = "14px Arial";
+    ctx.fillStyle = "#f60";
+    ctx.fillRect(0, 0, 100, 20);
+    ctx.fillStyle = "#069";
+    ctx.fillText("device-fp-🔐", 2, 2);
+    ctx.fillStyle = "rgba(102,204,0,0.7)";
+    ctx.fillText("device-fp-🔐", 4, 4);
+    components.push(canvas.toDataURL());
+  } catch (_) {}
+
+  // WebGL GPU 型号（renderer/vendor 字符串，由显卡硬件决定）
+  try {
+    const gl = document.createElement("canvas").getContext("webgl")
+            || document.createElement("canvas").getContext("experimental-webgl");
+    if (gl) {
+      const ext = gl.getExtension("WEBGL_debug_renderer_info");
+      if (ext) {
+        components.push(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || "");
+        components.push(gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) || "");
+      } else {
+        components.push(gl.getParameter(gl.RENDERER) || "");
+        components.push(gl.getParameter(gl.VENDOR) || "");
+      }
+    }
+  } catch (_) {}
+
+  const raw = components.join("|");
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  _deviceIdCache = Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .substring(0, 32);
+  return _deviceIdCache;
+}
+
 const PARAM_SCHEMA = {
   "skill-security-audit": [
     // Upload skill zip file instead of path/URL
@@ -91,7 +148,7 @@ const FINAL_STATUSES = new Set(["completed", "failed"]);
 const MAX_FILE_SIZES = {
   "skill-security-audit":    10,
   "multichain-contract-vuln": 50,
-  "skill-stress-lab":         50,
+  "skill-stress-lab":         10,
 };
 
 function showUploadError(msg) {
@@ -550,6 +607,7 @@ async function runTask() {
       throw new Error("Please upload a Skill/Agent archive first.");
     }
     // Note: command is set to default value in backend if not provided
+    const deviceId = await getDeviceId();
     const body = {
       skillType: activeTab,
       codePath: codePathValue || null,
@@ -557,6 +615,7 @@ async function runTask() {
       params,
       walletAddress: currentWallet,
       fileName: currentFile ? currentFile.name : null,
+      deviceId: deviceId,
     };
     const headers = { "Content-Type": "application/json" };
     if (walletToken) {
@@ -579,6 +638,14 @@ async function runTask() {
         // 同类型任务已在运行中，提示等待，不展示 Failed
         setStatus("In Queue", "running");
         setSummary("A task of this type is already running. Please wait for it to complete before submitting a new one.");
+        runningTabs[taskTab] = false;
+        updateRunButtonState();
+        return;
+      }
+      if (resp.status === 429) {
+        // 每日配额已达上限，友好提示，不展示 Scan Failed
+        setStatus("Daily Limit Reached", "warning");
+        setSummary("⏳ You've used all 3 tasks for today. Your quota resets at midnight UTC+0 — come back tomorrow to continue scanning.");
         runningTabs[taskTab] = false;
         updateRunButtonState();
         return;

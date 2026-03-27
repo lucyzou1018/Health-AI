@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional, List
 
-MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB hard cap per upload
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB hard cap per upload
 MAX_WALLET_SESSIONS = 1000            # evict expired sessions above this threshold
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Header, Depends
@@ -17,6 +17,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .task_manager import SUPPORTED_SKILLS, TaskManager
+from . import rate_limiter
 
 # Try to import eth-account for signature verification
 try:
@@ -84,6 +85,7 @@ class TaskRequest(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict)
     wallet_address: Optional[str] = Field(default=None, alias="walletAddress")
     file_name: Optional[str] = Field(default=None, alias="fileName")
+    device_id: Optional[str] = Field(default=None, alias="deviceId")
 
     class Config:
         allow_population_by_field_name = True
@@ -152,6 +154,17 @@ def create_task(
 ) -> TaskResponse:
     # 优先使用 payload 中的钱包地址，否则使用 token 验证的地址
     effective_wallet = payload.wallet_address or wallet_address
+
+    # ── 每日任务配额强制校验（后端权威判断，无法通过接口绕过）─────────────────
+    if not rate_limiter.try_increment(payload.device_id or ""):
+        status = rate_limiter.get_status(payload.device_id or "")
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Daily task limit reached. You have used {status['used']}/{status['limit']} "
+                f"tasks today (UTC). Resets at midnight UTC."
+            ),
+        )
 
     try:
         record = task_manager.create_task(

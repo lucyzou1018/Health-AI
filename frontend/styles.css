@@ -472,6 +472,12 @@ button#run-task:active {
   color: var(--error);
 }
 
+.status.warning {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.5);
+  color: #f59e0b;
+}
+
 .task-summary {
   margin: 0;
   color: var(--text-secondary);
@@ -3336,14 +3342,15 @@ body:not(.landing-only) .ambient-glow {
 }
 
 /* Hide idle visual when a task state is active */
-#result-panel:has(.status.running) .result-idle-visual,
-#result-panel:has(.status.success) .result-idle-visual,
-#result-panel:has(.status.error)   .result-idle-visual {
+#result-panel:has(.status.running)  .result-idle-visual,
+#result-panel:has(.status.success)  .result-idle-visual,
+#result-panel:has(.status.error)    .result-idle-visual,
+#result-panel:has(.status.warning)  .result-idle-visual {
   display: none;
 }
 
 /* Hide default summary text on idle (idle visual covers it) */
-#result-panel:not(:has(.status.running)):not(:has(.status.success)):not(:has(.status.error)) #task-summary {
+#result-panel:not(:has(.status.running)):not(:has(.status.success)):not(:has(.status.error)):not(:has(.status.warning)) #task-summary {
   display: none;
 }
 

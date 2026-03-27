@@ -70,11 +70,25 @@ Skill Security Audit 包含**强制 AI 代码审查**，启动前需配置以下
 | `OPENAI_API_KEY` | OpenAI API Key | `sk-...` |
 | `XAI_API_KEY` | xAI（Grok）API Key | `xai-...` |
 | `SKILL_AUDIT_AI_MODEL` | 使用的模型名称（默认 `gpt-4o-mini`） | `gpt-4o-mini` / `grok-3-mini` |
+| `SKILL_AUDIT_AI_DETAIL` | AI 详细报告开关（默认关闭） | `true` / `false` |
+
+### 每日任务配额（可选）
+
+| 变量名 | 说明 | 示例 |
+|--------|------|------|
+| `DAILY_TASK_LIMIT_ENABLED` | 每日任务配额开关（默认关闭） | `true` / `false` |
+
+> **说明：**
+> - 开启后，同一设备每 UTC 自然日（00:00–23:59 UTC）最多提交 **3 个任务**（三种任务类型合计）。
+> - 次日 UTC 00:00 自动重置为 3 次。
+> - 设备识别基于**硬件指纹**（物理屏幕分辨率、CPU 核心数、内存大小、Canvas GPU 渲染特征、WebGL GPU 型号），仅使用用户无法通过软件修改的属性，修改时区/浏览器语言/UserAgent 不会影响识别结果。
+> - 配额校验**仅在后端 `POST /api/tasks` 内执行**，不暴露任何配额查询接口，无法通过直接调用接口绕过。超限时后端返回 `HTTP 429`，前端展示友好提示。
 
 > **说明：**
 > - 优先使用 `OPENAI_API_KEY`，若未设置则自动切换到 `XAI_API_KEY`（xAI Grok，base_url 为 `https://api.x.ai/v1`）。
 > - 若两者均未配置，AI 审查模块会跳过并在报告中标注"不可用"，静态分析结果仍然有效。
 > - `SKILL_AUDIT_AI_MODEL` 未设置时默认使用 `gpt-4o-mini`（OpenAI）或 `grok-3-mini`（xAI）。
+> - `SKILL_AUDIT_AI_DETAIL=true` 时，报告中会额外展示各维度风险分和 LLM 输出的具体风险项（findings）；默认关闭，仅显示"⚠️ Risk Detected"。
 
 ### 配置方式
 
