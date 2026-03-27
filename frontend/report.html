@@ -530,27 +530,27 @@
             return 'high';
           }
 
-          // --- Parse key metrics from original summary section ---
-          const successRateM = reportText.match(/(?:Successes|成功次数):\s*(\d+)\s*\(([^)]+)\)/);
-          const totalRunsM   = reportText.match(/(?:Total Runs|总次数):\s*(\d+)/);
-          const avgDurM      = reportText.match(/(?:Avg Duration|平均耗时):\s*([\d.]+)s/);
-          const p95DurM      = reportText.match(/(?:P95 Duration|P95\s*耗时):\s*([\d.]+)s/);
-          const testRunsM    = reportText.match(/(?:Test Runs|测试轮次)\*?\*?:\s*(\d+)/);
-          const concurrencyM = reportText.match(/(?:Concurrency|并发度)\*?\*?:\s*(\d+)/);
+          // --- Parse key metrics (supports both list "- Key: Val" and table "| Key | Val |" formats) ---
+          const successRateM = reportText.match(/(\d+)\/(\d+)\s*\(([^)]+)\)/);
+          const totalRunsM   = reportText.match(/(?:Total Runs|总次数)[:\s|]*(\d+)/);
+          const avgDurM      = reportText.match(/Avg Duration[:\s|]*([\d.]+)s/);
+          const p95DurM      = reportText.match(/P95 Duration[:\s|]*([\d.]+)s/);
+          const testRunsM    = reportText.match(/Test Runs[:\s|]*(\d+)/);
+          const concurrencyM = reportText.match(/Concurrency[:\s|]*(\d+)/);
           const commandM     = reportText.match(/Command:\s*`([^`]+)`/);
 
-          const totalRuns   = totalRunsM ? parseInt(totalRunsM[1]) : (testRunsM ? parseInt(testRunsM[1]) : 0);
+          const testRuns    = testRunsM ? testRunsM[1] : '0';
+          const totalRuns   = totalRunsM ? parseInt(totalRunsM[1]) : parseInt(testRuns);
           const successes   = successRateM ? parseInt(successRateM[1]) : totalRuns;
-          const successRate = successRateM ? successRateM[2] : (totalRuns ? '100.0%' : '-');
+          const successRate = successRateM ? successRateM[3] : (totalRuns ? '100.0%' : '-');
           const failures    = totalRuns - successes;
           const avgDuration = avgDurM ? avgDurM[1] + 's' : '-';
           const p95Duration = p95DurM ? p95DurM[1] + 's' : '-';
-          const testRuns    = testRunsM ? testRunsM[1] : String(totalRuns);
           const concurrency = concurrencyM ? concurrencyM[1] : '-';
 
           // --- Parse failure samples ---
           const failureSamples = [];
-          const failRegex = /- Run #(\d+) exit (\d+), duration ([\d.]+)s/g;
+          const failRegex = /Run #(\d+)[\s(]*exit (\d+)[,)]\s*(?:duration\s*)?([\d.]+)s/g;
           let fm;
           while ((fm = failRegex.exec(reportText)) !== null) {
             failureSamples.push({ run: fm[1], exitCode: fm[2], duration: fm[3] });
@@ -582,7 +582,7 @@
           }
           html += '</div></div></div>';
 
-          // Performance metrics section
+          // Performance metrics section — 4 cards
           html += '<div class="issues-section" style="margin-bottom:24px;"><div class="issues-header">📈 Performance Metrics</div><div style="padding:16px 20px;">';
           html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">';
           html += '<div style="text-align:center;padding:16px;background:var(--bg-hover);border-radius:var(--radius-sm);"><div style="font-size:24px;font-weight:700;color:' + (failures === 0 ? '#22c55e' : '#ef4444') + ';">' + successRate + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Success Rate</div></div>';

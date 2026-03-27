@@ -480,33 +480,35 @@ class TaskManager:
                 return f"python3 {{skill}}/{candidate}"
         return None
 
-    def _run_security_pre_check(self, code_dir: Path, report_dir: Path) -> int:
-        """Run a Security Audit on the uploaded package and return the overall score.
+    def _run_security_pre_check(self, code_dir: Path, report_dir: Path) -> dict:
+        """Run a Security Audit on the uploaded package and return score + AI review.
 
-        The audit results are saved under report_dir/security_precheck/ so they
-        don't collide with the main stress-test outputs.
+        Returns dict with keys: score (int), aiReview (dict).
+        The audit results are saved under report_dir/security_precheck/.
         """
         precheck_dir = report_dir / "security_precheck"
         precheck_dir.mkdir(parents=True, exist_ok=True)
+        empty_ai = {"status": "skipped", "hasRisk": False, "riskLevel": "none",
+                     "privacyRisk": 0, "privilegeRisk": 0, "integrityRisk": 0,
+                     "dependencyRisk": 0, "stabilityRisk": 0}
         try:
             result = self._run_security_audit(code_dir, precheck_dir, {})
         except Exception as exc:
-            # If the security audit itself fails, treat as score 0 (block)
             print(f"[TaskManager] Security pre-check audit error: {exc}")
-            return 0
+            return {"score": 0, "aiReview": empty_ai}
 
-        # Parse the overall score from the JSON report
         summary_path = result.get("summary", "")
         if summary_path:
             try:
                 data = json.loads(Path(summary_path).read_text(encoding="utf-8"))
                 score = int(data.get("overallScore", 0))
-                print(f"[TaskManager] Security pre-check score: {score}/100")
-                return score
+                ai_review = data.get("aiReview", empty_ai) or empty_ai
+                print(f"[TaskManager] Security pre-check score: {score}/100, AI review: {ai_review.get('status')}")
+                return {"score": score, "aiReview": ai_review}
             except Exception as exc:
                 print(f"[TaskManager] Failed to parse security pre-check score: {exc}")
-                return 0
-        return 0
+                return {"score": 0, "aiReview": empty_ai}
+        return {"score": 0, "aiReview": empty_ai}
 
     # Patterns to detect mandatory arguments in Python source code
     _RE_REQUIRED_TRUE = re.compile(r'add_argument\s*\([^)]*required\s*=\s*True', re.DOTALL)
@@ -575,7 +577,9 @@ class TaskManager:
 
         # ── Step 2: Security Audit pre-check ─────────────────────────────
         #   Only reached if the skill can run without extra arguments.
-        audit_score = self._run_security_pre_check(code_dir, report_dir)
+        precheck = self._run_security_pre_check(code_dir, report_dir)
+        audit_score = precheck["score"]
+        ai_review = precheck["aiReview"]
         if audit_score < self.STRESS_MIN_SECURITY_SCORE:
             raise RuntimeError(
                 "This Skill contains high-risk operations and is not eligible for stress testing. "
@@ -613,9 +617,9 @@ class TaskManager:
             cmd.extend(["--api-count-file", str(params["apiCountFile"])])
         self._run_command(cmd, cwd=self.repo_root, log_file=log_file)
         
-        # Generate enhanced report with 5-dimension scores
+        # Generate enhanced report with 5-dimension scores + AI review
         enhanced_md = report_dir / "stress_report.md"
-        self._generate_stress_lab_report(summary_md, enhanced_md, runs, concurrency)
+        self._generate_stress_lab_report(summary_md, enhanced_md, runs, concurrency, ai_review)
         
         summary_payload = {
             "runs": runs,
@@ -634,8 +638,8 @@ class TaskManager:
             "message": "Stress test completed",
         }
 
-    def _generate_stress_lab_report(self, summary_md: Path, output_md: Path, runs: int, concurrency: int) -> None:
-        """Generate enhanced stress lab report with 5-dimension scoring."""
+    def _generate_stress_lab_report(self, summary_md: Path, output_md: Path, runs: int, concurrency: int, ai_review: dict | None = None) -> None:
+        """Generate enhanced stress lab report with 5-dimension scoring + AI review."""
         original = summary_md.read_text() if summary_md.exists() else ""
 
         # ── Parse all metrics from stress_runner summary ─────────────
@@ -700,42 +704,64 @@ class TaskManager:
         else:
             stability_score = performance_score = resource_score = consistency_score = recovery_score = 0
 
+        # ── Apply AI code review deductions (same logic as security audit) ──
+        ai = ai_review or {}
+        ai_has_risk = ai.get("status") == "ok" and ai.get("hasRisk", False)
+        if ai_has_risk:
+            stability_score   = max(0, stability_score   - min(15, ai.get("stabilityRisk",  0) // 4))
+            performance_score = max(0, performance_score - min(15, ai.get("privacyRisk",     0) // 4))
+            resource_score    = max(0, resource_score    - min(15, ai.get("privilegeRisk",   0) // 4))
+            consistency_score = max(0, consistency_score  - min(15, ai.get("integrityRisk",   0) // 4))
+            recovery_score    = max(0, recovery_score    - min(15, ai.get("dependencyRisk",  0) // 4))
+
         overall_score = int((stability_score + performance_score + resource_score + consistency_score + recovery_score) / 5)
+
+        # ── Rating helper ──────────────────────────────────────────
+        def _rating(score: int) -> str:
+            if score >= 80: return "🟢 Excellent"
+            if score >= 60: return "🔵 Good"
+            if score >= 40: return "🟡 Caution"
+            return "🔴 Risk"
 
         # ── Build clean report ───────────────────────────────────────
         # NOTE: Frontend report.html parses with regex like "Test Runs: N",
         #       "Successes: N (XX%)", "Avg Duration: X.Xs", "Stability ... N/100".
         #       Use plain "Key: Value" format so frontend regex can extract values.
+        test_status = "Pass" if failures == 0 and has_data else ("Fail" if has_data else "N/A")
+        status_icon = "✅" if test_status == "Pass" else ("❌" if test_status == "Fail" else "⚪")
         lines = [
             "# Skill Stress Lab Report",
             "",
             "## Test Configuration",
             "",
-            f"- Test Runs: {total_runs}",
-            f"- Concurrency: {concurrency}",
-            f"- Skill: {skill_name}",
+            "| Item | Value |",
+            "|------|-------|",
+            f"| Test Runs | {total_runs} |",
+            f"| Concurrency | {concurrency} |",
+            f"| Skill | {skill_name} |",
             "",
             "## Performance Metrics",
             "",
-            f"- Total Runs: {total_runs}",
-            f"- Successes: {successes} ({success_rate*100:.1f}%)",
-            f"- Avg Duration: {avg_duration:.4f}s",
-            f"- P95 Duration: {p95_duration:.4f}s",
-            f"- Min Duration: {min_duration:.4f}s",
-            f"- Max Duration: {max_duration:.4f}s",
-            f"- Std Deviation: {std_deviation:.4f}s",
+            "| Metric | Value | Status |",
+            "|--------|-------|--------|",
+            f"| **Success Rate** | **{successes}/{total_runs} ({success_rate*100:.1f}%)** | {status_icon} {test_status} |",
+            f"| Avg Duration | {avg_duration:.4f}s | {'✅ Pass' if avg_duration <= 10 else '❌ Fail'} |",
+            f"| P95 Duration | {p95_duration:.4f}s | {'✅ Pass' if p95_duration <= 30 else '❌ Fail'} |",
+            f"| Min Duration | {min_duration:.4f}s | ✅ Pass |",
+            f"| Max Duration | {max_duration:.4f}s | {'✅ Pass' if max_duration <= 60 else '❌ Fail'} |",
+            f"| Std Deviation | {std_deviation:.4f}s | {'✅ Pass' if std_deviation <= 5 else '❌ Fail'} |",
             "",
             "## Five-Dimension Scores",
             "",
-            f"| Dimension | Score | Description |",
-            f"|-----------|-------|-------------|",
-            f"| 🛡️ Stability | {stability_score}/100 | Success rate under concurrent load |",
-            f"| ⚡ Performance | {performance_score}/100 | Response time (P95-based) |",
-            f"| 💾 Resource | {resource_score}/100 | Resource efficiency under load |",
-            f"| 🔄 Consistency | {consistency_score}/100 | Result repeatability |",
-            f"| 🆘 Recovery | {recovery_score}/100 | Failure tolerance and recovery |",
+            f"| Dimension | Score | Rating | Description |",
+            f"|-----------|-------|--------|-------------|",
+            f"| 🛡️ Stability | {stability_score}/100 | {_rating(stability_score)} | Success rate under concurrent load |",
+            f"| ⚡ Performance | {performance_score}/100 | {_rating(performance_score)} | Response time (P95-based) |",
+            f"| 💾 Resource | {resource_score}/100 | {_rating(resource_score)} | Resource efficiency under load |",
+            f"| 🔄 Consistency | {consistency_score}/100 | {_rating(consistency_score)} | Result repeatability |",
+            f"| 🆘 Recovery | {recovery_score}/100 | {_rating(recovery_score)} | Failure tolerance and recovery |",
             "",
-            f"**Overall Score: {overall_score}/100**",
+            f"**Overall Score: {overall_score}/100** ({_rating(overall_score)})",
         ]
 
         if failure_samples:
