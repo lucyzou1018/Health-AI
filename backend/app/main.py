@@ -364,6 +364,5 @@ def get_wallet_info(wallet_address: str = Depends(verify_wallet_token)):
     return {"wallet_address": wallet_address}
 
 
-FRONTEND_DIR = REPO_ROOT / "frontend"
-if FRONTEND_DIR.exists():
-    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+# Frontend static mounting disabled in server deployment.
+# Frontend is served by Vercel; backend only exposes API routes.
