@@ -601,11 +601,7 @@ async function runTask() {
     }
     // 任务结束：原地更新历史记录状态
     if (finalTask) upsertHistoryTask(finalTask);
-    // Reset upload zone on success so the user knows the scan is done
-    // and the panel is ready for a new package.
-    if (finalTask && finalTask.status === "completed") {
-      clearCurrentFile();
-    }
+    // Keep the uploaded file visible after completion — user can manually remove it.
   } catch (err) {
     setStatus("Failed", "error");
     const message = err instanceof Error ? err.message : String(err);
