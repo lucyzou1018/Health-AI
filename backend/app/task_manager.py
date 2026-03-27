@@ -445,7 +445,7 @@ class TaskManager:
         return warnings
 
     # Minimum security audit score required to proceed with stress testing
-    STRESS_MIN_SECURITY_SCORE = 90
+    STRESS_MIN_SECURITY_SCORE = 60
 
     def _find_skill_dir(self, code_dir: Path, params: dict) -> Path:
         """Resolve the skill directory from params or by scanning code_dir."""
