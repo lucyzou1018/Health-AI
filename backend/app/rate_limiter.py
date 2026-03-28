@@ -1,9 +1,8 @@
 """
-每日任务提交限流模块。
+Daily task rate-limiter.
 
-开关：环境变量 DAILY_TASK_LIMIT_ENABLED=true（默认关闭）。
-规则：同一设备每 UTC 自然日最多提交 3 个任务（三种类型合计）。
-设备识别：由前端生成的设备指纹哈希（device_id）标识，与钱包地址无关。
+Toggle: set DAILY_TASK_LIMIT_ENABLED=true (disabled by default).
+Rule:   each client IP may submit at most DAILY_LIMIT tasks per UTC calendar day (all skill types combined).
 """
 from __future__ import annotations
 
@@ -37,66 +36,52 @@ def _load() -> Dict[str, Any]:
     return {}
 
 
-def _save(data: Dict[str, Any]) -> None:
-    _STORAGE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    _STORAGE_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-
-
-def get_status(device_id: str) -> Dict[str, Any]:
-    """返回设备今日配额使用情况，不消耗配额。"""
-    if not _is_enabled():
-        return {
-            "enabled": False,
-            "used": 0,
-            "limit": DAILY_LIMIT,
-            "remaining": DAILY_LIMIT,
-            "allowed": True,
-        }
-    if not device_id:
-        return {
-            "enabled": True,
-            "used": 0,
-            "limit": DAILY_LIMIT,
-            "remaining": DAILY_LIMIT,
-            "allowed": True,
-        }
-
+def _prune(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove stale date entries (older than today) to keep the file compact."""
     today = _today_utc()
-    with _lock:
-        data = _load()
-        used = data.get(device_id, {}).get(today, 0)
-
-    remaining = max(0, DAILY_LIMIT - used)
     return {
-        "enabled": True,
-        "used": used,
-        "limit": DAILY_LIMIT,
-        "remaining": remaining,
-        "allowed": used < DAILY_LIMIT,
-        "date": today,
+        ip: {date: count for date, count in dates.items() if date >= today}
+        for ip, dates in data.items()
+        if any(date >= today for date in dates)
     }
 
 
-def try_increment(device_id: str) -> bool:
-    """
-    尝试消耗一次今日配额。
-    返回 True 表示允许并已记录；返回 False 表示已达上限，不记录。
-    """
+def _save(data: Dict[str, Any]) -> None:
+    _STORAGE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _STORAGE_PATH.write_text(json.dumps(_prune(data), indent=2, ensure_ascii=False), encoding="utf-8")
+
+
+def get_status(client_ip: str) -> Dict[str, Any]:
+    """Return the IP's daily quota usage without consuming a slot."""
     if not _is_enabled():
-        return True
-    if not device_id:
+        return {"enabled": False, "used": 0, "limit": DAILY_LIMIT, "remaining": DAILY_LIMIT, "allowed": True}
+    if not client_ip:
+        return {"enabled": True, "used": 0, "limit": DAILY_LIMIT, "remaining": DAILY_LIMIT, "allowed": True}
+
+    today = _today_utc()
+    with _lock:
+        used = _load().get(client_ip, {}).get(today, 0)
+
+    remaining = max(0, DAILY_LIMIT - used)
+    return {"enabled": True, "used": used, "limit": DAILY_LIMIT, "remaining": remaining, "allowed": used < DAILY_LIMIT, "date": today}
+
+
+def try_increment(client_ip: str) -> bool:
+    """
+    Attempt to consume one daily quota slot.
+    Returns True if allowed (slot recorded); False if the daily limit is already reached.
+    """
+    if not _is_enabled() or not client_ip:
         return True
 
     today = _today_utc()
     with _lock:
         data = _load()
-        device_data = data.get(device_id, {})
-        used = device_data.get(today, 0)
-
+        ip_data = data.get(client_ip, {})
+        used = ip_data.get(today, 0)
         if used >= DAILY_LIMIT:
             return False
-
-        device_data[today] = used + 1
-        data[device_id] = device_data
+        ip_data[today] = used + 1
+        data[client_ip] = ip_data
         _save(data)
         return True

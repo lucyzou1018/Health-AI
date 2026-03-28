@@ -38,8 +38,8 @@ class TaskRecord:
     summary_path: Optional[str] = None
     log_path: Optional[str] = None
     params: Dict[str, Any] = field(default_factory=dict)
-    wallet_address: Optional[str] = None  # 关联的钱包地址
-    file_name: Optional[str] = None  # 上传文件的原始文件名
+    wallet_address: Optional[str] = None
+    file_name: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         payload = asdict(self)
@@ -59,7 +59,7 @@ class TaskManager:
         self._lock = threading.Lock()
         self.executor = ThreadPoolExecutor(max_workers=2)
         self._load_index()
-        self._recover_orphaned_tasks()  # 服务重启时恢复孤儿任务
+        self._recover_orphaned_tasks()
 
     # --------------------------- persistence ---------------------------
     def _load_index(self) -> None:
@@ -72,13 +72,14 @@ class TaskManager:
         except Exception:
             self.tasks = {}
 
-    # 刚创建的任务在此秒数内不会被视为孤儿（防止 reload 时误杀）
+    # Tasks created within this window are not considered orphans, so uvicorn
+    # --reload does not accidentally fail tasks that were just submitted.
     ORPHAN_GRACE_SECONDS = 30
 
     def _recover_orphaned_tasks(self) -> None:
-        """服务重启时，将孤儿任务（running/queued）标记为 failed。
-        仅处理 created_at 超过 ORPHAN_GRACE_SECONDS 秒的任务，
-        避免在 uvicorn --reload 时将刚提交的任务误杀。"""
+        """On startup, mark stuck running/queued tasks as failed.
+        Tasks created within ORPHAN_GRACE_SECONDS are skipped to avoid
+        killing tasks that were submitted right before a hot-reload."""
         from datetime import timezone
         now_ts = datetime.now(timezone.utc).timestamp()
         orphaned = []
@@ -99,7 +100,7 @@ class TaskManager:
         for task_id in orphaned:
             record = self.tasks[task_id]
             record.status = "failed"
-            record.message = "服务已重启，任务中断。请重新提交文件进行分析。"
+            record.message = "Service restarted — task was interrupted. Please re-submit."
             record.updated_at = _now()
         self._save_index()
         print(f"[TaskManager] Recovered {len(orphaned)} orphaned task(s) on startup.")
@@ -135,13 +136,16 @@ class TaskManager:
         src = matches[0]
         dest.mkdir(parents=True, exist_ok=True)
         suffix = src.suffix.lower()
-        if suffix == ".skill":
-            shutil.unpack_archive(str(src), dest, format="zip")
-        elif suffix in {".zip", ".tar", ".gz", ".bz2", ".xz"}:
-            shutil.unpack_archive(str(src), dest)
+        if suffix in {".skill", ".zip", ".tar", ".gz", ".bz2", ".xz"}:
+            fmt = "zip" if suffix == ".skill" else None
+            shutil.unpack_archive(str(src), dest, format=fmt)
+            # Path traversal guard: ensure no extracted file escapes dest
+            dest_resolved = dest.resolve()
+            for extracted in dest.rglob("*"):
+                if not str(extracted.resolve()).startswith(str(dest_resolved)):
+                    raise ValueError(f"Archive contains unsafe path: {extracted.name}")
         else:
-            target = dest / src.name
-            shutil.copyfile(src, target)
+            shutil.copyfile(src, dest / src.name)
 
     # --------------------------- tasks ---------------------------
     def create_task(
@@ -156,7 +160,7 @@ class TaskManager:
         if skill_type not in SUPPORTED_SKILLS:
             raise ValueError(f"unsupported skill_type: {skill_type}")
         if not code_path and not upload_id:
-            raise ValueError("codePath 或 uploadId 必须至少提供一个")
+            raise ValueError("Either codePath or uploadId must be provided")
         task_id = uuid.uuid4().hex
         record = TaskRecord(
             task_id=task_id,
@@ -214,7 +218,7 @@ class TaskManager:
             return self._snapshot(record)
 
     def get_tasks_by_wallet(self, wallet_address: str, skill_type: Optional[str] = None, limit: int = 50) -> list:
-        """获取指定钱包的分析历史"""
+        """Return analysis history for the given wallet address."""
         wallet_lower = wallet_address.lower()
         with self._lock:
             # Only snapshot matching records; release lock before any sorting/filtering.
@@ -234,7 +238,7 @@ class TaskManager:
     def _copy_code(self, source: Path, dest: Path) -> None:
         src = source.expanduser().resolve()
         if not src.exists():
-            raise FileNotFoundError(f"代码路径不存在：{src}")
+            raise FileNotFoundError(f"Code path does not exist: {src}")
         if src.is_dir():
             shutil.copytree(src, dest, dirs_exist_ok=True)
         else:
@@ -256,8 +260,7 @@ class TaskManager:
         record.message = result.get("message", "")
         return result
 
-    # 单个子进程最长执行时间（秒）。超过视为卡死，强制终止。
-    SUBPROCESS_TIMEOUT = 600  # 10 分钟
+    SUBPROCESS_TIMEOUT = 600  # 10 minutes; processes exceeding this are killed
 
     def _run_command(
         self,
@@ -282,11 +285,11 @@ class TaskManager:
         except subprocess.TimeoutExpired:
             log_file.write_text(
                 "$ " + " ".join(cmd) + "\n\n"
-                + f"[ERROR] 执行超时（超过 {self.SUBPROCESS_TIMEOUT} 秒）\n"
+                + f"[ERROR] Timed out after {self.SUBPROCESS_TIMEOUT} seconds\n"
             )
             raise RuntimeError(
-                f"分析超时（超过 {self.SUBPROCESS_TIMEOUT // 60} 分钟）。"
-                "请检查文件是否过大或脚本是否存在死循环。"
+                f"Analysis timed out (exceeded {self.SUBPROCESS_TIMEOUT // 60} minutes). "
+                "The file may be too large or the script encountered an infinite loop."
             )
         log_file.write_text(
             "$ " + " ".join(cmd) + "\n\n"
@@ -294,10 +297,7 @@ class TaskManager:
             + "[stderr]\n" + (proc.stderr or "") + "\n"
         )
         if proc.returncode != 0:
-            raise RuntimeError(
-                f"命令执行失败 (exit {proc.returncode})。\n"
-                f"[stderr] {(proc.stderr or '').strip()[:500]}"
-            )
+            raise RuntimeError((proc.stderr or "").strip()[:1000] or "Script exited with non-zero status")
         return proc.stdout
 
     def _run_security_audit(self, code_dir: Path, report_dir: Path, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -313,7 +313,6 @@ class TaskManager:
             "--markdown",
             str(report_md),
         ]
-        # 支持本地路径或远程 URL
         skill_path = params.get("skillPath", "")
         skill_url = params.get("skillUrl", "")
         if skill_url:
@@ -323,10 +322,10 @@ class TaskManager:
             targets = skill_dirs or [str(code_dir)]
             for target in targets:
                 cmd.extend(["--skill-path", target])
-        # 始终开启 AI 代码审查（模型由环境变量 SKILL_AUDIT_AI_MODEL 决定，默认 gpt-4o-mini）
+        # AI model is configurable via SKILL_AUDIT_AI_MODEL env var (default: gpt-4o-mini)
         ai_model = os.environ.get("SKILL_AUDIT_AI_MODEL", "gpt-4o-mini")
         cmd.extend(["--ai-model", ai_model])
-        # 详细 AI 报告开关：SKILL_AUDIT_AI_DETAIL=true 时在报告中展示各维度风险分和具体风险项
+        # Set SKILL_AUDIT_AI_DETAIL=true to include per-dimension risk scores in the report
         if os.environ.get("SKILL_AUDIT_AI_DETAIL", "").lower() in ("1", "true", "yes"):
             cmd.append("--ai-detail")
         self._run_command(cmd, cwd=self.repo_root, log_file=log_file)
@@ -335,15 +334,14 @@ class TaskManager:
             "report": str(report_md),
             "summary": str(report_json),
             "log": str(log_file),
-            "message": "Skill Security Audit 完成",
+            "message": "Skill Security Audit completed.",
             "details": summary_data,
         }
 
     def _run_contract_audit(self, code_dir: Path, report_dir: Path, params: Dict[str, Any]) -> Dict[str, Any]:
-        # ── 文件数上限校验（仅适用于上传包，evm-address 模式跳过）────────────────
+        # File count limit only applies to uploaded packages; skip for on-chain address mode.
         if not params.get("evmAddress"):
-            # 只统计主要合约文件（.sol/.vy/.rs）
-            # 排除 macOS zip 自动生成的 __MACOSX 元数据目录和 ._ 前缀文件
+            # Count only contract source files; exclude macOS __MACOSX metadata and ._-prefixed files.
             _CONTRACT_EXTS = {".sol", ".vy", ".rs"}
             _MAX_CONTRACT_FILES = 10
             _all_files = [
@@ -362,11 +360,9 @@ class TaskManager:
 
         script = self.repo_root / "skills" / "multichain-contract-vuln" / "scripts" / "run_cli.py"
         report_md = report_dir / "contract_audit.md"
-        bundle_md = report_dir / "contract_sources.md"
         log_file = report_dir / "contract_audit.log"
         ai_model = os.environ.get("SKILL_AUDIT_AI_MODEL", "gpt-4o-mini")
-        cmd = ["python3", str(script), "--report", str(report_md),
-               "--ai-model", ai_model]
+        cmd = ["python3", str(script), "--report", str(report_md), "--ai-model", ai_model]
         input_path = params.get("input") or str(code_dir)
         if params.get("evmAddress"):
             cmd.extend(["--evm-address", str(params["evmAddress"])])
@@ -382,23 +378,21 @@ class TaskManager:
         if params.get("etherscanApiKey"):
             env["ETHERSCAN_API_KEY"] = str(params["etherscanApiKey"])
         self._run_command(cmd, cwd=self.repo_root, log_file=log_file, env=env)
-        summary_payload = {
+        summary_json = report_dir / "contract_summary.json"
+        summary_json.write_text(json.dumps({
             "report": str(report_md),
-            "bundle": str(bundle_md),
             "inputs": {
                 "input": input_path,
                 "evmAddress": params.get("evmAddress"),
                 "network": params.get("network"),
                 "chain": params.get("chain"),
             },
-        }
-        summary_json = report_dir / "contract_summary.json"
-        summary_json.write_text(json.dumps(summary_payload, ensure_ascii=False, indent=2))
+        }, ensure_ascii=False, indent=2))
         return {
             "report": str(report_md),
             "summary": str(summary_json),
             "log": str(log_file),
-            "message": "合约漏洞扫描完成",
+            "message": "Contract audit completed.",
         }
 
     # -------------------- upload security scan --------------------
@@ -539,7 +533,7 @@ class TaskManager:
     # Patterns for manual validation: "if not args.xxx" → exit/return/error
     _RE_MANUAL_REQUIRED = re.compile(
         r'(?:if\s+not\s+args\.\w+|'                   # if not args.xxx
-        r'必须提供|must\s+provide|'                      # Chinese/English "must provide"
+        r'must\s+provide|'                              # "must provide"
         r'parser\.error\s*\(|'                          # parser.error(...)
         r'(?:--\w[\w-]+)\s+is\s+required)',             # "--xxx is required"
         re.IGNORECASE,
@@ -551,7 +545,7 @@ class TaskManager:
         Scans the source code for:
         1. argparse: add_argument(..., required=True)
         2. argparse: add_argument("positional_arg") (no --)
-        3. Manual checks: "if not args.xxx", "必须提供", parser.error(...)
+        3. Manual checks: "if not args.xxx", parser.error(...)
         Returns True if mandatory arguments are found.
         """
         try:
@@ -692,8 +686,12 @@ class TaskManager:
         if m: std_deviation = float(m.group(1))
         m = re.search(r'Skill:\s*(\S+)', original)
         if m: skill_name = m.group(1)
-        for fm in re.finditer(r'Run #(\d+) exit (\d+), duration ([\d.]+)s', original):
-            failure_samples.append(f"Run #{fm.group(1)} (exit {fm.group(2)}, {fm.group(3)}s)")
+        for fm in re.finditer(r'Run #(\d+) exit (\d+), duration ([\d.]+)s(?::\s*(.+))?', original):
+            detail = f"Run #{fm.group(1)} (exit {fm.group(2)}, {fm.group(3)}s)"
+            reason = (fm.group(4) or "").strip()
+            if reason:
+                detail += f": {reason}"
+            failure_samples.append(detail)
 
         failures = total_runs - successes
         success_rate = successes / total_runs if total_runs > 0 else 0.0
@@ -711,13 +709,31 @@ class TaskManager:
             elif d <= 60:   performance_score = int(40 - (d - 30) * (15 / 30))
             else:           performance_score = max(10, int(25 - (d - 60) * 0.1))
 
-            if   failure_rate == 0:   resource_score = 90
+            # consistency: timing regularity via coefficient of variation (low = more consistent)
+            if avg_duration > 0:
+                cv = std_deviation / avg_duration
+                if   cv <= 0.05: consistency_score = 100
+                elif cv <= 0.15: consistency_score = 90
+                elif cv <= 0.30: consistency_score = 70
+                elif cv <= 0.50: consistency_score = 50
+                elif cv <= 1.00: consistency_score = 30
+                else:            consistency_score = max(10, int(30 - (cv - 1.0) * 10))
+            else:
+                consistency_score = stability_score
+
+            # resource: tail-latency ratio (P95 / avg — measures burst overhead)
+            if avg_duration > 0 and p95_duration >= avg_duration:
+                ratio = p95_duration / avg_duration
+                if   ratio <= 1.5: resource_score = 95
+                elif ratio <= 2.0: resource_score = 80
+                elif ratio <= 3.0: resource_score = 60
+                elif ratio <= 5.0: resource_score = 40
+                else:              resource_score = max(10, int(40 - (ratio - 5) * 3))
+            elif failure_rate == 0:   resource_score = 90
             elif failure_rate <= 0.1: resource_score = 80
             elif failure_rate <= 0.3: resource_score = 60
             elif failure_rate <= 0.5: resource_score = 40
             else:                     resource_score = max(10, int(40 - failure_rate * 30))
-
-            consistency_score = stability_score
 
             if   failures == 0:       recovery_score = 100
             elif failure_rate <= 0.1: recovery_score = 85
@@ -746,6 +762,107 @@ class TaskManager:
             if score >= 40: return "🟡 Caution"
             return "🔴 Risk"
 
+        # ── Compute per-dimension deduction reasons ──────────────────
+        cv = (std_deviation / avg_duration) if avg_duration > 0 else 0.0
+        tail_ratio = (p95_duration / avg_duration) if avg_duration > 0 and p95_duration >= avg_duration else None
+
+        # Mapping: dimension → AI review risk field → human-readable label
+        _AI_RISK_FIELD = {
+            "stability":   ("stabilityRisk",  "stability risk"),
+            "performance": ("privacyRisk",     "privacy risk"),
+            "resource":    ("privilegeRisk",   "privilege risk"),
+            "consistency": ("integrityRisk",   "integrity risk"),
+            "recovery":    ("dependencyRisk",  "dependency risk"),
+        }
+        # Human-readable description of each risk level
+        _RISK_LEVEL_LABEL = {"none": "none", "low": "low", "medium": "medium", "high": "high"}
+        ai_risk_level = _RISK_LEVEL_LABEL.get(str(ai.get("riskLevel", "none")).lower(), "unknown")
+
+        def _ai_deduct_reason(dim: str) -> str:
+            """Return a detailed explanation for an AI-driven deduction, or '' if none."""
+            if not ai_has_risk:
+                return ""
+            field, label = _AI_RISK_FIELD.get(dim, ("", ""))
+            raw_val = ai.get(field, 0)
+            deduct = min(15, raw_val // 4)
+            if deduct <= 0:
+                return ""
+            # e.g. "security pre-check: integrityRisk=5 (low) → −1 pt"
+            return (
+                f"security pre-check flagged {label} = {raw_val}/100"
+                f" (overall risk level: {ai_risk_level}) → −{deduct} pt(s)"
+            )
+
+        def _deduction(dim: str) -> str:
+            """Return a one-line explanation for why this dimension lost points, or '' if perfect."""
+            ai_reason = _ai_deduct_reason(dim)
+
+            if dim == "stability":
+                reasons = []
+                if failures > 0:
+                    reasons.append(f"{failures}/{total_runs} run(s) failed ({failure_rate*100:.1f}% failure rate)")
+                if ai_reason:
+                    reasons.append(ai_reason)
+                return "; ".join(reasons) if reasons else ""
+
+            if dim == "performance":
+                d = p95_duration if p95_duration > 0 else avg_duration
+                reasons = []
+                if d > 1:
+                    tier = (f"P95={p95_duration:.3f}s > 1 s threshold" if p95_duration > 0
+                            else f"avg={avg_duration:.3f}s > 1 s threshold")
+                    reasons.append(tier)
+                    if d <= 10:
+                        deduct = int((d - 1) * (30 / 9))
+                        reasons.append(f"−{deduct} pt(s) from linear penalty (1–10 s band)")
+                    elif d <= 30:
+                        reasons.append(f"−{int(60 - (d-10))} pt(s) (10–30 s band)")
+                if ai_reason:
+                    reasons.append(ai_reason)
+                return "; ".join(reasons) if reasons else ""
+
+            if dim == "resource":
+                reasons = []
+                if tail_ratio is not None:
+                    if tail_ratio > 1.5:
+                        reasons.append(f"P95/avg tail ratio = {tail_ratio:.2f}x (threshold: ≤1.5x for 95)")
+                    else:
+                        reasons.append(f"P95/avg tail ratio = {tail_ratio:.2f}x → capped at 95 (ratio ≤1.5x)")
+                elif failure_rate > 0:
+                    reasons.append(f"failure-based fallback: {failure_rate*100:.1f}% failure rate")
+                if ai_reason:
+                    reasons.append(ai_reason)
+                return "; ".join(reasons) if reasons else ""
+
+            if dim == "consistency":
+                reasons = []
+                if avg_duration > 0 and cv > 0.05:
+                    reasons.append(
+                        f"CV = {cv:.3f} (std={std_deviation:.3f}s / avg={avg_duration:.3f}s)"
+                        f"; threshold: ≤0.05 for 100"
+                    )
+                if ai_reason:
+                    reasons.append(ai_reason)
+                return "; ".join(reasons) if reasons else ""
+
+            if dim == "recovery":
+                reasons = []
+                if failures > 0:
+                    reasons.append(f"{failures} failure(s) detected — perfect score requires 0 failures")
+                if ai_reason:
+                    reasons.append(ai_reason)
+                return "; ".join(reasons) if reasons else ""
+
+            return ""
+
+        dim_scores_map = {
+            "stability":   stability_score,
+            "performance": performance_score,
+            "resource":    resource_score,
+            "consistency": consistency_score,
+            "recovery":    recovery_score,
+        }
+
         # ── Build clean report ───────────────────────────────────────
         # NOTE: Frontend report.html parses with regex like "Test Runs: N",
         #       "Successes: N (XX%)", "Avg Duration: X.Xs", "Stability ... N/100".
@@ -768,11 +885,11 @@ class TaskManager:
             "| Metric | Value | Status |",
             "|--------|-------|--------|",
             f"| **Success Rate** | **{successes}/{total_runs} ({success_rate*100:.1f}%)** | {status_icon} {test_status} |",
-            f"| Avg Duration | {avg_duration:.4f}s | {'✅ Pass' if avg_duration <= 10 else '❌ Fail'} |",
-            f"| P95 Duration | {p95_duration:.4f}s | {'✅ Pass' if p95_duration <= 30 else '❌ Fail'} |",
-            f"| Min Duration | {min_duration:.4f}s | ✅ Pass |",
-            f"| Max Duration | {max_duration:.4f}s | {'✅ Pass' if max_duration <= 60 else '❌ Fail'} |",
-            f"| Std Deviation | {std_deviation:.4f}s | {'✅ Pass' if std_deviation <= 5 else '❌ Fail'} |",
+            f"| Avg Duration | {avg_duration:.2f}s | {'✅ Pass' if avg_duration <= 10 else '❌ Fail'} |",
+            f"| P95 Duration | {p95_duration:.2f}s | {'✅ Pass' if p95_duration <= 30 else '❌ Fail'} |",
+            f"| Min Duration | {min_duration:.2f}s | ✅ Pass |",
+            f"| Max Duration | {max_duration:.2f}s | {'✅ Pass' if max_duration <= 60 else '❌ Fail'} |",
+            f"| Std Deviation | {std_deviation:.2f}s | {'✅ Pass' if std_deviation <= 5 else '❌ Fail'} |",
             "",
             "## Five-Dimension Scores",
             "",
@@ -786,6 +903,32 @@ class TaskManager:
             "",
             f"**Overall Score: {overall_score}/100** ({_rating(overall_score)})",
         ]
+
+        # ── Score Analysis: deduction reasons for non-100 dimensions ──
+        deduction_lines = []
+        dim_labels = {
+            "stability":   "🛡️ Stability",
+            "performance": "⚡ Performance",
+            "resource":    "💾 Resource",
+            "consistency": "🔄 Consistency",
+            "recovery":    "🆘 Recovery",
+        }
+        for dim, label in dim_labels.items():
+            score = dim_scores_map[dim]
+            if score < 100:
+                reason = _deduction(dim)
+                if reason:
+                    deduction_lines.append(
+                        f"- **{label} ({score}/100):** {reason}"
+                    )
+                else:
+                    deduction_lines.append(
+                        f"- **{label} ({score}/100):** scoring cap applied at this tier"
+                    )
+
+        if deduction_lines:
+            lines += ["", "## Score Analysis", ""]
+            lines += deduction_lines
 
         if failure_samples:
             lines += [
@@ -840,7 +983,7 @@ class TaskManager:
 
     def _execute_task(self, task_id: str, workspace: Path, input_dir: Path) -> None:
         try:
-            self._set_task_state(task_id, status="running", message="执行中")
+            self._set_task_state(task_id, status="running", message="Running…")
             with self._lock:
                 record = self.tasks.get(task_id)
                 if not record:
@@ -850,7 +993,7 @@ class TaskManager:
             self._set_task_state(
                 task_id,
                 status="completed",
-                message=result.get("message", "完成"),
+                message=result.get("message", "Completed."),
                 report=result.get("report"),
                 summary=result.get("summary"),
                 log=result.get("log"),

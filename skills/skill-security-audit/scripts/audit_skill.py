@@ -66,15 +66,6 @@ TOOL_REMEDIATION_HINTS = {
     "canvas": "Restrict canvas interactions to non-sensitive dashboards and require read-only mode when possible.",
 }
 
-TOOL_REMEDIATION_HINTS_ZH = {
-    "exec": "在运行 subprocess/CLI（如 slither、forge）前增加人工审批或沙箱隔离。",
-    "gateway": "将外部 HTTP 请求限制在允许的端点（如 Etherscan/Sourcify）并做好脱敏。",
-    "browser": "将浏览器自动化限制在可信域名，并定期轮换凭据。",
-    "message": "仅允许向批准的频道发送消息，并加上频率限制。",
-    "nodes": "校验节点指令，只允许预设的远端命令。",
-    "cron": "记录所有定时任务并在启用前获得负责人确认。",
-    "canvas": "仅对非敏感 Dashboard 使用 canvas，必要时改为只读模式。",
-}
 TEXT_PATTERN_DEFS = {
     "API Key": re.compile(r"(api[_-]?key|apikey)[\s:=]+['\"][A-Za-z0-9]{20,}['\"]", re.IGNORECASE),
     "Private Key": re.compile(r"0x[a-fA-F0-9]{64}"),
@@ -95,9 +86,9 @@ TOKEN_PATTERNS = [
     re.compile(r'"model"\s*:\s*"(?P<model>[^"]+)".*?"totalTokens"\s*:\s*(?P<tokens>\d+)', re.IGNORECASE | re.DOTALL),
     re.compile(r'model=(?P<model>\S+).*?(?:tokens|totalTokens)=(?P<tokens>\d+)', re.IGNORECASE),
 ]
-MNEMONIC_KEYWORDS = ("mnemonic", "seed phrase", "seed", "助记词")
+MNEMONIC_KEYWORDS = ("mnemonic", "seed phrase", "seed")
 
-# ── 即时拒绝：发现任意一项则 verdict=REJECT ──────────────────────────────────
+# ── Instant-reject patterns: any match → verdict=REJECT ─────────────────────
 INSTANT_REJECT_PATTERNS: Dict[str, Any] = {
     "eval_obfuscation":     re.compile(r'eval\s*\(\s*base64\.b64decode\s*\(', re.IGNORECASE),
     "exec_compile":         re.compile(r'exec\s*\(\s*compile\s*\(', re.IGNORECASE),
@@ -110,32 +101,14 @@ INSTANT_REJECT_PATTERNS: Dict[str, Any] = {
     "credential_request":   re.compile(r'input\s*\(\s*[\'"][^\'"]*?(api.?key|password|secret|token|private)', re.IGNORECASE),
 }
 
-INSTANT_REJECT_LABELS_ZH = {
-    "eval_obfuscation":      "eval(base64.decode) 混淆执行",
-    "exec_compile":          "exec(compile()) 动态编译执行",
-    "dynamic_pip_install":   "动态安装 Python 包（pip install）",
-    "dynamic_npm_install":   "动态安装 Node 包（npm install）",
-    "ip_exfil":              "向 IP 地址直连发送 HTTP 请求（可疑数据外泄）",
-    "credential_exfil":      "向外部接口 POST 凭证/密钥",
-    "soul_write":            "修改 SOUL.md（AI 代理身份文件）",
-    "openclaw_config_write": "修改 openclaw.json（配置文件）",
-    "credential_request":    "通过 input() 请求用户输入凭证",
-}
-
-# ── 混淆代码检测 ──────────────────────────────────────────────────────────────
+# ── Obfuscation detection ─────────────────────────────────────────────────────
 OBFUSCATION_PATTERNS: Dict[str, Any] = {
     "base64_exec":  re.compile(r'base64\.b64decode\s*\(', re.IGNORECASE),
     "hex_dense":    re.compile(r'(\\x[0-9a-fA-F]{2}){10,}'),
     "chr_concat":   re.compile(r'(chr\s*\(\s*\d+\s*\)\s*\+\s*){5,}'),
 }
 
-OBFUSCATION_LABELS_ZH = {
-    "base64_exec": "Base64 解码执行代码",
-    "hex_dense":   "大量十六进制字节（可能混淆）",
-    "chr_concat":  "chr() 字符拼接（可能混淆）",
-}
-
-# ── Side-Effects：外部写操作检测 ───────────────────────────────────────────────
+# ── Side-effects: external write detection ────────────────────────────────────
 SIDE_EFFECT_PATTERNS: Dict[str, Any] = {
     "file_write":  re.compile(r'open\s*\([^)]+,\s*["\'][wa][^"\']*["\']', re.IGNORECASE),
     "path_write":  re.compile(r'\.(write_text|write_bytes)\s*\(', re.IGNORECASE),
@@ -145,16 +118,7 @@ SIDE_EFFECT_PATTERNS: Dict[str, Any] = {
     "db_write":    re.compile(r'(execute|executemany)\s*\([^)]{0,200}(INSERT|UPDATE|DELETE|DROP)\b', re.IGNORECASE | re.DOTALL),
 }
 
-SIDE_EFFECT_LABELS_ZH: Dict[str, str] = {
-    "file_write": "写入文件（open w/a 模式）",
-    "path_write": "Path.write_text/write_bytes 写入",
-    "env_write":  "修改环境变量（os.environ 赋值）",
-    "net_mutate": "网络写操作（POST/PUT/PATCH/DELETE）",
-    "fs_modify":  "文件系统修改（mkdir/remove/rename 等）",
-    "db_write":   "数据库写操作（INSERT/UPDATE/DELETE）",
-}
-
-# ── Data Access：敏感数据读取检测 ──────────────────────────────────────────────
+# ── Data Access: sensitive read detection ─────────────────────────────────────
 DATA_ACCESS_PATTERNS: Dict[str, Any] = {
     "sensitive_path":  re.compile(r'["\']/(etc|proc|sys)/|~/\.(ssh|aws|gnupg)/', re.IGNORECASE),
     "env_secret_read": re.compile(r'os\.(getenv|environ\.get)\s*\(\s*["\'][^"\'"]*(key|secret|token|password|api)[^"\']*["\']', re.IGNORECASE),
@@ -163,18 +127,10 @@ DATA_ACCESS_PATTERNS: Dict[str, Any] = {
     "aws_cred":        re.compile(r'(\.aws/credentials|boto3\.Session|aws_access_key_id)', re.IGNORECASE),
 }
 
-DATA_ACCESS_LABELS_ZH: Dict[str, str] = {
-    "sensitive_path":  "访问敏感系统路径（/etc/, ~/.ssh/ 等）",
-    "env_secret_read": "读取敏感环境变量（key/secret/token）",
-    "cred_file_read":  "读取凭证文件（.pem/.key/.crt 等）",
-    "ssh_access":      "访问 SSH 密钥文件",
-    "aws_cred":        "访问 AWS 凭证配置",
-}
-
-# ── Tool Call Depth：调用链深度检测 ────────────────────────────────────────────
-# 方法链 .a().b().c().d() 深度 ≥ 4
+# ── Tool Call Depth: deep call-chain detection ────────────────────────────────
+# Method chain .a().b().c().d() depth >= 4
 _TOOL_CHAIN_PAT = re.compile(r'(\.\w+\s*\([^)]*\)){4,}')
-# 嵌套函数调用 f(g(h(i(...)))) 深度 ≥ 4
+# Nested function calls f(g(h(i(...)))) depth >= 4
 _TOOL_NESTED_PAT = re.compile(r'\w+\s*\([^()]*\w+\s*\([^()]*\w+\s*\([^()]*\w+\s*\(')
 
 
@@ -348,44 +304,6 @@ def _score_external_metrics(payload: Dict[str, Any], body: str) -> Dict[str, int
         "_token_hits":     token_hits,
         "_failure_hits":   failure_hits,
     }
-
-    bins: List[str] = []
-    env_vars: List[str] = []
-
-    def _walk(node: Any) -> None:
-        if isinstance(node, str):
-            stripped = node.strip()
-            if stripped.startswith("{") or stripped.startswith("["):
-                try:
-                    parsed = json.loads(stripped)
-                except Exception:
-                    return
-                _walk(parsed)
-            return
-        if isinstance(node, dict):
-            for key, value in node.items():
-                lowered = str(key).lower()
-                if lowered in {"bins", "tools"}:
-                    if isinstance(value, list):
-                        bins.extend(str(item) for item in value)
-                    else:
-                        bins.append(str(value))
-                elif lowered in {"env", "envs", "environment", "variables"}:
-                    if isinstance(value, list):
-                        env_vars.extend(str(item) for item in value)
-                    elif isinstance(value, dict):
-                        env_vars.extend(str(k) for k in value.keys())
-                    else:
-                        env_vars.append(str(value))
-                else:
-                    _walk(value)
-        elif isinstance(node, list):
-            for item in node:
-                _walk(item)
-
-    if isinstance(meta, dict):
-        _walk(meta)
-    return bins, env_vars
 
 
 def _load_skill_text_from_path(raw_path: str) -> Tuple[str, str]:
@@ -716,7 +634,14 @@ def scan_memory(directory: Path) -> Dict[str, Any]:
         return {"totalSize": 0, "files": [], "sensitiveHits": 0, "dataAvailable": False, "patternHits": []}
 
     base_dir = directory.resolve()
-    for path in directory.glob("*.md"):
+    seen: set = set()
+    all_paths: List[Path] = []
+    for pattern in ("*.md", "*.json", "*.yaml", "*.yml", "*.txt"):
+        for p in directory.glob(pattern):
+            if p not in seen:
+                seen.add(p)
+                all_paths.append(p)
+    for path in all_paths:
         try:
             resolved = path.resolve()
         except OSError:
@@ -768,7 +693,7 @@ def scan_memory(directory: Path) -> Dict[str, Any]:
             if count:
                 file_issues.append(f"{label} ×{count}")
         if size > 1_000_000:
-            file_issues.append("文件超过 1MB，建议归档")
+            file_issues.append("File exceeds 1MB — consider archiving")
         if file_issues:
             results.append(MemoryIssue(str(path), size, file_issues))
     return {
@@ -792,9 +717,9 @@ def scan_logs_and_tokens(directory: Path) -> Tuple[Dict[str, Any], Dict[str, Any
             {"totalTokens": 0, "byModel": [], "dataAvailable": False},
         )
 
-    # 超过此阈值的文件只采样末尾，避免扫描巨型日志卡住整个审计
+    # Files over this threshold are tail-sampled to avoid blocking the audit on huge logs
     MAX_SCAN_BYTES = 512_000   # 512 KB
-    TAIL_LINES     = 1_000     # 超限时只扫最后 1000 行
+    TAIL_LINES     = 1_000     # scan only the last 1000 lines when the limit is exceeded
 
     keywords = ("error", "exception", "traceback", "failed")
     for path in directory.glob("*.log"):
@@ -805,13 +730,13 @@ def scan_logs_and_tokens(directory: Path) -> Tuple[Dict[str, Any], Dict[str, Any
             file_size = stat_info.st_size
 
             if file_size > MAX_SCAN_BYTES:
-                # 大文件：只读末尾 TAIL_LINES 行，元数据正常记录
+                # Large file: read only the last TAIL_LINES lines; metadata is recorded normally
                 from collections import deque
                 with path.open("r", encoding="utf-8", errors="ignore") as fh:
                     tail = list(deque(fh, maxlen=TAIL_LINES))
                 scan_lines = tail
-                # 行数/错误数基于采样，标注为估算
-                lines = TAIL_LINES  # 用采样行数代表（已标注）
+                # Line/error counts are based on the sample — marked as estimates
+                lines = TAIL_LINES  # represent with sampled line count (noted)
                 skipped = True
             else:
                 with path.open("r", encoding="utf-8", errors="ignore") as fh:
@@ -951,36 +876,10 @@ def build_suggestions(report: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _translate_warning(message: str, lang: str) -> str:
-    if lang != "zh":
-        return message
-    mapping = {
-        "memory/ directory not found; skipped memory scan": "未检测到 memory/ 目录，已跳过记忆扫描",
-        "memory/ directory not found; unable to audit persistence.": "未检测到 memory/ 目录，无法审计持久化内容",
-        "logs/ directory not found; failure rate assumed 0": "未检测到 logs/ 目录，失败率按 0 处理",
-        "logs/ directory is empty; failure rate assumed 0": "logs/ 目录为空，失败率按 0 处理",
-        "logs/ directory not found; failure rate unavailable.": "未检测到 logs/ 目录，无法计算失败率",
-        "Log files missing tokenUsage metadata; token cost set to 0": "日志缺少 tokenUsage 信息，Token 成本按 0 处理",
-        "Token usage data missing from logs.": "日志缺少 tokenUsage 数据，无法统计。",
-    }
-    return mapping.get(message, message)
+    return message
 
 
 def _translate_note(note: str, lang: str) -> str:
-    if lang != "zh":
-        return note
-    replacements = {
-        "Local skill path:": "本地 Skill 路径：",
-        "External skill source:": "外部 Skill 来源：",
-        "Detected high-risk tools:": "检测到高危权限：",
-        "Environment variables:": "声明的环境变量：",
-        "CLI dependencies:": "依赖工具：",
-        "Body matches": "正文匹配",
-        "Sensitive config key detected:": "检测到敏感配置键：",
-        "Configured credentials detected": "检测到已配置的凭据",
-    }
-    for eng, zh in replacements.items():
-        if note.startswith(eng):
-            return note.replace(eng, zh, 1)
     return note
 
 
@@ -993,62 +892,37 @@ def _render_suggestions(suggestions: List[Dict[str, Any]], lang: str) -> List[st
             summary = "; ".join(
                 f"{Path(entry['path']).name} ({', '.join(entry.get('issues', []))})" for entry in files
             )
-            if lang == "zh":
-                rendered.append(f"清理以下 memory 文件中的敏感内容：{summary}")
-            else:
-                rendered.append(f"Scrub or relocate sensitive content in: {summary}")
+            rendered.append(f"Scrub or relocate sensitive content in: {summary}")
         elif stype == "memory_missing":
-            rendered.append(
-                "请创建 memory/ 目录以启用隐私扫描。" if lang == "zh" else "Provide a memory/ directory so privacy scans can run."
-            )
+            rendered.append("Provide a memory/ directory so privacy scans can run.")
         elif stype == "tool":
             tool = item.get("tool", "-")
             skill = item.get("skill", "skill")
-            hint = (
-                TOOL_REMEDIATION_HINTS_ZH.get(tool, f"为 {tool} 增加防护。")
-                if lang == "zh"
-                else TOOL_REMEDIATION_HINTS.get(tool, f"Add guardrails before invoking {tool}.")
-            )
+            hint = TOOL_REMEDIATION_HINTS.get(tool, f"Add guardrails before invoking {tool}.")
             rendered.append(f"{skill} – {hint}")
         elif stype == "memory_size":
             size_text = human_size(item.get("size", 0))
-            rendered.append(
-                f"memory/ 总大小约 {size_text}，建议归档或压缩超 1MB 的文件。"
-                if lang == "zh"
-                else f"Memory footprint is {size_text}; archive or summarize files over 1MB."
-            )
+            rendered.append(f"Memory footprint is {size_text}; archive or summarize files over 1MB.")
         elif stype == "token":
             model = item.get("model")
             tokens = item.get("tokens")
-            rendered.append(
-                f"模型 {model} 最近消耗 {tokens} tokens，建议设置预算或改用低成本模型。"
-                if lang == "zh"
-                else f"Model {model} consumed {tokens} tokens recently; enforce budgets or switch to cheaper models."
-            )
+            rendered.append(f"Model {model} consumed {tokens} tokens recently; enforce budgets or switch to cheaper models.")
         elif stype == "log_errors":
             path = item.get("path")
             errors = item.get("errors")
             lines = item.get("lines")
-            rendered.append(
-                f"{path} 记录 {errors} 个错误 / {lines} 行日志，建议排查并加上重试/超时。"
-                if lang == "zh"
-                else f"{path} logged {errors} errors across {lines} lines; investigate and add retries/timeouts."
-            )
+            rendered.append(f"{path} logged {errors} errors across {lines} lines; investigate and add retries/timeouts.")
         elif stype == "none":
-            rendered.append("暂无需要整改的项目。" if lang == "zh" else "No remediation required based on current telemetry.")
+            rendered.append("No remediation required based on current telemetry.")
     return rendered
 
 
 def _render_pattern_table(hits: List[Dict[str, str]], lang: str, title_en: str, title_zh: str) -> List[str]:
     if not hits:
         return []
-    lines = ["", title_zh if lang == "zh" else title_en]
-    if lang == "zh":
-        lines.append("| 类型 | 文件 | 内容 |")
-        lines.append("| --- | --- | --- |")
-    else:
-        lines.append("| Pattern | File | Snippet |")
-        lines.append("| --- | --- | --- |")
+    lines = ["", title_en]
+    lines.append("| Pattern | File | Snippet |")
+    lines.append("| --- | --- | --- |")
     for hit in hits:
         lines.append(f"| {hit['label']} | {hit['path']} | {hit['line']} |")
     return lines
@@ -1086,11 +960,13 @@ def scan_skill_logs(skill_path: Path, limit: int = 20) -> List[Dict[str, str]]:
 
 def _build_skill_bundle(paths: List[Path], max_files: int = 200) -> str:
     """
-    将 skill 包中所有文件的完整内容拼合为发送给 LLM 的字符串。
+    Concatenate the full contents of all files in the skill package into a
+    single string to send to the LLM.
 
-    不设字符上限：主流模型（GPT-4o / Grok）支持 128k token（约 50 万字符），
-    skill 包源码体积通常远低于此上限，无需截断，确保 LLM 能审查全部代码。
-    若将来遇到超大包导致模型返回 context_length_exceeded，可在此处按需增加分块逻辑。
+    No character limit is applied: mainstream models (GPT-4o / Grok) support
+    128k tokens (~500k characters), which is well above the typical skill
+    package size. If a future over-large package triggers context_length_exceeded,
+    add chunking logic here as needed.
     """
     collected: List[str] = []
     files: List[Path] = []
@@ -1125,8 +1001,8 @@ def _build_skill_bundle(paths: List[Path], max_files: int = 200) -> str:
 
 
 def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str, detail: bool = False) -> Dict[str, Any]:
-    """强制执行 AI 代码审查，返回各维度风险分（0-100）和综合风险等级。
-    detail=True 时额外要求 LLM 输出 findings 具体风险项列表。
+    """Run AI code review and return per-dimension risk scores (0-100) and overall risk level.
+    When detail=True, also request a list of specific findings from the LLM.
     """
     _EMPTY = {"status": "skipped", "reason": "no local skill paths",
               "hasRisk": False, "riskLevel": "none",
@@ -1148,11 +1024,11 @@ def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str, de
     except Exception as exc:
         return {**_EMPTY, "status": "error", "reason": f"openai package missing: {exc}"}
 
-    # 支持 OPENAI_API_KEY 和 XAI_API_KEY（xAI / Grok）
+    # Supports OPENAI_API_KEY and XAI_API_KEY (xAI / Grok)
     openai_key = os.getenv("OPENAI_API_KEY")
     xai_key    = os.getenv("XAI_API_KEY")
     if not openai_key and not xai_key:
-        return {**_EMPTY, "status": "error", "reason": "未配置 API Key（需设置 OPENAI_API_KEY 或 XAI_API_KEY）"}
+        return {**_EMPTY, "status": "error", "reason": "No API key configured (set OPENAI_API_KEY or XAI_API_KEY)"}
 
     bundle = _build_skill_bundle(paths)
     if not bundle:
@@ -1188,7 +1064,7 @@ def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str, de
     user_prompt = "Analyze the following skill package for security risks:\n\n" + bundle
 
     def _parse_result(raw: str) -> Optional[Dict[str, Any]]:
-        """从 LLM 响应中提取 JSON，返回 None 表示解析失败。"""
+        """Extract JSON from LLM response; returns None on parse failure."""
         import re as _re
         json_match = _re.search(r'\{[\s\S]+?\}', raw)
         if not json_match:
@@ -1218,14 +1094,14 @@ def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str, de
         }
 
     def _call_responses_api() -> Optional[str]:
-        """尝试 OpenAI Responses API（SDK v2 新增，适用于 gpt-4.1 / o 系列等新模型）。"""
+        """Try the OpenAI Responses API (added in SDK v2, suitable for gpt-4.1 / o-series models)."""
         try:
             resp = client.responses.create(
                 model=model_name,
                 instructions=system_prompt,
                 input=user_prompt,
             )
-            # SDK v2: resp.output_text 或 resp.output[0].content[0].text
+            # SDK v2: resp.output_text or resp.output[0].content[0].text
             if hasattr(resp, "output_text"):
                 return (resp.output_text or "").strip()
             if hasattr(resp, "output") and resp.output:
@@ -1236,7 +1112,7 @@ def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str, de
             pass
         return None
 
-    # ── 路径 1：Chat Completions（gpt-4o / gpt-4.1 / grok 等对话模型）────────────
+    # ── Path 1: Chat Completions (gpt-4o / gpt-4.1 / grok and other chat models) ──
     try:
         response = client.chat.completions.create(
             model=model_name,
@@ -1253,7 +1129,7 @@ def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str, de
     except Exception as chat_exc:
         chat_err = str(chat_exc)
 
-        # ── 路径 2：Legacy Completions（codex / instruct 等旧补全模型）────────────
+        # ── Path 2: Legacy Completions (codex / instruct and other older completion models) ──
         if "not a chat model" in chat_err or "v1/completions" in chat_err:
             try:
                 legacy_response = client.completions.create(
@@ -1266,20 +1142,20 @@ def run_ai_review(skill_entries: List[Dict[str, Any]], model: str, lang: str, de
                 result = _parse_result(raw)
                 if result:
                     return result
-                # Legacy completions 也失败，继续尝试 Responses API
+                # Legacy completions also failed; fall through to Responses API
             except Exception:
                 pass
 
-            # ── 路径 3：Responses API（SDK v2 新增，gpt-4.1 / o 系列等新模型）────
+            # ── Path 3: Responses API (SDK v2, gpt-4.1 / o-series models) ─────────
             raw = _call_responses_api()
             if raw is not None:
                 result = _parse_result(raw)
                 return result if result else {**_EMPTY, "status": "ok", "model": model_name}
 
             return {**_EMPTY, "status": "error",
-                    "reason": f"模型 '{model_name}' 不支持任何可用接口，请检查 SKILL_AUDIT_AI_MODEL 配置是否正确"}
+                    "reason": f"Model '{model_name}' is not supported by any available API endpoint; check your SKILL_AUDIT_AI_MODEL configuration"}
 
-        # ── Chat Completions 报其他错误，先尝试 Responses API 再报错 ──────────────
+        # ── Chat Completions returned another error; try Responses API before failing ──
         raw = _call_responses_api()
         if raw is not None:
             result = _parse_result(raw)
@@ -1297,8 +1173,9 @@ def _risk_label(score: int) -> str:
 
 
 def detect_code_risks(base_path: Optional[Path]) -> Dict[str, Any]:
-    """检测即时拒绝标志、混淆代码、供应链攻击风险，以及源码中的硬编码敏感数据。
-    同时检测：Side-Effects（外部写操作）、Data Access（敏感数据读取）、Tool Call Depth（调用链深度）。
+    """Detect instant-reject flags, obfuscated code, supply-chain attack risks, and hardcoded
+    sensitive data in source. Also detects: Side-Effects (external writes), Data Access
+    (sensitive reads), and Tool Call Depth (call-chain depth).
     """
     result: Dict[str, Any] = {
         "instantRejects": [],
@@ -1326,32 +1203,32 @@ def detect_code_risks(base_path: Optional[Path]) -> Dict[str, Any]:
             for label, pat in OBFUSCATION_PATTERNS.items():
                 if pat.search(text):
                     result["obfuscation"].append({"label": label, "path": rel})
-            # 4D: 源码中的硬编码敏感数据（API Key / 私钥 / JWT 等）
+            # Hardcoded sensitive data in source (API Key / private key / JWT etc.)
             for label, pat in SENSITIVE_PATTERNS.items():
                 if pat.search(text):
                     result["sensitiveData"].append({"label": label, "path": rel})
-            # Side-Effects：外部写操作
+            # Side-Effects: external write operations
             for label, pat in SIDE_EFFECT_PATTERNS.items():
                 if pat.search(text):
-                    # file_write 排除 /tmp 临时写（风险较低）
+                    # file_write: exclude /tmp writes (lower risk)
                     if label == "file_write" and "/tmp" in text.lower():
                         continue
                     result["sideEffects"].append({"label": label, "path": rel})
-            # Data Access：敏感数据读取
+            # Data Access: sensitive data reads
             for label, pat in DATA_ACCESS_PATTERNS.items():
                 if pat.search(text):
                     result["dataAccess"].append({"label": label, "path": rel})
-            # Tool Call Depth：调用链深度 ≥ 4
+            # Tool Call Depth: method chain depth >= 4
             if _TOOL_CHAIN_PAT.search(text) or _TOOL_NESTED_PAT.search(text):
                 result["toolCallDepth"].append({"label": "deep_call_chain", "path": rel})
-    # 去重（同一 label 只保留一条）
+    # Deduplicate (keep one entry per label)
     for key in ("sensitiveData", "sideEffects", "dataAccess", "toolCallDepth"):
         result[key] = list({item["label"]: item for item in result[key]}.values())
     return result
 
 
 def compute_verdict(report: Dict[str, Any]) -> str:
-    """返回最终安全结论：SAFE / CAUTION / REJECT"""
+    """Return final security verdict: SAFE / CAUTION / REJECT."""
     code_risks = report.get("codeRisks", {})
     if code_risks.get("instantRejects"):
         return "REJECT"
@@ -1380,9 +1257,10 @@ def generate_report(
     ai_detail: bool = False,
 ) -> Dict[str, Any]:
     """
-    scan_paths: 原始输入目录列表（始终执行代码扫描，无论 SKILL.md 是否存在）。
-    当上传的 ZIP 不含 SKILL.md 时，load_external_skills() 返回空列表，代码扫描
-    会被跳过。通过 scan_paths 把原始目录直接传入，确保扫描不被绕过。
+    scan_paths: list of raw input directories (code scan always runs regardless of whether
+    SKILL.md is present). When an uploaded ZIP contains no SKILL.md, load_external_skills()
+    returns an empty list and the code scan would be skipped. Passing raw directories via
+    scan_paths ensures the scan cannot be bypassed.
     """
     skills = extra_skills or []
     agents = extra_agents or []
@@ -1407,7 +1285,7 @@ def generate_report(
         "sideEffects": [], "dataAccess": [], "toolCallDepth": [],
     }
 
-    # 已扫描路径集合，避免重复扫描同一目录
+    # Track already-scanned paths to avoid scanning the same directory twice
     _scanned: set = set()
 
     def _merge_risks(risks: Dict[str, Any]) -> None:
@@ -1424,7 +1302,7 @@ def generate_report(
                 skill_log_hits.extend(scan_skill_logs(origin_path))
                 _merge_risks(detect_code_risks(origin_path))
 
-    # 对所有 scan_paths 执行代码扫描（即使 SKILL.md 缺失也不跳过）
+    # Run code scan on all scan_paths (even if SKILL.md is missing)
     for raw in scan_paths or []:
         try:
             p = Path(raw).expanduser().resolve()
@@ -1436,7 +1314,7 @@ def generate_report(
         skill_log_hits.extend(scan_skill_logs(p))
         _merge_risks(detect_code_risks(p))
 
-    # 全局去重（同 label 只保留一条）
+    # Global deduplication (keep one entry per label)
     for _key in ("sensitiveData", "sideEffects", "dataAccess", "toolCallDepth"):
         aggregate_code_risks[_key] = list(
             {item["label"]: item for item in aggregate_code_risks[_key]}.values()
@@ -1465,12 +1343,12 @@ def generate_report(
         "staticScores": static_scores,
     }
 
-    # ── AI 代码审查（必检项，在评分前执行，结果会影响各维度得分）────────────────
+    # ── AI code review (mandatory check; runs before scoring and affects dimension scores) ──
     _model = ai_model or os.getenv("SKILL_AUDIT_AI_MODEL", "")
     report["aiReview"] = (
-        run_ai_review(skills, _model, "zh", detail=ai_detail)
+        run_ai_review(skills, _model, "en", detail=ai_detail)
         if _model
-        else {"status": "skipped", "reason": "未配置 AI 模型（设置 SKILL_AUDIT_AI_MODEL 环境变量）",
+        else {"status": "skipped", "reason": "No AI model configured (set SKILL_AUDIT_AI_MODEL environment variable)",
               "hasRisk": False, "riskLevel": "none",
               "privacyRisk": 0, "privilegeRisk": 0, "integrityRisk": 0,
               "dependencyRisk": 0, "stabilityRisk": 0, "findings": []}
@@ -1544,10 +1422,10 @@ def _compute_checklist_scores(report: Dict[str, Any]) -> Dict[str, int]:
     skill_name = skill_entries[0].get("name", "") if skill_entries else ""
 
     # 4D: Sensitive data patterns found in source code (❌)
-    # 优先从 skill_entries 的 notes 中提取（SKILL.md body 扫描结果）
+    # Primary: extract from skill_entries notes (SKILL.md body scan results)
     body_hits: set = {n.replace("Body matches ", "").strip()
                       for n in all_notes if n.startswith("Body matches ")}
-    # 补充：从 codeRisks.sensitiveData 中合并（无 SKILL.md 时由 scan_paths 扫描所得）
+    # Supplement: merge from codeRisks.sensitiveData (from scan_paths when no SKILL.md)
     for item in code_risks.get("sensitiveData", []):
         body_hits.add(item.get("label", "").strip())
     body_hits.discard("")
@@ -1641,8 +1519,9 @@ def _compute_checklist_scores(report: Dict[str, Any]) -> Dict[str, int]:
         if "version"     not in cfg_keys_lower:  risk_failure += 10  # missing version
         if "description" not in cfg_keys_lower:  risk_failure += 5   # missing description
 
-    # ── 🤖 AI 代码审查扣分（仅 medium / high 风险触发，low 不扣分）──────────────
-    # riskLevel "low" 代表极轻微风险，不足以影响评分，避免所有维度均匀扣 1 分的假象。
+    # ── 🤖 AI code review deductions (only triggered for medium / high risk; low does not deduct) ──
+    # riskLevel "low" represents negligible risk — not enough to affect scores, avoiding
+    # the illusion of a uniform 1-point deduction across all dimensions.
     ai_review = report.get("aiReview") or {}
     _ai_risk_level = ai_review.get("riskLevel", "none")
     if ai_review.get("status") == "ok" and _ai_risk_level in ("medium", "high"):
@@ -1726,7 +1605,7 @@ def to_markdown(report: Dict[str, Any], lang: str = "en", ai_detail: bool = Fals
     # ── helpers ───────────────────────────────────────────────────────────────
     def _c(s: str) -> str:
         """Escape pipe so it doesn't break Markdown tables."""
-        return str(s).replace("|", "｜")
+        return str(s).replace("|", "\uff5c")
 
     def _badge(score: int) -> str:
         if score >= 80: return "🟢 Excellent"
@@ -2217,7 +2096,7 @@ def to_markdown(report: Dict[str, Any], lang: str = "en", ai_detail: bool = Fals
     lines += ["---", "", "## 🤖 AI Code Review", ""]
     ai_status = ai_review.get("status", "skipped")
     if ai_status == "ok":
-        # Risk Level 图标映射
+        # Risk level icon mapping
         _rl_icon = {"none": "🟢", "low": "🟡", "medium": "🟠", "high": "🔴"}
         _rl = ai_review.get("riskLevel", "none").lower()
         _rl_display = f"{_rl_icon.get(_rl, '⚪')} {_rl.capitalize()}"
@@ -2230,7 +2109,7 @@ def to_markdown(report: Dict[str, Any], lang: str = "en", ai_detail: bool = Fals
                 "",
             ]
             if ai_detail:
-                # 开关打开：展示各维度风险分 + 具体风险项
+                # Detail mode: show per-dimension risk scores and specific findings
                 lines += [
                     "| Dimension | Risk Score |",
                     "| --- | :---: |",
@@ -2281,8 +2160,8 @@ def main() -> None:
 
     extra_skills = load_external_skills(args.skill_path, args.skill_url)
     extra_agents = load_external_agents(args.agent_path, args.agent_url)
-    # 始终把原始路径传入，确保即使没有 SKILL.md 也能完整扫描代码风险
-    # ai_model 始终传入（由环境变量 SKILL_AUDIT_AI_MODEL 或 --ai-model 参数决定）
+    # Always pass raw paths so code risk scanning is complete even without SKILL.md
+    # ai_model is always passed in (determined by SKILL_AUDIT_AI_MODEL env var or --ai-model flag)
     report = generate_report(
         extra_skills=extra_skills,
         extra_agents=extra_agents,

@@ -135,6 +135,19 @@ const runningTabs = {
   "skill-stress-lab": false,
 };
 
+// Per-tab state: stores the last known task and polling message for each tab.
+// Used to restore the correct UI when the user switches tabs while a task runs.
+const lastTaskPerTab = {
+  "skill-security-audit":     null,
+  "multichain-contract-vuln": null,
+  "skill-stress-lab":         null,
+};
+const pollingMsgPerTab = {
+  "skill-security-audit":     null,
+  "multichain-contract-vuln": null,
+  "skill-stress-lab":         null,
+};
+
 // Pagination state
 let allHistoryTasks = [];
 let currentPage = 1;
@@ -368,9 +381,53 @@ function selectTab(tab, opts = {}) {
   }
   renderParamFields();
   updateContextBanner();
-  // 清除上传的文件和结果
+  // 清除上传的文件
   clearCurrentFile();
-  clearResults();
+  // Restore this tab's last task state, or show empty defaults if no task yet
+  const lastTask = lastTaskPerTab[tab];
+  if (lastTask) {
+    // If the stored task is in a non-final state but polling has already stopped,
+    // the status is stale — refresh from backend to get the real state.
+    if (!FINAL_STATUSES.has(lastTask.status) && !runningTabs[tab]) {
+      fetch(`${API_BASE}/api/tasks/${lastTask.taskId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(fresh => {
+          if (!fresh) return;
+          lastTaskPerTab[tab] = fresh;
+          if (activeTab === tab) {
+            const v = fresh.status === "failed" ? "error" : fresh.status === "completed" ? "success" : "running";
+            const label = { completed:"Scan Complete", failed:"Scan Failed", running:"Analyzing…", pending:"Queued" }[fresh.status] || fresh.status;
+            setStatus(label, v);
+            setSummary(describeTask(fresh));
+            renderArtifacts(fresh);
+            renderReportPreview(fresh);
+          }
+        })
+        .catch(() => {});
+      // Show a neutral loading state while fetching
+      setStatus("Loading…", "info");
+      setSummary("Refreshing task status…");
+      return;
+    }
+    const variant = lastTask.status === "failed" ? "error"
+                  : lastTask.status === "completed" ? "success"
+                  : "running";
+    const statusLabel = {
+      completed: "Scan Complete",
+      failed:    "Scan Failed",
+      running:   "Analyzing…",
+      pending:   "Queued",
+    }[lastTask.status] || lastTask.status;
+    setStatus(statusLabel, variant);
+    const msg = (!FINAL_STATUSES.has(lastTask.status) && pollingMsgPerTab[tab])
+      ? pollingMsgPerTab[tab]
+      : describeTask(lastTask);
+    setSummary(msg);
+    renderArtifacts(lastTask);
+    renderReportPreview(lastTask);
+  } else {
+    clearResults();
+  }
 }
 
 function updateContextBanner() {
@@ -636,16 +693,20 @@ async function runTask() {
       }
       if (resp.status === 409) {
         // 同类型任务已在运行中，提示等待，不展示 Failed
-        setStatus("In Queue", "running");
-        setSummary("A task of this type is already running. Please wait for it to complete before submitting a new one.");
+        if (activeTab === taskTab) {
+          setStatus("In Queue", "running");
+          setSummary("A task of this type is already running. Please wait for it to complete before submitting a new one.");
+        }
         runningTabs[taskTab] = false;
         updateRunButtonState();
         return;
       }
       if (resp.status === 429) {
         // 每日配额已达上限，友好提示，不展示 Scan Failed
-        setStatus("Daily Limit Reached", "warning");
-        setSummary("⏳ You've used all 3 tasks for today. Your quota resets at midnight UTC+0 — come back tomorrow to continue scanning.");
+        if (activeTab === taskTab) {
+          setStatus("Daily Limit Reached", "warning");
+          setSummary("⏳ You've used all 3 tasks for today. Your quota resets at midnight UTC+0 — come back tomorrow to continue scanning.");
+        }
         runningTabs[taskTab] = false;
         updateRunButtonState();
         return;
@@ -658,7 +719,7 @@ async function runTask() {
     upsertHistoryTask(task);
     let finalTask = task;
     if (!FINAL_STATUSES.has(task.status)) {
-      finalTask = await pollTask(task.taskId);
+      finalTask = await pollTask(task.taskId, taskTab);
       // pollTask 超时时返回 null，不重置上传区（让用户直接 retry）
       if (finalTask === null) {
         runningTabs[taskTab] = false;
@@ -670,9 +731,14 @@ async function runTask() {
     if (finalTask) upsertHistoryTask(finalTask);
     // Keep the uploaded file visible after completion — user can manually remove it.
   } catch (err) {
-    setStatus("Failed", "error");
-    const message = err instanceof Error ? err.message : String(err);
-    setSummary(message);
+    let message = err instanceof Error ? err.message : String(err);
+    // If the error contains "[stderr]", show only the stderr content
+    const stderrMatch = message.match(/\[stderr\]\s*([\s\S]+)/);
+    if (stderrMatch) message = stderrMatch[1].trim();
+    if (activeTab === taskTab) {
+      setStatus("Scan Failed", "error");
+      setSummary(message);
+    }
     artifactBox?.classList.add("hidden");
     // 网络/上传阶段失败才清空，扫描本身失败保留文件方便重试
   } finally {
@@ -709,6 +775,14 @@ function describeTask(task) {
     // Stress Test: show backend error message directly (already user-friendly)
     if (task.skillType === "skill-stress-lab") {
       return `⚠️ ${raw}`;
+    }
+
+    // Extract [stderr] content if present — this is the clean, user-facing
+    // error emitted directly by the script (e.g. "No supported source files…")
+    const stderrMatch = raw.match(/\[stderr\]\s*([\s\S]{1,300})/);
+    if (stderrMatch) {
+      const msg = stderrMatch[1].trim().replace(/\s+/g, " ");
+      return msg.slice(0, 200) + (msg.length > 200 ? "…" : "");
     }
 
     // General error handling: strip file paths and exit codes
@@ -846,7 +920,7 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function pollTask(taskId) {
+async function pollTask(taskId, taskTab) {
   // 每 2s 轮询一次，最多 150 次（5 分钟），足以覆盖大文件分析
   const MAX_ATTEMPTS  = 150;
   const POLL_INTERVAL = 2000;
@@ -869,21 +943,29 @@ async function pollTask(taskId) {
       continue;
     }
 
+    // renderTask is tab-aware: updates DOM only if taskTab === activeTab
     renderTask(task);
-    if (FINAL_STATUSES.has(task.status)) return task;
+    if (FINAL_STATUSES.has(task.status)) {
+      pollingMsgPerTab[taskTab] = null;
+      return task;
+    }
 
-    // 显示进度提示，让用户知道系统还在工作
+    // Build progress message and save it for the tab
     const elapsed = Math.round((attempts * POLL_INTERVAL) / 1000);
-    if (activeTab === "skill-stress-lab") {
+    let progressMsg;
+    if (taskTab === "skill-stress-lab") {
       // Stress Test has a security pre-check phase before the actual stress test
       const phase = elapsed < 30
         ? "Running security pre-check…"
         : "Security pre-check passed, running stress test…";
-      setSummary(`${phase} (${elapsed}s elapsed)`);
+      progressMsg = `${phase} (${elapsed}s elapsed)`;
     } else {
-      setSummary(
-        `Analyzing… (${elapsed}s elapsed — large packages may take several minutes)`
-      );
+      progressMsg = `Analyzing… (${elapsed}s elapsed — large packages may take several minutes)`;
+    }
+    pollingMsgPerTab[taskTab] = progressMsg;
+    // Only update the visible panel if this task's tab is currently active
+    if (activeTab === taskTab) {
+      setSummary(progressMsg);
     }
 
     await delay(POLL_INTERVAL);
@@ -891,18 +973,26 @@ async function pollTask(taskId) {
   }
 
   // 超时：服务可能在处理中，给出明确指引
-  setStatus("Timeout", "error");
-  setSummary(
-    "Analysis is taking longer than expected. " +
-    "The server may have restarted — please re-upload your file and try again. " +
-    "If this keeps happening, check the server logs."
-  );
+  pollingMsgPerTab[taskTab] = null;
+  if (activeTab === taskTab) {
+    setStatus("Timeout", "error");
+    setSummary(
+      "Analysis is taking longer than expected. " +
+      "The server may have restarted — please re-upload your file and try again. " +
+      "If this keeps happening, check the server logs."
+    );
+  }
   // 不 throw，避免触发 catch 再次 clearCurrentFile，让用户可以直接 retry
   return null;
 }
 
 function renderTask(task) {
   if (!task) return;
+  // Always save per-tab state and update history (global)
+  lastTaskPerTab[task.skillType] = task;
+  appendHistoryEntry(task);
+  // Only update the visible panel if this task belongs to the currently active tab
+  if (task.skillType !== activeTab) return;
   const variant = task.status === "failed" ? "error" : task.status === "completed" ? "success" : "running";
   const statusLabel = {
     completed: "Scan Complete",
@@ -913,7 +1003,6 @@ function renderTask(task) {
   setStatus(statusLabel, variant);
   setSummary(describeTask(task));
   renderArtifacts(task);
-  appendHistoryEntry(task);
   renderReportPreview(task);
 }
 
@@ -966,9 +1055,12 @@ function renderReportPreview(task) {
 
 // Build contract audit score cards — new format (6 dimension scores)
 function buildContractAuditSummary(text) {
-  // Parse new 5-dimension format (per CONTRACT_AUDIT_GUIDE.md)
+  // Parse new 5-dimension format (per CONTRACT_AUDIT_GUIDE.md).
+  // Only scan the summary section before "Per-File Analysis" to avoid
+  // per-file dimension scores overwriting the aggregate scores.
   const scores = {};
-  for (const line of text.split(/\r?\n/)) {
+  const summarySection = text.split(/^##\s+📄\s+Per-File Analysis/m)[0];
+  for (const line of summarySection.split(/\r?\n/)) {
     if (/Overall Security/.test(line)) {
       const m = line.match(/\*?\*?(\d+)\/100/);
       if (m) scores['Overall'] = parseInt(m[1]);
@@ -1082,7 +1174,7 @@ function buildSecurityAuditSummary(text) {
       const m = line.match(/\*?\*?(\d+)\/100/);
       if (m) scores['Overall'] = parseInt(m[1]);
     }
-    if (!scores['Overall']) {
+    if (scores['Overall'] === undefined) {
       const m = line.match(/(?:Overall Safety|综合安全评分)[:：\/]?\s*(\d+)/i);
       if (m) scores['Overall'] = parseInt(m[1]);
     }

@@ -10,7 +10,7 @@ from typing import Any, Dict, Literal, Optional, List
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB hard cap per upload
 MAX_WALLET_SESSIONS = 1000            # evict expired sessions above this threshold
 
-from fastapi import FastAPI, File, HTTPException, UploadFile, Header, Depends
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -34,7 +34,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 task_manager = TaskManager(BASE_DIR, repo_root=REPO_ROOT)
 
-# 简单的内存会话存储 (生产环境应使用 Redis)
+# In-memory session store (for production consider Redis or a DB)
 wallet_sessions: Dict[str, Dict[str, Any]] = {}
 _sessions_lock = threading.Lock()  # protects wallet_sessions against concurrent access
 
@@ -52,7 +52,7 @@ def _get_pdf_lock(task_id: str) -> threading.Lock:
 
 
 def verify_wallet_token(token: str = Header(None, alias="X-Wallet-Token")) -> Optional[str]:
-    """验证钱包 token，返回钱包地址"""
+    """Validate X-Wallet-Token header and return the associated wallet address, or None."""
     if not token:
         return None
     with _sessions_lock:
@@ -110,8 +110,8 @@ class TaskResponse(BaseModel):
 
 class WalletAuthRequest(BaseModel):
     wallet_address: str = Field(alias="walletAddress")
-    signature: str = Field(description="用户签名消息")
-    message: str = Field(description="签名的消息内容")
+    signature: str = Field(description="EIP-191 wallet signature")
+    message: str = Field(description="The message that was signed")
 
     class Config:
         allow_population_by_field_name = True
@@ -133,11 +133,20 @@ def health_check() -> Dict[str, str]:
     return {"status": "ok"}
 
 
+_ALLOWED_UPLOAD_EXTS = {".zip", ".skill", ".tar", ".gz", ".bz2", ".xz"}
+
+
 @app.post("/api/uploads", response_model=UploadResponse)
 def upload_file(file: UploadFile = File(...)) -> UploadResponse:
     # Using a sync handler: FastAPI dispatches it to the default threadpool so
     # the blocking file-read / disk-write don't block the async event loop.
-    content = file.file.read()  # sync read from the underlying SpooledTemporaryFile
+    suffix = Path(file.filename).suffix.lower() if file.filename else ""
+    if suffix not in _ALLOWED_UPLOAD_EXTS:
+        raise HTTPException(
+            status_code=415,
+            detail=f"Unsupported file type '{suffix}'. Allowed: {', '.join(sorted(_ALLOWED_UPLOAD_EXTS))}",
+        )
+    content = file.file.read()
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=413,
@@ -149,19 +158,21 @@ def upload_file(file: UploadFile = File(...)) -> UploadResponse:
 
 @app.post("/api/tasks", response_model=TaskResponse)
 def create_task(
+    request: Request,
     payload: TaskRequest,
     wallet_address: Optional[str] = Depends(verify_wallet_token)
 ) -> TaskResponse:
-    # 优先使用 payload 中的钱包地址，否则使用 token 验证的地址
     effective_wallet = payload.wallet_address or wallet_address
 
-    # ── 每日任务配额强制校验（后端权威判断，无法通过接口绕过）─────────────────
-    if not rate_limiter.try_increment(payload.device_id or ""):
-        status = rate_limiter.get_status(payload.device_id or "")
+    # Check quota first (non-consuming) — quota is consumed only after successful task creation
+    # to avoid wasting the user's daily allowance on validation errors.
+    client_ip = request.client.host if request.client else ""
+    quota = rate_limiter.get_status(client_ip)
+    if not quota["allowed"]:
         raise HTTPException(
             status_code=429,
             detail=(
-                f"Daily task limit reached. You have used {status['used']}/{status['limit']} "
+                f"Daily task limit reached. You have used {quota['used']}/{quota['limit']} "
                 f"tasks today (UTC). Resets at midnight UTC."
             ),
         )
@@ -184,8 +195,11 @@ def create_task(
         raise HTTPException(status_code=400, detail=str(exc))
     except FileNotFoundError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:  # pragma: no cover - 调试信息
+    except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+    # Consume quota after task is successfully created
+    rate_limiter.try_increment(client_ip)
     return TaskResponse(
         taskId=record.task_id,
         status=record.status,
@@ -236,7 +250,7 @@ def download_report(task_id: str):
 
 @app.get("/api/tasks/{task_id}/report/pdf")
 def download_report_pdf(task_id: str):
-    """将 markdown 报告实时渲染成 PDF 并返回"""
+    """Render the Markdown report as a PDF and stream it to the client."""
     try:
         record = task_manager.get_task(task_id)
     except KeyError:
@@ -272,14 +286,14 @@ def download_report_pdf(task_id: str):
     )
 
 
-# /api/tasks/{task_id}/artifact 接口已禁用（summary/log 含服务器内部信息，不对外暴露）
+# /api/tasks/{task_id}/artifact is intentionally not exposed — summary/log contain internal paths.
 
 
 # --------------------------- Wallet Authentication ---------------------------
 
 @app.get("/api/wallet/nonce")
 def get_wallet_nonce(wallet_address: str):
-    """获取用于签名的 nonce"""
+    """Return a one-time message for the client to sign with their wallet."""
     nonce = secrets.token_hex(16)
     message = f"Health AI Login\nAddress: {wallet_address}\nNonce: {nonce}\nTimestamp: {int(time.time())}"
     return {"message": message, "nonce": nonce}
@@ -287,26 +301,28 @@ def get_wallet_nonce(wallet_address: str):
 
 @app.post("/api/wallet/verify", response_model=WalletAuthResponse)
 def verify_wallet_login(payload: WalletAuthRequest) -> WalletAuthResponse:
-    """验证钱包签名并返回 token"""
+    """Verify the wallet signature and return a session token."""
     wallet_address = payload.wallet_address.lower()
-    
-    # 验证签名
     if ETH_ACCOUNT_AVAILABLE:
         try:
             message = encode_defunct(text=payload.message)
             recovered_address = Account.recover_message(message, signature=payload.signature)
             if recovered_address.lower() != wallet_address:
-                raise HTTPException(status_code=401, detail="签名验证失败")
+                raise HTTPException(status_code=401, detail="Signature verification failed: address mismatch")
+        except HTTPException:
+            raise
         except Exception as e:
-            raise HTTPException(status_code=401, detail=f"签名验证失败: {str(e)}")
+            raise HTTPException(status_code=401, detail=f"Signature verification failed: {e}")
     else:
-        # 简化模式：仅检查签名格式（生产环境应使用 eth-account）
-        if not payload.signature or len(payload.signature) < 10:
-            raise HTTPException(status_code=401, detail="无效签名")
+        # Fallback when eth-account is unavailable.
+        # EIP-191 signatures are 65 bytes = 132 hex chars with 0x prefix.
+        # Reject anything that doesn't look like a real signature.
+        sig = payload.signature or ""
+        if not (sig.startswith("0x") and len(sig) == 132):
+            raise HTTPException(status_code=401, detail="Invalid signature format. Install eth-account for full verification.")
     
-    # 生成 session token
     token = secrets.token_urlsafe(32)
-    expires_at = int(time.time()) + 7 * 24 * 3600  # 7 天有效期
+    expires_at = int(time.time()) + 7 * 24 * 3600  # 7-day session
 
     with _sessions_lock:
         # Evict expired sessions before inserting to bound memory usage.
@@ -333,9 +349,9 @@ def get_wallet_history(
     limit: int = 20,
     wallet_address: str = Depends(verify_wallet_token)
 ) -> List[TaskResponse]:
-    """获取当前登录钱包的分析历史"""
+    """Return analysis history for the authenticated wallet."""
     if not wallet_address:
-        raise HTTPException(status_code=401, detail="请先连接钱包")
+        raise HTTPException(status_code=401, detail="Wallet not connected. Please connect your wallet first.")
     
     records = task_manager.get_tasks_by_wallet(wallet_address, skill_type, limit)
     return [
@@ -358,11 +374,15 @@ def get_wallet_history(
 
 @app.get("/api/wallet/me")
 def get_wallet_info(wallet_address: str = Depends(verify_wallet_token)):
-    """获取当前登录钱包信息"""
+    """Return the wallet address for the current session."""
     if not wallet_address:
-        raise HTTPException(status_code=401, detail="未登录")
+        raise HTTPException(status_code=401, detail="Not authenticated.")
     return {"wallet_address": wallet_address}
 
 
-# Frontend static mounting disabled in server deployment.
-# Frontend is served by Vercel; backend only exposes API routes.
+# Serve frontend for local development / self-hosted deployment.
+# In Vercel deployment the frontend is served by Vercel itself; this mount
+# is a no-op there because the frontend directory won't exist server-side.
+_frontend_dir = REPO_ROOT / "frontend"
+if _frontend_dir.exists():
+    app.mount("/", StaticFiles(directory=str(_frontend_dir), html=True), name="frontend")

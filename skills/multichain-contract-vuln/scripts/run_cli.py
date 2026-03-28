@@ -46,7 +46,7 @@ _DIM_SCORE_KEYS = {
 }
 
 # Supported contract source extensions
-SOURCE_EXTS = {".sol", ".vy", ".rs", ".ts", ".tsx", ".js"}
+SOURCE_EXTS = {".sol", ".vy", ".rs"}
 MAX_FILES      = 10
 MAX_FILE_CHARS = 8000
 
@@ -254,43 +254,46 @@ _LLM_SYSTEM = (
 )
 
 _LLM_PROMPT_TMPL = """\
-你是一名资深智能合约安全审计专家。请对以下合约进行全面安全审计，并按照 5 个维度输出评分和具体风险项。
+You are a senior smart contract security auditor. Perform a thorough security audit of the contract below and score it across 5 dimensions. All output must be in English.
 
-**合约信息：**
-- 文件名：{filename}
-- 链类型：{chain_type}
-- 代码：
+**Contract Info:**
+- Filename: {filename}
+- Chain Type: {chain_type}
+- Source Code:
 ```
 {source_code}
 ```
 
-**审计要求：**
-1. 按照以下 5 个维度进行评分（每个维度 0-100 分，100 分表示无风险）：
-   - accessControl（访问控制）：权限管理、身份验证、owner检查、modifier完整性
-   - financialSecurity（资金安全）：重入攻击、整数溢出/下溢、资金锁定、提现逻辑、余额检查
-   - randomnessOracle（随机数与预言机）：弱随机数、区块属性依赖、预言机操纵、时间戳依赖
-   - dosResistance（拒绝服务）：Gas限制、循环炸弹、外部调用失败、数组无界增长
-   - businessLogic（业务逻辑）：状态不一致、条件竞争、前置运行、闪电贷攻击、逻辑漏洞
+**Audit Requirements:**
+1. For each of the 5 dimensions below, first identify concrete issues in the code, then derive the score from those findings:
+   - accessControl: Permission management, authentication, owner checks, modifier completeness
+   - financialSecurity: Reentrancy, integer overflow/underflow, fund locking, withdrawal logic, balance checks
+   - randomnessOracle: Weak randomness, block attribute dependency, oracle manipulation, timestamp dependency
+   - dosResistance: Gas limits, loop bombs, external call failures, unbounded array growth
+   - businessLogic: State inconsistency, race conditions, front-running, flash loan attacks, logic flaws
 
-2. 对每个维度列出发现的具体风险项（如果有）
+2. The score for each dimension MUST be consistent with its findings:
+   - Score = 100 only if there are zero findings for that dimension.
+   - Score < 100 requires at least one specific finding describing what was found and why points were deducted.
+   - Do NOT deduct points without documenting the reason in findings. Write all findings in English.
 
-3. criticalFindings 只包含可直接导致资金损失或合约失效的漏洞
+3. criticalFindings must only include vulnerabilities that directly lead to loss of funds or contract failure. Write in English.
 
-**评分标准：90-100=优秀，70-89=良好，50-69=需改进，<50=高风险**
+**Scoring guide (derived from findings severity): 90–100 = no/trivial issues | 70–89 = minor issues | 50–69 = moderate issues | <50 = critical issues**
 
-**严格按以下 JSON 格式输出，不要包含任何其他文字：**
+**Respond ONLY with the following JSON — no markdown fences, no additional text:**
 {{
   "filename": "{filename}",
-  "overallScore": <综合评分 0-100>,
+  "overallScore": <integer 0-100>,
   "dimensions": {{
-    "accessControl":    {{"score": <0-100>, "findings": ["风险描述1", "风险描述2"]}},
+    "accessControl":    {{"score": <0-100>, "findings": ["finding description"]}},
     "financialSecurity":{{"score": <0-100>, "findings": []}},
     "randomnessOracle": {{"score": <0-100>, "findings": []}},
     "dosResistance":    {{"score": <0-100>, "findings": []}},
     "businessLogic":    {{"score": <0-100>, "findings": []}}
   }},
-  "criticalFindings": ["严重漏洞描述（如无则为空数组）"],
-  "recommendation": "总体建议（1-2句话）"
+  "criticalFindings": ["critical vulnerability description, or empty array if none"],
+  "recommendation": "Overall recommendation in 1-2 sentences."
 }}
 """
 
@@ -354,11 +357,46 @@ def _analyze_file_with_llm(filename: str, code: str, model: str, chain: str) -> 
 
     def _parse_raw(raw: str) -> Optional[Dict]:
         """Parse and validate LLM JSON response into internal format."""
-        m = re.search(r'\{[\s\S]+\}', raw)
-        if not m:
+        # Strip markdown code fences (```json ... ``` or ``` ... ```)
+        text = re.sub(r'```[a-zA-Z]*\n?', '', raw).strip()
+
+        # Extract balanced JSON object using brace counting,
+        # avoiding the greedy-regex pitfall of grabbing extra trailing content.
+        start = text.find('{')
+        if start < 0:
             return None
+        depth = 0
+        in_str = False
+        escaped = False
+        end = -1
+        for i, ch in enumerate(text[start:], start):
+            if escaped:
+                escaped = False
+                continue
+            if ch == '\\' and in_str:
+                escaped = True
+                continue
+            if ch == '"':
+                in_str = not in_str
+                continue
+            if in_str:
+                continue
+            if ch == '{':
+                depth += 1
+            elif ch == '}':
+                depth -= 1
+                if depth == 0:
+                    end = i
+                    break
+        if end < 0:
+            return None
+        candidate = text[start:end + 1]
+
+        # Fix common LLM JSON quirks: trailing commas before } or ]
+        candidate = re.sub(r',\s*([}\]])', r'\1', candidate)
+
         try:
-            parsed = json.loads(m.group())
+            parsed = json.loads(candidate)
         except json.JSONDecodeError:
             return None
 
@@ -429,7 +467,7 @@ def _analyze_file_with_llm(filename: str, code: str, model: str, chain: str) -> 
         )
         raw = (resp.choices[0].message.content or "").strip()
         result = _parse_raw(raw)
-        return result if result else {**_empty, "status": "ok", "filename": filename}
+        return result if result else _err(f"LLM returned unparseable response: {raw[:100]}")
 
     except Exception as chat_exc:
         chat_err = str(chat_exc)
@@ -454,7 +492,7 @@ def _analyze_file_with_llm(filename: str, code: str, model: str, chain: str) -> 
             raw = _call_responses_api()
             if raw is not None:
                 result = _parse_raw(raw)
-                return result if result else {**_empty, "status": "ok", "filename": filename}
+                return result if result else _err(f"LLM returned unparseable response: {raw[:100]}")
 
             return _err(
                 f"Model '{model}' is not supported by any available API endpoint. "
@@ -465,7 +503,7 @@ def _analyze_file_with_llm(filename: str, code: str, model: str, chain: str) -> 
         raw = _call_responses_api()
         if raw is not None:
             result = _parse_raw(raw)
-            return result if result else {**_empty, "status": "ok", "filename": filename}
+            return result if result else _err(f"LLM returned unparseable response: {raw[:100]}")
 
         return _err(f"[model={model}] {chat_err}")
 
@@ -521,7 +559,7 @@ def _build_per_file_section(file_results: List[Dict]) -> List[str]:
 
         overall  = result.get("overallScore", 100)
         has_risk = result.get("hasRisk", False)
-        lines.append(f"\n**Overall Score:** {overall}/100 &nbsp;|&nbsp; **Risk Level:** {_risk_level_label(overall)}")
+        lines.append(f"\n**Overall Score:** {overall}/100  |  **Risk Level:** {_risk_level_label(overall)}")
         lines.append("")
 
         # Dimension score summary table
@@ -544,7 +582,7 @@ def _build_per_file_section(file_results: List[Dict]) -> List[str]:
             findings = dim_findings.get(k, [])
             status   = "✅ Pass" if sc >= 90 and not findings else "❌ Risk Detected"
             lines.append(f"#### {_DIM_LABELS[k]}")
-            lines.append(f"**Score:** {sc}/100 &nbsp;|&nbsp; **Status:** {status}")
+            lines.append(f"**Score:** {sc}/100  |  **Status:** {status}")
             if findings:
                 lines.append("")
                 lines.append("**Findings:**")
@@ -604,7 +642,7 @@ def build_report(
         "",
         "---",
         "",
-        "## 📊 Risk Scores",
+        "## 📊 Total Risk Scores",
         "",
         "| Dimension | Score | Rating |",
         "| --- | :---: | --- |",
@@ -760,13 +798,16 @@ def main() -> int:
 
     print(f"[ContractAudit] Found {len(source_files)} file(s) to analyze with model={model}")
 
-    # ── Analyze each file with LLM ────────────────────────────────────────────
-    llm_file_results: List[Dict] = []
-    for file_path in source_files:
+    # ── Analyze each file with LLM (parallel) ────────────────────────────────
+    # LLM calls are I/O-bound; run them concurrently to reduce total wait time.
+    # Concurrency is capped at MAX_FILES (10) which is already a small number.
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    def _analyze_one(file_path: Path) -> Dict:
         try:
             code = file_path.read_text(encoding="utf-8", errors="ignore")
         except Exception as exc:
-            llm_file_results.append({
+            return {
                 "status": "error", "reason": str(exc),
                 "filename": file_path.name,
                 "overallScore": 100,
@@ -775,12 +816,17 @@ def main() -> int:
                 "dimensionFindings": {k: []  for k in _DIM_KEYS},
                 "criticalFindings":  [],
                 "recommendation":    "",
-            })
-            continue
-
+            }
         print(f"[ContractAudit] Analyzing {file_path.name} ...")
-        result = _analyze_file_with_llm(file_path.name, code, model, chain)
-        llm_file_results.append(result)
+        return _analyze_file_with_llm(file_path.name, code, model, chain)
+
+    # Preserve original file order in results
+    ordered: Dict[int, Dict] = {}
+    with ThreadPoolExecutor(max_workers=min(len(source_files), MAX_FILES)) as pool:
+        futures = {pool.submit(_analyze_one, fp): i for i, fp in enumerate(source_files)}
+        for fut in as_completed(futures):
+            ordered[futures[fut]] = fut.result()
+    llm_file_results: List[Dict] = [ordered[i] for i in range(len(source_files))]
 
     # ── Generate report ───────────────────────────────────────────────────────
     report_file = build_report(scope, chain, target, report_path, llm_file_results, notes, model)

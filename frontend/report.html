@@ -249,9 +249,14 @@
       let html = markdown
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/>/g, '&gt;')
+        // Restore HTML entities that were present in the source markdown
+        .replace(/&amp;nbsp;/g, '&nbsp;')
+        .replace(/&amp;lt;/g, '&lt;')
+        .replace(/&amp;gt;/g, '&gt;');
       
-      // Headers
+      // Headers (#### must be replaced before ## and ### to avoid partial matches)
+      html = html.replace(/^#### (.*)$/gm, '<h4 style="color:var(--text-primary);font-size:13px;font-weight:600;margin:10px 0 3px;">$1</h4>');
       html = html.replace(/^# (.*)$/gm, '<h1 style="color:var(--text-primary);font-size:20px;margin:16px 0 8px;">$1</h1>');
       html = html.replace(/^## (.*)$/gm, '<h2 style="color:var(--text-primary);font-size:16px;margin:14px 0 6px;">$1</h2>');
       html = html.replace(/^### (.*)$/gm, '<h3 style="color:var(--text-primary);font-size:14px;margin:12px 0 4px;">$1</h3>');
@@ -665,27 +670,31 @@
         document.title = 'Contract Audit Report - Health AI';
         const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown';
 
-        // ── New format: dimension score table ───────────────────────────────
+        // ── New format: dimension score table (per CONTRACT_AUDIT_GUIDE.md) ───
         if (/\|\s*[^\|]*Access Control/.test(reportText)) {
           const scoreMap = {};
-          for (const line of reportText.split(/\r?\n/)) {
-            if (/Overall Security/.test(line)) { const m = line.match(/\*?\*?(\d+)\/100/); if (m) scoreMap['Overall'] = +m[1]; }
-            if (/Access Control/.test(line))   { const m = line.match(/Access Control[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Access'] = +m[1]; }
-            if (/Reentrancy/.test(line))        { const m = line.match(/Reentrancy[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Reentrancy'] = +m[1]; }
-            if (/Arithmetic/.test(line))        { const m = line.match(/Arithmetic[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Arithmetic'] = +m[1]; }
-            if (/External Calls/.test(line))    { const m = line.match(/External Calls[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['External'] = +m[1]; }
-            if (/Code Quality/.test(line))      { const m = line.match(/Code Quality[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Quality'] = +m[1]; }
+          // Only parse scores from the main "Risk Scores" summary table.
+          // Stop before "Per-File Analysis" to avoid per-file dimension scores
+          // overwriting the aggregate scores.
+          const summarySection = reportText.split(/^##\s+📄\s+Per-File Analysis/m)[0];
+          for (const line of summarySection.split(/\r?\n/)) {
+            if (/Overall Security/.test(line))       { const m = line.match(/\*?\*?(\d+)\/100/); if (m) scoreMap['Overall'] = +m[1]; }
+            if (/Access Control/.test(line))         { const m = line.match(/Access Control[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Access'] = +m[1]; }
+            if (/Financial Security/.test(line))     { const m = line.match(/Financial Security[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Financial'] = +m[1]; }
+            if (/Randomness.*Oracle/.test(line))     { const m = line.match(/Randomness[^\|]*Oracle[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Randomness'] = +m[1]; }
+            if (/DoS Resistance/.test(line))         { const m = line.match(/DoS Resistance[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['DoS'] = +m[1]; }
+            if (/Business Logic/.test(line))         { const m = line.match(/Business Logic[^\|]*\|\s*\*?\*?(\d+)\/100/i); if (m) scoreMap['Logic'] = +m[1]; }
           }
           function scoreClass(s) {
-            if (s >= 80) return 'low'; if (s >= 60) return 'total'; if (s >= 40) return 'medium'; return 'high';
+            if (s >= 90) return 'low'; if (s >= 70) return 'total'; if (s >= 50) return 'medium'; return 'high';
           }
           const dims = [
             { key:'Overall',    icon:'📊', label:'Overall' },
-            { key:'Access',     icon:'🔒', label:'Access Control' },
-            { key:'Reentrancy', icon:'🔄', label:'Reentrancy' },
-            { key:'Arithmetic', icon:'🔢', label:'Arithmetic' },
-            { key:'External',   icon:'📞', label:'External Calls' },
-            { key:'Quality',    icon:'📋', label:'Code Quality' },
+            { key:'Access',     icon:'🔐', label:'Access Control' },
+            { key:'Financial',  icon:'💰', label:'Financial Security' },
+            { key:'Randomness', icon:'🎲', label:'Randomness & Oracle' },
+            { key:'DoS',        icon:'⚡', label:'DoS Resistance' },
+            { key:'Logic',      icon:'🛡️', label:'Business Logic' },
           ];
           let html = '';
           html += '<div class="report-header"><h1>📋 Contract Audit Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
@@ -697,8 +706,21 @@
             html += `<div class="risk-label">${d.icon} ${d.label}</div></div>`;
           }
           html += '</div>';
-          html += '<div style="margin-bottom:20px;padding:8px 12px;background:rgba(99,102,241,0.1);border-radius:6px;font-size:12px;color:#94a3b8;text-align:center;">Score: 80-100 = Excellent 🟢 &nbsp;|&nbsp; 60-79 = Good 🔵 &nbsp;|&nbsp; 40-59 = Caution 🟡 &nbsp;|&nbsp; &lt;40 = Risk 🔴</div>';
-          html += '<div class="issues-section"><div class="issues-header">📄 Full Report</div><div style="padding:16px 20px;"><div class="raw-report">' + markdownToHtml(reportText) + '</div></div></div>';
+          html += '<div style="margin-bottom:20px;padding:8px 12px;background:rgba(99,102,241,0.1);border-radius:6px;font-size:12px;color:#94a3b8;text-align:center;">Score: 90-100 = Excellent 🟢 &nbsp;|&nbsp; 70-89 = Good 🔵 &nbsp;|&nbsp; 50-69 = Caution 🟡 &nbsp;|&nbsp; &lt;50 = Risk 🔴</div>';
+          // Strip title + metadata preamble (everything before the first ## section)
+          // to avoid duplicating info already shown in the page header above.
+          const firstSection = reportText.indexOf('\n## ');
+          let displayText = firstSection >= 0 ? reportText.slice(firstSection + 1) : reportText;
+          // Remove "## Scope Overview" and everything after it (includes disclaimer)
+          const scopeIdx = displayText.indexOf('\n## Scope Overview');
+          if (scopeIdx >= 0) {
+            displayText = displayText.slice(0, scopeIdx);
+          } else {
+            // Fallback: remove trailing disclaimer paragraph after last ---
+            const disclaimerIdx = displayText.lastIndexOf('\n---\n\n*Disclaimer');
+            if (disclaimerIdx >= 0) displayText = displayText.slice(0, disclaimerIdx);
+          }
+          html += '<div class="issues-section"><div class="issues-header">📄 Full Report</div><div style="padding:16px 20px;"><div class="raw-report">' + markdownToHtml(displayText) + '</div></div></div>';
           container.innerHTML = html;
           return;
         }
