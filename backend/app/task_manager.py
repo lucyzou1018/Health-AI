@@ -103,7 +103,6 @@ class TaskManager:
             record.message = "Service restarted — task was interrupted. Please re-submit."
             record.updated_at = _now()
         self._save_index()
-        print(f"[TaskManager] Recovered {len(orphaned)} orphaned task(s) on startup.")
 
     def _build_index_payload(self) -> dict:
         """Serialize self.tasks to a plain dict.  Must be called with self._lock held."""
@@ -417,47 +416,6 @@ class TaskManager:
         (rb"__import__\s*\(\s*['\"]os['\"]\s*\)", "obfuscated import: os"),
     ]
 
-    def _scan_upload_security(self, input_dir: Path) -> list[str]:
-        """Scan extracted upload for dangerous files and malicious patterns.
-
-        Returns a list of human-readable warning strings.  An empty list
-        means no threats were found.
-        """
-        import re as _re
-
-        warnings: list[str] = []
-
-        for filepath in input_dir.rglob("*"):
-            if not filepath.is_file():
-                continue
-
-            rel = filepath.relative_to(input_dir)
-
-            # 1. Check dangerous file extensions
-            if filepath.suffix.lower() in self.DANGEROUS_EXTENSIONS:
-                warnings.append(f"Dangerous file detected: {rel} (type: {filepath.suffix})")
-                continue  # no need to scan content
-
-            # 2. Check content of text-like files for suspicious patterns
-            if filepath.suffix.lower() in {
-                ".py", ".js", ".ts", ".rb", ".pl", ".php", ".java",
-                ".c", ".cpp", ".h", ".go", ".rs", ".lua", ".r",
-                ".yaml", ".yml", ".json", ".toml", ".ini", ".cfg",
-                ".txt", ".md", ".rst", "",
-            }:
-                try:
-                    content = filepath.read_bytes()[:50_000]  # first 50 KB
-                    for pattern, desc in self.SUSPICIOUS_PATTERNS:
-                        if _re.search(pattern, content):
-                            warnings.append(
-                                f"Suspicious pattern in {rel}: {desc}"
-                            )
-                            break  # one warning per file is enough
-                except (OSError, UnicodeDecodeError):
-                    pass
-
-        return warnings
-
     # Minimum security audit score required to proceed with stress testing
     STRESS_MIN_SECURITY_SCORE = 95
 
@@ -510,8 +468,7 @@ class TaskManager:
                      "dependencyRisk": 0, "stabilityRisk": 0}
         try:
             result = self._run_security_audit(code_dir, precheck_dir, {})
-        except Exception as exc:
-            print(f"[TaskManager] Security pre-check audit error: {exc}")
+        except Exception:
             return {"score": 0, "aiReview": empty_ai}
 
         summary_path = result.get("summary", "")
@@ -520,10 +477,8 @@ class TaskManager:
                 data = json.loads(Path(summary_path).read_text(encoding="utf-8"))
                 score = int(data.get("overallScore", 0))
                 ai_review = data.get("aiReview", empty_ai) or empty_ai
-                print(f"[TaskManager] Security pre-check score: {score}/100, AI review: {ai_review.get('status')}")
                 return {"score": score, "aiReview": ai_review}
-            except Exception as exc:
-                print(f"[TaskManager] Failed to parse security pre-check score: {exc}")
+            except Exception:
                 return {"score": 0, "aiReview": empty_ai}
         return {"score": 0, "aiReview": empty_ai}
 
@@ -554,22 +509,17 @@ class TaskManager:
             return True  # Can't read → assume needs args
 
         if self._RE_REQUIRED_TRUE.search(source):
-            print(f"[StressLab] {script_path.name}: found required=True")
             return True
         if self._RE_POSITIONAL_ARG.search(source):
-            print(f"[StressLab] {script_path.name}: found positional argument")
             return True
         if self._RE_MANUAL_REQUIRED.search(source):
-            print(f"[StressLab] {script_path.name}: found manual required check")
             return True
 
-        print(f"[StressLab] {script_path.name}: no mandatory args detected")
         return False
 
     def _run_stress_lab(self, code_dir: Path, report_dir: Path, params: Dict[str, Any]) -> Dict[str, Any]:
         # ── Step 1: Check for mandatory parameters (static analysis) ─────
         skill_dir = self._find_skill_dir(code_dir, params)
-        print(f"[StressLab] skill_dir = {skill_dir}")
 
         command = params.get("command")  # allow explicit override
         if not command:
@@ -583,7 +533,6 @@ class TaskManager:
             # e.g. "python3 {skill}/scripts/run_cli.py" → skill_dir / "scripts/run_cli.py"
             rel_path = entry.replace("python3 {skill}/", "")
             script_path = skill_dir / rel_path
-            print(f"[StressLab] checking entry script: {script_path}")
 
             if self._has_mandatory_args(script_path):
                 raise RuntimeError(

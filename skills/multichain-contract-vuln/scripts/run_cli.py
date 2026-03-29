@@ -19,7 +19,7 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from urllib import error as urlerror, request as urlrequest
+from urllib import request as urlrequest
 
 # ── Dimension definitions (per CONTRACT_AUDIT_GUIDE.md) ──────────────────────
 
@@ -760,7 +760,6 @@ def main() -> int:
     if args.input:
         target = Path(args.input).expanduser().resolve()
         if not target.exists():
-            print(f"Input path does not exist: {target}", file=sys.stderr)
             return 1
     elif args.evm_address:
         api_key = args.etherscan_api_key or os.getenv("ETHERSCAN_API_KEY")
@@ -768,13 +767,11 @@ def main() -> int:
             args.evm_address, args.network.lower(), api_key
         )
         if not fetched_dir:
-            print("❌ Failed to download on-chain source (verify address or configure Etherscan/Sourcify)", file=sys.stderr)
             return 1
         target = fetched_dir
         if fetch_note:
             notes.append(fetch_note)
     else:
-        print("Must provide --input or --evm-address", file=sys.stderr)
         return 1
 
     chain_hint = args.chain or ("evm" if args.evm_address else None)
@@ -793,10 +790,7 @@ def main() -> int:
     # ── Collect source files ──────────────────────────────────────────────────
     source_files = _collect_source_files(target)
     if not source_files:
-        print("❌ No supported source files found in the uploaded package.", file=sys.stderr)
         return 1
-
-    print(f"[ContractAudit] Found {len(source_files)} file(s) to analyze with model={model}")
 
     # ── Analyze each file with LLM (parallel) ────────────────────────────────
     # LLM calls are I/O-bound; run them concurrently to reduce total wait time.
@@ -817,7 +811,6 @@ def main() -> int:
                 "criticalFindings":  [],
                 "recommendation":    "",
             }
-        print(f"[ContractAudit] Analyzing {file_path.name} ...")
         return _analyze_file_with_llm(file_path.name, code, model, chain)
 
     # Preserve original file order in results
@@ -829,8 +822,7 @@ def main() -> int:
     llm_file_results: List[Dict] = [ordered[i] for i in range(len(source_files))]
 
     # ── Generate report ───────────────────────────────────────────────────────
-    report_file = build_report(scope, chain, target, report_path, llm_file_results, notes, model)
-    print(f"✅ Report generated: {report_file}")
+    build_report(scope, chain, target, report_path, llm_file_results, notes, model)
     return 0
 
 

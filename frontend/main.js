@@ -118,7 +118,6 @@ const walletBtn = document.getElementById("wallet-connect");
 const walletText = document.getElementById("wallet-text");
 const historyFilters = document.querySelectorAll(".filter-btn");
 const historyCount = document.getElementById("history-count");
-const historyEmpty = document.getElementById("history-empty");
 const historyPanel = document.getElementById("history-panel");
 const reportPreviewBox = document.getElementById("report-preview");
 const paginationEl = document.getElementById("pagination");
@@ -844,10 +843,6 @@ function upsertHistoryTask(task) {
   renderHistoryPage();
 }
 
-function addHistoryTask(task) {
-  upsertHistoryTask(task);
-}
-
 function appendHistoryEntry(task) {
   upsertHistoryTask(task);
 }
@@ -1097,7 +1092,7 @@ function buildContractAuditSummary(text) {
   ];
 
   // Contract Audit uses guide thresholds: 90/70/50 (not 80/60/40 used elsewhere)
-  function getScoreClass(s) {
+  function contractScoreClass(s) {
     if (s >= 90) return 'low';    // green  — Excellent
     if (s >= 70) return 'total';  // blue   — Good
     if (s >= 50) return 'medium'; // yellow — Caution
@@ -1107,17 +1102,10 @@ function buildContractAuditSummary(text) {
   let html = `<div class="report-stats-cards report-stats-cards--6">`;
   for (const d of dims) {
     const s = scores[d.key] ?? 0;
-    html += `<div class="stat-card ${getScoreClass(s)}">`;
-    html += `<span class="stat-number">${s}</span>`;
-    html += `<span class="stat-label"><span class="stat-icon">${d.icon}</span>${d.label}</span>`;
-    html += `</div>`;
+    html += _scoreCard(s, d.icon, d.label, contractScoreClass);
   }
   html += `</div>`;
-
-  // Score legend (contract audit thresholds differ from security audit)
-  html += `<div style="margin-top:8px;padding:8px 12px;background:rgba(99,102,241,0.1);border-radius:6px;font-size:12px;color:#94a3b8;">`;
-  html += `Score: 90-100 = Excellent 🟢 | 70-89 = Good 🔵 | 50-69 = Caution 🟡 | &lt;50 = Risk 🔴`;
-  html += `</div>`;
+  html += _scoreLegend('contract');
 
   return html;
 }
@@ -1153,6 +1141,26 @@ function buildReportSummary(text) {
   html += `</div>`;
 
   return html;
+}
+
+// Shared helpers for score card rendering (80/60/40 thresholds used by Security Audit and Stress Lab)
+function _scoreClass(score) {
+  if (score >= 80) return 'low';    // Excellent - green
+  if (score >= 60) return 'total';  // Good - blue
+  if (score >= 40) return 'medium'; // Caution - yellow
+  return 'high';                    // Risk - red
+}
+
+function _scoreCard(score, icon, label, classFn) {
+  const cls = (classFn || _scoreClass)(score);
+  return `<div class="stat-card ${cls}"><span class="stat-number">${score}</span><span class="stat-label"><span class="stat-icon">${icon}</span>${label}</span></div>`;
+}
+
+function _scoreLegend(thresholds) {
+  const text = thresholds === 'contract'
+    ? 'Score: 90-100 = Excellent 🟢 | 70-89 = Good 🔵 | 50-69 = Caution 🟡 | &lt;50 = Risk 🔴'
+    : 'Score: 80-100 = Excellent 🟢 | 60-79 = Good 🔵 | 40-59 = Caution 🟡 | &lt;40 = Risk 🔴';
+  return `<div style="margin-top: 8px; padding: 8px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #94a3b8;">${text}</div>`;
 }
 
 // Build security audit score cards (6 dimensions)
@@ -1233,28 +1241,16 @@ function buildSecurityAuditSummary(text) {
   const supplyChainScore = scores['SupplyChain'] || 0;
   const failureScore     = scores['Failure']     || 0;
 
-  // Determine score class based on value (higher = safer)
-  function getScoreClass(score) {
-    if (score >= 80) return 'low';      // 优秀 - 绿色
-    if (score >= 60) return 'total';    // 良好 - 蓝色
-    if (score >= 40) return 'medium';   // 一般 - 黄色
-    return 'high';                      // 需改进 - 红色
-  }
-
   // Build 6 score cards — 3-column grid (2 rows of 3)
   let html = `<div class="report-stats-cards report-stats-cards--6">`;
-  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label"><span class="stat-icon">📊</span>Overall</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(privacyScore)}"><span class="stat-number">${privacyScore}</span><span class="stat-label"><span class="stat-icon">🔏</span>Privacy</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(privilegeScore)}"><span class="stat-number">${privilegeScore}</span><span class="stat-label"><span class="stat-icon">🔐</span>Privilege</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(integrityScore)}"><span class="stat-number">${integrityScore}</span><span class="stat-label"><span class="stat-icon">🛡️</span>Integrity</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(supplyChainScore)}"><span class="stat-number">${supplyChainScore}</span><span class="stat-label"><span class="stat-icon">🔗</span>Dependency Risk</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(failureScore)}"><span class="stat-number">${failureScore}</span><span class="stat-label"><span class="stat-icon">✅</span>Stability</span></div>`;
+  html += _scoreCard(overallScore,    '📊', 'Overall');
+  html += _scoreCard(privacyScore,    '🔏', 'Privacy');
+  html += _scoreCard(privilegeScore,  '🔐', 'Privilege');
+  html += _scoreCard(integrityScore,  '🛡️', 'Integrity');
+  html += _scoreCard(supplyChainScore,'🔗', 'Dependency Risk');
+  html += _scoreCard(failureScore,    '✅', 'Stability');
   html += `</div>`;
-
-  // Add score legend
-  html += `<div style="margin-top: 8px; padding: 8px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #94a3b8;">`;
-  html += `Score: 80-100 = Excellent 🟢 | 60-79 = Good 🔵 | 40-59 = Caution 🟡 | &lt;40 = Risk 🔴`;
-  html += `</div>`;
+  html += _scoreLegend();
 
   return html;
 }
@@ -1304,29 +1300,17 @@ function buildStressLabSummary(text) {
     overallScore = scoreValues.length ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length) : 0;
   }
   
-  // Determine score class (higher = better)
-  function getScoreClass(score) {
-    if (score >= 80) return 'low';      // Excellent - green
-    if (score >= 60) return 'total';    // Good - blue
-    if (score >= 40) return 'medium';   // Caution - yellow
-    return 'high';                      // Risk - red
-  }
-  
   // Build 6 score cards (overall + 5 dimensions) — 3-column grid (2 rows of 3)
   let html = `<div class="report-stats-cards report-stats-cards--6">`;
-  html += `<div class="stat-card ${getScoreClass(overallScore)}"><span class="stat-number">${overallScore}</span><span class="stat-label"><span class="stat-icon">🎯</span>Overall</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(stabilityScore)}"><span class="stat-number">${stabilityScore}</span><span class="stat-label"><span class="stat-icon">🛡️</span>Stability</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(performanceScore)}"><span class="stat-number">${performanceScore}</span><span class="stat-label"><span class="stat-icon">⚡</span>Performance</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(resourceScore)}"><span class="stat-number">${resourceScore}</span><span class="stat-label"><span class="stat-icon">💾</span>Resource</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(consistencyScore)}"><span class="stat-number">${consistencyScore}</span><span class="stat-label"><span class="stat-icon">🔄</span>Consistency</span></div>`;
-  html += `<div class="stat-card ${getScoreClass(recoveryScore)}"><span class="stat-number">${recoveryScore}</span><span class="stat-label"><span class="stat-icon">🆘</span>Recovery</span></div>`;
+  html += _scoreCard(overallScore,     '🎯', 'Overall');
+  html += _scoreCard(stabilityScore,   '🛡️', 'Stability');
+  html += _scoreCard(performanceScore, '⚡', 'Performance');
+  html += _scoreCard(resourceScore,    '💾', 'Resource');
+  html += _scoreCard(consistencyScore, '🔄', 'Consistency');
+  html += _scoreCard(recoveryScore,    '🆘', 'Recovery');
   html += `</div>`;
+  html += _scoreLegend();
 
-  // Add score legend
-  html += `<div style="margin-top: 8px; padding: 8px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #94a3b8;">`;
-  html += `Score: 80-100 = Excellent 🟢 | 60-79 = Good 🔵 | 40-59 = Caution 🟡 | &lt;40 = Risk 🔴`;
-  html += `</div>`;
-  
   return html;
 }
 
@@ -1371,24 +1355,8 @@ function extractAllIssues(text) {
   return items;
 }
 
-function extractKeyRisks(text) {
-  const items = extractAllIssues(text);
-  return items.map(item => ({
-    type: item.name,
-    location: item.location,
-    desc: item.desc
-  }));
-}
-
 function extractDetectorSummaries(text) {
   return extractAllIssues(text);
-}
-
-function buildDetectorRecommendation(name) {
-  return (
-    DETECTOR_REMEDIATIONS[name] ||
-    `For the ${name} finding, review the related business logic and apply the remediation suggestions in the report.`
-  );
 }
 
 // --------------------------- Wallet Functions ---------------------------

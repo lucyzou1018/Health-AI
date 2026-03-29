@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import secrets
 import threading
 import time
@@ -12,11 +11,11 @@ MAX_WALLET_SESSIONS = 1000            # evict expired sessions above this thresh
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .task_manager import SUPPORTED_SKILLS, TaskManager
+from .task_manager import TaskManager
 from . import rate_limiter
 
 # Try to import eth-account for signature verification
@@ -26,7 +25,6 @@ try:
     ETH_ACCOUNT_AVAILABLE = True
 except ImportError:
     ETH_ACCOUNT_AVAILABLE = False
-    print("Warning: eth-account not available, wallet verification will be simplified")
 
 BASE_DIR = Path(__file__).resolve().parent.parent / "storage"
 BASE_DIR.mkdir(parents=True, exist_ok=True)
@@ -380,5 +378,7 @@ def get_wallet_info(wallet_address: str = Depends(verify_wallet_token)):
     return {"wallet_address": wallet_address}
 
 
-# Frontend static mounting disabled in server deployment.
-# Frontend is served by Vercel; backend only exposes API routes.
+# Serve frontend static files — must be mounted last so API routes take precedence
+_FRONTEND_DIR = REPO_ROOT / "frontend"
+if _FRONTEND_DIR.exists():
+    app.mount("/", StaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")

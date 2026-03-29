@@ -32,8 +32,6 @@ except Exception:
 HOME = Path.home()
 CONFIG_PATH = HOME / ".openclaw" / "openclaw.json"
 WORKSPACE = HOME / ".openclaw" / "workspace"
-MEMORY_DIR = WORKSPACE / "memory"
-LOG_DIR = HOME / ".openclaw" / "logs"
 DEFAULT_OUTPUT: Path | None = None
 
 HIGH_RISK_TOOLS = {
@@ -250,9 +248,6 @@ def _score_external_metrics(payload: Dict[str, Any], body: str) -> Dict[str, int
     def _hits(keywords: List[str]) -> int:
         return sum(1 for keyword in keywords if keyword in haystack)
 
-    def _score(base: int, step: int, keywords: List[str], cap: int = 90) -> int:
-        return min(cap, base + _hits(keywords) * step)
-
     privacy_keywords = [
         "private key",
         "mnemonic",
@@ -399,16 +394,16 @@ def load_external_skills(path_inputs: Optional[List[str]], url_inputs: Optional[
             name_hint, text = _load_skill_text_from_path(raw)
             origin = str(Path(raw).expanduser())
             entries.append(_analyze_external_skill(name_hint, text, origin))
-        except Exception as exc:
-            print(f"⚠️ Unable to read local skill {raw}: {exc}", file=sys.stderr)
+        except Exception:
+            pass
     for url in url_inputs or []:
         if not url:
             continue
         try:
             name_hint, text = _load_skill_text_from_url(url)
             entries.append(_analyze_external_skill(name_hint, text, url))
-        except (URLError, OSError) as exc:
-            print(f"⚠️ Unable to fetch remote skill {url}: {exc}", file=sys.stderr)
+        except (URLError, OSError):
+            pass
     return entries
 
 
@@ -480,16 +475,16 @@ def load_external_agents(path_inputs: Optional[List[str]], url_inputs: Optional[
             _, data = _load_agent_json_from_path(raw)
             origin = str(Path(raw).expanduser())
             _extend(data, origin)
-        except Exception as exc:
-            print(f"⚠️ Unable to read local agent {raw}: {exc}", file=sys.stderr)
+        except Exception:
+            pass
     for url in url_inputs or []:
         if not url:
             continue
         try:
             _, data = _load_agent_json_from_url(url)
             _extend(data, url)
-        except (URLError, OSError, json.JSONDecodeError) as exc:
-            print(f"⚠️ Unable to fetch remote agent {url}: {exc}", file=sys.stderr)
+        except (URLError, OSError, json.JSONDecodeError):
+            pass
     return entries
 
 
@@ -509,7 +504,7 @@ def _warn_perms(path: Path) -> None:
     except OSError:
         return
     if stat_info.st_mode & 0o077:
-        print(f"⚠️ Warning: {path} permissions are too broad (recommended 600)", file=sys.stderr)
+        pass  # permissions are broader than recommended 600
 
 
 def load_config() -> Dict[str, Any]:
@@ -875,14 +870,6 @@ def build_suggestions(report: Dict[str, Any]) -> List[Dict[str, Any]]:
     return suggestions
 
 
-def _translate_warning(message: str, lang: str) -> str:
-    return message
-
-
-def _translate_note(note: str, lang: str) -> str:
-    return note
-
-
 def _render_suggestions(suggestions: List[Dict[str, Any]], lang: str) -> List[str]:
     rendered: List[str] = []
     for item in suggestions:
@@ -915,17 +902,6 @@ def _render_suggestions(suggestions: List[Dict[str, Any]], lang: str) -> List[st
         elif stype == "none":
             rendered.append("No remediation required based on current telemetry.")
     return rendered
-
-
-def _render_pattern_table(hits: List[Dict[str, str]], lang: str, title_en: str, title_zh: str) -> List[str]:
-    if not hits:
-        return []
-    lines = ["", title_en]
-    lines.append("| Pattern | File | Snippet |")
-    lines.append("| --- | --- | --- |")
-    for hit in hits:
-        lines.append(f"| {hit['label']} | {hit['path']} | {hit['line']} |")
-    return lines
 
 
 def _scan_patterns_in_line(line: str, path: Path, hits: List[Dict[str, str]]) -> List[str]:
@@ -1238,15 +1214,6 @@ def compute_verdict(report: Dict[str, Any]) -> str:
     if overall >= 45:
         return "CAUTION"
     return "REJECT"
-
-
-def _select_logs(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    if not entries:
-        return []
-    focus = [entry for entry in entries if entry.get("errors", 0) > 0 or entry.get("sizeBytes", 0) >= 500_000]
-    if not focus:
-        focus = sorted(entries, key=lambda item: item.get("sizeBytes", 0), reverse=True)[:3]
-    return focus
 
 
 def generate_report(
@@ -2171,12 +2138,8 @@ def main() -> None:
     )
     if args.output:
         save_report(report, args.output)
-        print(f"✅ JSON report saved to {args.output.name}")
     if args.markdown:
         _secure_write(args.markdown, to_markdown(report, args.lang, args.ai_detail))
-        print(f"✅ Markdown report saved to {args.markdown.name}")
-    if not args.output and not args.markdown:
-        print("Audit completed, but no output path was provided.")
 
 
 if __name__ == "__main__":
