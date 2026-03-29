@@ -3,7 +3,7 @@
 Health AI 是一个 AI Agent 安全审计平台，提供三类扫描能力：
 
 - **Skill Security Audit** — 对 OpenClaw Skill/Agent ZIP 包进行多维安全检查，覆盖权限、隐私、混淆、高危工具、副作用、数据访问、调用深度、日志卫生、配置与 Manifest 等维度，**强制执行 AI 代码审查**，输出量化健康评分（5 维 0–100 分）+ 专业 PDF 报告
-- **Contract Audit** — 对 EVM 智能合约（本地文件或链上地址）进行漏洞分析，可选接入 Slither 静态分析
+- **Contract Audit** — 对 EVM 智能合约（本地文件或链上地址）进行漏洞分析，基于 AI 大模型进行多维度安全评分
 - **Stress Test** — 对任意命令（含 Skill）进行并发压力测试，输出成功率、P95 耗时等指标
 
 ---
@@ -41,8 +41,6 @@ Health-AI/
 
 - **Python 3.11+**
 - **pip**
-- （可选）Slither — Contract Audit EVM 深度分析所需：`pip install slither-analyzer`
-- （可选）Foundry — Contract Audit Solana/Anchor 支持所需
 
 ---
 
@@ -52,7 +50,7 @@ Health-AI/
 |------|----------------|----------|
 | Skill Security Audit（静态分析） | `PyYAML`（可选） | 无 |
 | Skill Security Audit（AI 代码审查） | `openai>=1.0`（已含于 `requirements.txt`） | 需配置 API Key，见下方说明 |
-| Contract Audit | 无（仅标准库） | `slither`（可选）；Anchor（可选） |
+| Contract Audit | 无（仅标准库） | 无 |
 | Stress Test | 无（仅标准库） | 取决于被压测的命令 |
 
 所有依赖（含 AI 代码审查所需的 `openai`）均已写入 `backend/requirements.txt`，执行 `pip install -r requirements.txt` 即可一次性安装完毕，无需额外操作。
@@ -185,13 +183,6 @@ export SKILL_AUDIT_AI_MODEL="gpt-4o-mini"
 > 开发调试时使用 `./start.sh --dev`，但 `--dev` 模式下文件变动会重启服务，
 > **正在运行的扫描任务会被中断**。
 
-### 5. （可选）安装 Slither
-
-若需要 Contract Audit 的 EVM 深度分析能力：
-
-```bash
-pip install slither-analyzer
-```
 
 ---
 
