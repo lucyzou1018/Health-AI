@@ -20,8 +20,6 @@ RUN pip install slither-analyzer
 
 COPY backend ./backend
 COPY skills ./skills
-COPY dist ./dist
-COPY standalone-agent-audit ./standalone-agent-audit
 COPY README.md ./README.md
 COPY frontend ./frontend
 

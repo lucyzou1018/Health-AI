@@ -380,9 +380,5 @@ def get_wallet_info(wallet_address: str = Depends(verify_wallet_token)):
     return {"wallet_address": wallet_address}
 
 
-# Serve frontend for local development / self-hosted deployment.
-# In Vercel deployment the frontend is served by Vercel itself; this mount
-# is a no-op there because the frontend directory won't exist server-side.
-_frontend_dir = REPO_ROOT / "frontend"
-if _frontend_dir.exists():
-    app.mount("/", StaticFiles(directory=str(_frontend_dir), html=True), name="frontend")
+# Frontend static mounting disabled in server deployment.
+# Frontend is served by Vercel; backend only exposes API routes.
