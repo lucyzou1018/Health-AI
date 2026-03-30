@@ -65,7 +65,7 @@ def verify_wallet_token(token: str = Header(None, alias="X-Wallet-Token")) -> Op
 app = FastAPI(title="Health AI", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://www.healthaionline.com"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
