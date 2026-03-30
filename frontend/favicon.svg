@@ -1,0 +1,27 @@
+<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="32" height="32" rx="8" fill="#1e1b4b"/>
+  <defs>
+    <linearGradient id="lobsterBody" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <path d="M16 28L13 30L16 31L19 30L16 28" fill="url(#lobsterBody)" opacity="0.9"/>
+  <path d="M16 24L14 27H18L16 24" fill="url(#lobsterBody)" opacity="0.8"/>
+  <ellipse cx="16" cy="19" rx="5" ry="6" fill="url(#lobsterBody)"/>
+  <path d="M13 17H19M13 19H19M13 21H19" stroke="rgba(255,255,255,0.3)" stroke-width="0.5" stroke-linecap="round"/>
+  <ellipse cx="16" cy="12" rx="4" ry="3.5" fill="url(#lobsterBody)"/>
+  <circle cx="16" cy="7" r="3" fill="url(#lobsterBody)"/>
+  <circle cx="14.5" cy="6.5" r="1" fill="#22d3ee"/>
+  <circle cx="17.5" cy="6.5" r="1" fill="#22d3ee"/>
+  <path d="M14 5C12 3 9 2 6 3" stroke="url(#lobsterBody)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <path d="M18 5C20 3 23 2 26 3" stroke="url(#lobsterBody)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <path d="M12 13C8 12 6 10 7 8C8 6 10 7 11 9" stroke="url(#lobsterBody)" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <circle cx="7" cy="8" r="1.5" fill="url(#lobsterBody)"/>
+  <path d="M20 13C24 10 26 7 24 5C22 3 20 5 21 7" stroke="url(#lobsterBody)" stroke-width="2" stroke-linecap="round" fill="none"/>
+  <circle cx="24" cy="5" r="1.5" fill="#22d3ee"/>
+  <path d="M12 16L9 18M12 18L9 20" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+  <path d="M20 16L23 18M20 18L23 20" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
+  <path d="M14 17L15 15L16 18L17 16L18 17" stroke="#22d3ee" stroke-width="0.6" stroke-linecap="round" fill="none" opacity="0.8"/>
+</svg>
