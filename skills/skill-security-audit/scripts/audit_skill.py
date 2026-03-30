@@ -312,14 +312,40 @@ def _load_skill_text_from_path(raw_path: str) -> Tuple[str, str]:
     return candidate.stem, text
 
 
+def _validate_url(url: str) -> None:
+    """Block non-HTTP schemes and internal/private addresses to prevent SSRF."""
+    import ipaddress as _ipaddress
+    import socket as _socket
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Unsupported URL scheme: {parsed.scheme!r}. Only http/https allowed.")
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("URL has no hostname.")
+    # Resolve hostname and reject private/loopback/link-local IPs
+    try:
+        resolved_ips = _socket.getaddrinfo(hostname, None)
+        for _, _, _, _, sockaddr in resolved_ips:
+            ip = _ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                raise ValueError(f"URL resolves to internal address ({ip}), request blocked.")
+    except _socket.gaierror:
+        raise ValueError(f"Cannot resolve hostname: {hostname}")
+
+
 def _fetch_text_from_url(url: str) -> str:
+    _validate_url(url)
     try:
         context = ssl.create_default_context()
-        with urlopen(url, context=context) as resp:  # nosec - user-supplied URL
+        with urlopen(url, context=context, timeout=30) as resp:
             charset = resp.headers.get_content_charset() or "utf-8"
             return resp.read().decode(charset, errors="ignore")
     except Exception:
-        proc = subprocess.run(["curl", "-fsSL", url], capture_output=True, text=True)
+        proc = subprocess.run(
+            ["curl", "-fsSL", "--max-time", "30", url],
+            capture_output=True, text=True,
+        )
         if proc.returncode != 0:
             raise URLError(proc.stderr.strip() or "Unable to fetch content via curl")
         return proc.stdout
