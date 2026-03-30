@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 import secrets
 import threading
 import time
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 from typing import Any, Dict, Literal, Optional, List
 
@@ -194,7 +197,8 @@ def create_task(
     except FileNotFoundError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        logger.exception("Unexpected error creating task")
+        raise HTTPException(status_code=500, detail="Internal server error. Please try again later.")
 
     # Consume quota after task is successfully created
     rate_limiter.try_increment(client_ip)
@@ -275,7 +279,8 @@ def download_report_pdf(task_id: str):
             try:
                 generate_pdf(md_path, pdf_path, skill_type=record.skill_type)
             except Exception as e:
-                raise HTTPException(status_code=500, detail=f"PDF generation failed: {e}")
+                logger.exception("PDF generation failed for task %s", task_id)
+                raise HTTPException(status_code=500, detail="PDF generation failed. Please try again later.")
 
     return FileResponse(
         pdf_path,
@@ -310,7 +315,8 @@ def verify_wallet_login(payload: WalletAuthRequest) -> WalletAuthResponse:
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=401, detail=f"Signature verification failed: {e}")
+            logger.exception("Signature verification failed for wallet %s", wallet_address)
+            raise HTTPException(status_code=401, detail="Signature verification failed.")
     else:
         # Fallback when eth-account is unavailable.
         # EIP-191 signatures are 65 bytes = 132 hex chars with 0x prefix.

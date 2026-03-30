@@ -269,7 +269,17 @@ class TaskManager:
         env: Optional[Dict[str, str]] = None,
     ) -> str:
         log_file.parent.mkdir(parents=True, exist_ok=True)
-        merged_env = os.environ.copy()
+        # Only pass essential environment variables to subprocesses to prevent
+        # accidental leakage of secrets (e.g. OPENAI_API_KEY) through errors.
+        _ALLOWED_ENV_KEYS = {
+            "PATH", "HOME", "USER", "LANG", "LC_ALL", "LC_CTYPE",
+            "PYTHONPATH", "VIRTUAL_ENV", "TMPDIR", "TMP", "TEMP",
+            # Keys the analysis scripts explicitly need:
+            "OPENAI_API_KEY", "XAI_API_KEY", "SKILL_AUDIT_AI_MODEL",
+            "SKILL_AUDIT_AI_DETAIL", "ETHERSCAN_API_KEY",
+            "DAILY_TASK_LIMIT_ENABLED",
+        }
+        merged_env = {k: v for k, v in os.environ.items() if k in _ALLOWED_ENV_KEYS}
         if env:
             merged_env.update(env)
         try:
