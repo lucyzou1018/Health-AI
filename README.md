@@ -74,7 +74,7 @@ Skill Security Audit 包含**强制 AI 代码审查**，启动前需配置以下
 
 | 变量名 | 说明 | 示例 |
 |--------|------|------|
-| `DAILY_TASK_LIMIT_ENABLED` | 每日任务配额开关（默认关闭） | `true` / `false` |
+| `DAILY_TASK_LIMIT_ENABLED` | 每日任务配额开关（默认开启） | `true` / `false` |
 
 > **说明：**
 > - 开启后，同一设备每 UTC 自然日（00:00–23:59 UTC）最多提交 **3 个任务**（三种任务类型合计）。

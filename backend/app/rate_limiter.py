@@ -1,7 +1,7 @@
 """
 Daily task rate-limiter.
 
-Toggle: set DAILY_TASK_LIMIT_ENABLED=true (disabled by default).
+Toggle: set DAILY_TASK_LIMIT_ENABLED=false to disable (enabled by default).
 Rule:   each client IP may submit at most DAILY_LIMIT tasks per UTC calendar day (all skill types combined).
 """
 from __future__ import annotations
@@ -20,7 +20,7 @@ DAILY_LIMIT = 3
 
 
 def _is_enabled() -> bool:
-    return os.getenv("DAILY_TASK_LIMIT_ENABLED", "").lower() in ("1", "true", "yes")
+    return os.getenv("DAILY_TASK_LIMIT_ENABLED", "true").lower() not in ("0", "false", "no")
 
 
 def _today_utc() -> str:
