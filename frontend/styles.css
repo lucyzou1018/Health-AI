@@ -59,7 +59,7 @@ body {
 
 /* Header - 固定吸顶（fixed 跨浏览器最可靠） */
 .brand-nav {
-  background: rgba(7, 12, 28, 0.85);
+  background: rgba(7, 12, 28, 0.01);
   backdrop-filter: blur(20px) saturate(1.2);
   -webkit-backdrop-filter: blur(20px) saturate(1.2);
   padding: 0 24px;
