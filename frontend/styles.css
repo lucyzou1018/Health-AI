@@ -53,26 +53,38 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* fixed nav 高度 60px — 防止内容被遮 */
-  padding-top: 60px;
+  /* fixed nav 高度 72px — 防止内容被遮 */
+  padding-top: 72px;
 }
 
 /* Header - 固定吸顶（fixed 跨浏览器最可靠） */
 .brand-nav {
-  background: rgba(7, 12, 28, 0.88);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: none;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 200;
-  height: 60px;
+  height: 72px;
+}
+
+/* 渐变发光分割线 */
+.brand-nav::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 5%;
+  right: 5%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.5) 30%, rgba(139, 92, 246, 0.6) 50%, rgba(99, 102, 241, 0.5) 70%, transparent);
+  box-shadow: 0 1px 8px rgba(99, 102, 241, 0.15), 0 0 20px rgba(139, 92, 246, 0.06);
 }
 
 .brand-stack {
@@ -135,19 +147,18 @@ body {
 /* Tabs - 胶囊样式 */
 .workspace-tabs {
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  gap: 2px;
-  padding: 4px;
-  margin: 24px auto;
-  border-radius: 10px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-subtle);
-  width: fit-content;
-  max-width: calc(100% - 48px);
+  gap: 8px;
+  padding: 16px 24px;
+  margin: 0 auto;
+  max-width: 720px;
+  background: transparent;
+  border: none;
 }
 
 .workspace-tabs button {
+  flex: 1 1 0;
+  min-width: 0;
   background: transparent;
   border: none;
   color: var(--text-secondary);
@@ -158,6 +169,8 @@ body {
   font-size: 13px;
   transition: all 150ms ease;
   letter-spacing: -0.01em;
+  text-align: center;
+  justify-content: center;
 }
 
 .workspace-tabs button.active {
@@ -969,7 +982,8 @@ button#run-task:active {
 }
 
 .landing-header {
-  padding: 16px 24px 0;
+  padding: 0 24px;
+  height: 72px;
   font-size: 18px;
   font-weight: 600;
 }
@@ -1465,14 +1479,19 @@ body:not(.landing-only) .ambient-glow {
   display: flex;
   gap: 8px;
   padding: 16px 24px;
-  background: rgba(10, 10, 15, 0.6);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  max-width: 720px;
+  margin: 0 auto;
+  background: transparent;
+  border: none;
+  border-bottom: none;
+  backdrop-filter: none;
   overflow-x: auto;
 }
 
 .workspace-tabs button {
-  padding: 10px 20px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 10px 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
@@ -1482,6 +1501,8 @@ body:not(.landing-only) .ambient-glow {
   cursor: pointer;
   transition: all 0.3s ease;
   white-space: nowrap;
+  text-align: center;
+  justify-content: center;
 }
 
 .workspace-tabs button:hover {
@@ -1815,14 +1836,19 @@ body:not(.landing-only) .ambient-glow {
    ======================================== */
 
 /* ── Nav links ── */
+.lp-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
 .lp-nav-links {
   display: flex;
   align-items: center;
-  gap: 2px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 12px;
-  padding: 4px;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 0;
 }
 
 .lp-nav-item {
@@ -3143,6 +3169,10 @@ body:not(.landing-only) .ambient-glow {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  justify-content: center !important;
+  text-align: center !important;
 }
 .tab-icon {
   width: 13px;
@@ -3153,6 +3183,29 @@ body:not(.landing-only) .ambient-glow {
 }
 .workspace-tabs button.active .tab-icon { opacity: 1; }
 .workspace-tabs button:hover:not(.active) .tab-icon { opacity: 0.85; }
+
+/* ── Tabs: remove card wrapper & force equal width ───────────── */
+.workspace-tabs {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  width: auto !important;
+  max-width: 720px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  display: flex !important;
+  gap: 8px !important;
+  padding: 16px 24px !important;
+}
+.workspace-tabs button {
+  flex: 1 1 0 !important;
+  min-width: 0 !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
 
 /* ── Context Banner badge ────────────────────────────────────── */
 .cb-badge {
