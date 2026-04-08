@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import secrets
@@ -40,6 +41,7 @@ task_manager = TaskManager(BASE_DIR, repo_root=REPO_ROOT)
 # In-memory session store (for production consider Redis or a DB)
 wallet_sessions: Dict[str, Dict[str, Any]] = {}
 _sessions_lock = threading.Lock()  # protects wallet_sessions against concurrent access
+SESSIONS_PATH = BASE_DIR / "wallet_sessions.json"
 
 # Per-task-id locks for PDF generation — prevents two concurrent requests from
 # writing to the same .pdf file simultaneously.
@@ -54,6 +56,40 @@ def _get_pdf_lock(task_id: str) -> threading.Lock:
         return _pdf_gen_locks[task_id]
 
 
+def _persist_wallet_sessions() -> None:
+    with _sessions_lock:
+        payload = {
+            token: session
+            for token, session in wallet_sessions.items()
+            if session.get("expires_at", 0) >= int(time.time())
+        }
+    tmp_path = SESSIONS_PATH.with_suffix(".tmp")
+    tmp_path.write_text(json.dumps(payload), encoding="utf-8")
+    tmp_path.replace(SESSIONS_PATH)
+
+
+def _load_wallet_sessions() -> None:
+    if not SESSIONS_PATH.exists():
+        return
+    try:
+        data = json.loads(SESSIONS_PATH.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return
+    except Exception:
+        logger.exception("Failed to load wallet sessions from %s", SESSIONS_PATH)
+        return
+
+    now = int(time.time())
+    with _sessions_lock:
+        wallet_sessions.clear()
+        for token, session in data.items():
+            if not isinstance(session, dict):
+                continue
+            if session.get("expires_at", 0) < now:
+                continue
+            wallet_sessions[token] = session
+
+
 def verify_wallet_token(token: str = Header(None, alias="X-Wallet-Token")) -> Optional[str]:
     """Validate X-Wallet-Token header and return the associated wallet address, or None."""
     if not token:
@@ -64,6 +100,7 @@ def verify_wallet_token(token: str = Header(None, alias="X-Wallet-Token")) -> Op
             return None
         if session.get("expires_at", 0) < int(time.time()):
             wallet_sessions.pop(token, None)  # pop avoids KeyError if evicted concurrently
+            _persist_wallet_sessions()
             return None
         return session.get("wallet_address")
 
@@ -74,6 +111,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+_load_wallet_sessions()
 
 
 class UploadResponse(BaseModel):
@@ -356,6 +394,7 @@ def verify_wallet_login(payload: WalletAuthRequest) -> WalletAuthResponse:
             "wallet_address": wallet_address,
             "expires_at": expires_at,
         }
+    _persist_wallet_sessions()
     
     return WalletAuthResponse(
         token=token,
@@ -407,6 +446,7 @@ def google_login(payload: GoogleAuthRequest):
             "wallet_address": google_wallet,
             "expires_at": expires_at,
         }
+    _persist_wallet_sessions()
 
     return {
         "token": token,

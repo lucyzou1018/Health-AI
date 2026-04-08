@@ -2190,8 +2190,12 @@ async function loadWalletHistory(skillType = "all") {
     
     if (!resp.ok) {
       if (resp.status === 401) {
-        // Token 过期，重新登录
-        disconnectWallet();
+        // Preserve the visible login state on refresh/reload.
+        // A transient backend restart should not immediately sign the user out.
+        if (historyList) {
+          historyList.innerHTML = '<li class="empty" id="history-empty">Session unavailable. Refresh later to reload history.</li>';
+        }
+        if (historyCount) historyCount.textContent = "0 records";
         return;
       }
       throw new Error("Failed to load history");
@@ -2458,4 +2462,3 @@ function initWallet() {
 
 // 页面加载时初始化钱包
 initWallet();
-

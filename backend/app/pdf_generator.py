@@ -54,6 +54,7 @@ BADGE_FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
 ]
 
+
 # Score → color mapping
 def score_color(score: int):
     if score >= 80:
@@ -122,8 +123,6 @@ def _load_badge_font(size: int) -> ImageFont.ImageFont:
             except OSError:
                 continue
     return ImageFont.load_default()
-
-
 
 
 class AuditPDF(FPDF):
@@ -297,62 +296,53 @@ class AuditPDF(FPDF):
         cx = size // 2
         radius = size // 2
 
-        # ── Draw badge decorations on a transparent layer ────────────────
         decor = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(decor)
 
-        # Outermost border — CSS: inset box-shadow 2px currentColor
-        draw.ellipse((1, 1, size - 2, size - 2),
-                     outline=(r, g, b, 220), width=2)
+        ring_gap = int(4 / 116 * size)
+        outer_r = int(radius * 0.83)
+        subtle_ring = (r, g, b, 64)  # ~25% opacity
 
-        # Outer ring — CSS radial-gradient 81%–85% (thick, prominent)
-        outer_mid = int(radius * 0.83)
+        # Ring order:
+        # 1. outer highlighted bold ring
+        # 2. two 14% solid rings
+        # 3. one dashed ring
+        # 4. equally spaced 14% solid rings inward
+        ring_radii = [
+            outer_r,
+            outer_r - ring_gap,
+            outer_r - ring_gap * 2,
+        ]
+
         outer_w = max(4, int(radius * 0.03))
-        oi = cx - outer_mid
+        oi = cx - ring_radii[0]
         draw.ellipse((oi, oi, size - oi, size - oi),
                      outline=(r, g, b, 255), width=outer_w)
 
-        # Inner ring — CSS radial-gradient 66%–70%
-        inner_mid = int(radius * 0.685)
-        inner_w = max(3, int(radius * 0.025))
-        ini = cx - inner_mid
-        draw.ellipse((ini, ini, size - ini, size - ini),
-                     outline=(r, g, b, 200), width=inner_w)
-
-        # Repeating concentric rings — CSS repeating-radial-gradient
-        # 1px white every 4px on 116px badge → scale to 480px
-        ring_step = int(4 / 116 * size)  # ≈16px
-        for ring_r in range(ring_step, cx - 10, ring_step):
-            inset = cx - ring_r
+        for rr in ring_radii[1:]:
+            inset = cx - rr
             draw.ellipse((inset, inset, size - inset, size - inset),
-                         outline=(255, 255, 255, 18), width=1)
+                         outline=subtle_ring, width=1)
 
-        # Dashed circle — CSS ::before inset:14px, dashed, opacity 0.35
-        di = int(14 / 116 * size)
-        dash_box = (di, di, size - di, size - di)
+        dash_r = outer_r - ring_gap * 3
+        dash_inset = cx - dash_r
+        dash_box = (dash_inset, dash_inset, size - dash_inset, size - dash_inset)
         for angle in range(0, 360, 10):
             draw.arc(dash_box, start=angle, end=angle + 4,
                      fill=(r, g, b, 100), width=1)
 
-        # Center glow — CSS radial-gradient 0–34% rgba(255,255,255,0.03)
-        glow_r = int(radius * 0.34)
-        for i in range(glow_r, 0, -4):
-            alpha = int(8 * (i / glow_r))
-            draw.ellipse((cx - i, cx - i, cx + i, cx + i),
-                         fill=(255, 255, 255, alpha))
+        inner_count = 10
+        for idx in range(1, inner_count + 1):
+            rr = dash_r - ring_gap * idx
+            if rr <= 0:
+                break
+            inset = cx - rr
+            draw.ellipse((inset, inset, size - inset, size - inset),
+                         outline=subtle_ring, width=1)
 
-        # Highlight at 30% 30% — CSS ::after radial-gradient
-        hl_r = int(size * 0.18)
-        hx, hy = int(size * 0.3), int(size * 0.3)
-        for i in range(hl_r, 0, -3):
-            alpha = int(14 * (i / hl_r))
-            draw.ellipse((hx - i, hy - i, hx + i, hy + i),
-                         fill=(255, 255, 255, alpha))
-
-        # ── Text — CSS font sizes 8px / 17px / 7px on 116px → ×4.14 ────
-        font_kicker = _load_badge_font(33)
-        font_main   = _load_badge_font(70)
-        font_sub    = _load_badge_font(29)
+        font_kicker = _load_badge_font(28)
+        font_main   = _load_badge_font(60)
+        font_sub    = _load_badge_font(24)
 
         kbb = draw.textbbox((0, 0), badge["kicker"], font=font_kicker)
         mbb = draw.textbbox((0, 0), badge["main"],   font=font_main)
@@ -362,7 +352,7 @@ class AuditPDF(FPDF):
         mw, mh = mbb[2] - mbb[0], mbb[3] - mbb[1]
         sw, sh = sbb[2] - sbb[0], sbb[3] - sbb[1]
 
-        gap = 10
+        gap = 32
         group_h = kh + gap + mh + gap + sh
         ty = cx - group_h // 2
 
@@ -373,13 +363,17 @@ class AuditPDF(FPDF):
         draw.text((cx - sw // 2, ty + kh + gap + mh + gap),
                   badge["sub"],    font=font_sub,    fill=(r, g, b, 200))
 
-        # ── Pre-composite onto dark circular base ────────────────────────
         base = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         base_draw = ImageDraw.Draw(base)
-        base_draw.ellipse((0, 0, size - 1, size - 1), fill=(*NAVY, 255))
+        light_base = (
+            min(255, NAVY[0] + 10),
+            min(255, NAVY[1] + 12),
+            min(255, NAVY[2] + 20),
+            255,
+        )
+        base_draw.ellipse((0, 0, size - 1, size - 1), fill=light_base)
         composited = Image.alpha_composite(base, decor)
 
-        # ── Rotate −14° (CSS rotate(14deg) = clockwise; PIL positive = CCW) ─
         rotated = composited.rotate(-14, resample=Image.Resampling.BICUBIC,
                                     expand=True)
 
@@ -388,7 +382,7 @@ class AuditPDF(FPDF):
             with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
                 tmp_path = tmp.name
             rotated.save(tmp_path, format="PNG")
-            self.image(tmp_path, x=x, y=y, w=38, h=38)
+            self.image(tmp_path, x=x, y=y, w=32, h=32)
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)

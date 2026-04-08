@@ -4,7 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CodeAutrix — Intelligent Skill Security Platform</title>
-  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href="caLogo.svg" />
+  <link rel="shortcut icon" href="caLogo.svg" />
+  <link rel="apple-touch-icon" href="caLogo.svg" />
+  <meta property="og:image" content="caLogo.svg" />
+  <meta name="twitter:image" content="caLogo.svg" />
   <link rel="stylesheet" href="styles.css?v=20260408c" />
 </head>
 <body class="landing-only">
@@ -16,37 +20,7 @@
     <div class="brand-stack">
       <span class="brand-logo">
         <span class="logo-pulse"></span>
-        <svg class="lobster-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="lobsterBody" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#6366f1"/>
-              <stop offset="50%" stop-color="#7c3aed"/>
-              <stop offset="100%" stop-color="#8b5cf6"/>
-            </linearGradient>
-            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
-              <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
-          <path d="M16 28L13 30L16 31L19 30L16 28" fill="url(#lobsterBody)" opacity="0.9"/>
-          <path d="M16 24L14 27H18L16 24" fill="url(#lobsterBody)" opacity="0.8"/>
-          <ellipse cx="16" cy="19" rx="5" ry="6" fill="url(#lobsterBody)"/>
-          <path d="M13 17H19M13 19H19M13 21H19" stroke="rgba(255,255,255,0.3)" stroke-width="0.5" stroke-linecap="round"/>
-          <ellipse cx="16" cy="12" rx="4" ry="3.5" fill="url(#lobsterBody)"/>
-          <circle cx="16" cy="7" r="3" fill="url(#lobsterBody)"/>
-          <circle cx="14.5" cy="6.5" r="1" fill="#22d3ee" filter="url(#glow)"/>
-          <circle cx="17.5" cy="6.5" r="1" fill="#22d3ee" filter="url(#glow)"/>
-          <path d="M14 5C12 3 9 2 6 3" stroke="url(#lobsterBody)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-          <path d="M18 5C20 3 23 2 26 3" stroke="url(#lobsterBody)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
-          <path d="M12 13C8 12 6 10 7 8C8 6 10 7 11 9" stroke="url(#lobsterBody)" stroke-width="2" stroke-linecap="round" fill="none"/>
-          <circle cx="7" cy="8" r="1.5" fill="url(#lobsterBody)"/>
-          <path d="M20 13C24 10 26 7 24 5C22 3 20 5 21 7" stroke="url(#lobsterBody)" stroke-width="2" stroke-linecap="round" fill="none"/>
-          <circle cx="24" cy="5" r="1.5" fill="#22d3ee" filter="url(#glow)"/>
-          <path d="M24 5L28 3" stroke="#22d3ee" stroke-width="0.8" stroke-dasharray="2 1" opacity="0.6"/>
-          <path d="M12 16L9 18M12 18L9 20" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
-          <path d="M20 16L23 18M20 18L23 20" stroke="url(#lobsterBody)" stroke-width="1" stroke-linecap="round" opacity="0.6"/>
-          <path d="M14 17L15 15L16 18L17 16L18 17" stroke="#22d3ee" stroke-width="0.6" stroke-linecap="round" fill="none" opacity="0.8"/>
-        </svg>
+        <img class="brand-logo__img" src="caLogo.svg" alt="CodeAutrix logo" />
       </span>
       <span class="brand-name">CodeAutrix</span>
     </div>
@@ -62,6 +36,10 @@
 
   <!-- ── Hero ── -->
   <section id="landing">
+    <div class="landing-hud" aria-hidden="true">
+      <div class="landing-hud__mount" id="landing-hud-mount"></div>
+    </div>
+
     <div class="hero-content">
       <div class="hero-badge">
         <span class="badge-dot"></span>
@@ -687,6 +665,66 @@
     });
   }, { threshold: 0.15 });
   dashObs.observe(heroVis);
+})();
+</script>
+
+<script>
+(() => {
+  var mount = document.getElementById('landing-hud-mount');
+  if (!mount || mount.shadowRoot) return;
+
+  fetch('hud-background.html?v=20260408f')
+    .then(function (response) {
+      if (!response.ok) throw new Error('Failed to load HUD background');
+      return response.text();
+    })
+    .then(function (html) {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+      var shadow = mount.attachShadow({ mode: 'open' });
+
+      var styleText = ':host { position: absolute; inset: 0; display: block; overflow: hidden; background: transparent; }' + '\n';
+      doc.querySelectorAll('style').forEach(function (styleNode) {
+        styleText += styleNode.textContent + '\n';
+      });
+
+      styleText = styleText
+        .replace(/html,\s*body\s*\{/g, ':host {')
+        .replace(/position:\s*fixed;/g, 'position: absolute;')
+        .replace(/width:\s*100vw;/g, 'width: 100%;')
+        .replace(/height:\s*min\(100vw,\s*100vh\);/g, 'height: 100%;');
+
+      var styleEl = document.createElement('style');
+      styleEl.textContent = styleText;
+      shadow.appendChild(styleEl);
+
+      Array.from(doc.body.children).forEach(function (node) {
+        if (node.tagName === 'SCRIPT') return;
+        shadow.appendChild(node.cloneNode(true));
+      });
+
+      var scriptNodes = Array.from(doc.body.querySelectorAll('script'));
+      scriptNodes.forEach(function (scriptNode) {
+        var code = scriptNode.textContent || '';
+        if (!code.trim()) return;
+
+        code = code
+          .replace(/document\.getElementById/g, 'root.getElementById')
+          .replace(/document\.querySelector/g, 'root.querySelector')
+          .replace(/document\.querySelectorAll/g, 'root.querySelectorAll')
+          .replace(/document\.documentElement\.style\.setProperty/g, 'host.style.setProperty');
+
+        try {
+          var runner = new Function('root', 'host', code);
+          runner(shadow, mount);
+        } catch (error) {
+          console.error('HUD runtime failed', error);
+        }
+      });
+    })
+    .catch(function (error) {
+      console.error(error);
+    });
 })();
 </script>
 
