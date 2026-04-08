@@ -283,10 +283,8 @@ class AuditPDF(FPDF):
         """Render badge matching the HTML report.html CSS badge.
 
         fpdf2 doesn't reliably composite semi-transparent RGBA pixels over
-        existing PDF content.  To work around this we pre-composite the badge
-        onto a circular patch of the NAVY header colour in PIL, then place
-        the resulting RGBA image (opaque circle + transparent surround) into
-        the PDF.  This guarantees bright, vivid lines on the dark header.
+        existing PDF content.  We pre-composite the badge onto a circular
+        NAVY patch in PIL, then place the resulting RGBA image into the PDF.
         """
         badge = REPORT_BADGES.get(skill_type)
         if not badge:
@@ -297,31 +295,59 @@ class AuditPDF(FPDF):
         size = 480
         r, g, b = badge["color"]
         cx = size // 2
+        radius = size // 2
 
         # ── Draw badge decorations on a transparent layer ────────────────
         decor = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(decor)
 
-        # Outer border — CSS: inset box-shadow 2px currentColor
-        draw.ellipse((2, 2, size - 3, size - 3),
-                     outline=(r, g, b, 255), width=2)
+        # Outermost border — CSS: inset box-shadow 2px currentColor
+        draw.ellipse((1, 1, size - 2, size - 2),
+                     outline=(r, g, b, 220), width=2)
 
-        # Outer concentric ring — CSS radial-gradient 81%–85%
-        oi = int(size * 0.075)
+        # Outer ring — CSS radial-gradient 81%–85% (thick, prominent)
+        outer_mid = int(radius * 0.83)
+        outer_w = max(4, int(radius * 0.03))
+        oi = cx - outer_mid
         draw.ellipse((oi, oi, size - oi, size - oi),
-                     outline=(r, g, b, 220), width=2)
+                     outline=(r, g, b, 255), width=outer_w)
 
-        # Inner concentric ring — CSS radial-gradient 66%–70%
-        ii = int(size * 0.15)
-        draw.ellipse((ii, ii, size - ii, size - ii),
-                     outline=(r, g, b, 220), width=2)
+        # Inner ring — CSS radial-gradient 66%–70%
+        inner_mid = int(radius * 0.685)
+        inner_w = max(3, int(radius * 0.025))
+        ini = cx - inner_mid
+        draw.ellipse((ini, ini, size - ini, size - ini),
+                     outline=(r, g, b, 200), width=inner_w)
 
-        # Dashed inner circle — CSS ::before  inset:14px, dashed, opacity 0.35
-        di = int(size * 0.12)
+        # Repeating concentric rings — CSS repeating-radial-gradient
+        # 1px white every 4px on 116px badge → scale to 480px
+        ring_step = int(4 / 116 * size)  # ≈16px
+        for ring_r in range(ring_step, cx - 10, ring_step):
+            inset = cx - ring_r
+            draw.ellipse((inset, inset, size - inset, size - inset),
+                         outline=(255, 255, 255, 18), width=1)
+
+        # Dashed circle — CSS ::before inset:14px, dashed, opacity 0.35
+        di = int(14 / 116 * size)
         dash_box = (di, di, size - di, size - di)
-        for angle in range(0, 360, 12):
+        for angle in range(0, 360, 10):
             draw.arc(dash_box, start=angle, end=angle + 4,
-                     fill=(r, g, b, 160), width=1)
+                     fill=(r, g, b, 100), width=1)
+
+        # Center glow — CSS radial-gradient 0–34% rgba(255,255,255,0.03)
+        glow_r = int(radius * 0.34)
+        for i in range(glow_r, 0, -4):
+            alpha = int(8 * (i / glow_r))
+            draw.ellipse((cx - i, cx - i, cx + i, cx + i),
+                         fill=(255, 255, 255, alpha))
+
+        # Highlight at 30% 30% — CSS ::after radial-gradient
+        hl_r = int(size * 0.18)
+        hx, hy = int(size * 0.3), int(size * 0.3)
+        for i in range(hl_r, 0, -3):
+            alpha = int(14 * (i / hl_r))
+            draw.ellipse((hx - i, hy - i, hx + i, hy + i),
+                         fill=(255, 255, 255, alpha))
 
         # ── Text — CSS font sizes 8px / 17px / 7px on 116px → ×4.14 ────
         font_kicker = _load_badge_font(33)
@@ -348,14 +374,13 @@ class AuditPDF(FPDF):
                   badge["sub"],    font=font_sub,    fill=(r, g, b, 200))
 
         # ── Pre-composite onto dark circular base ────────────────────────
-        # This avoids fpdf2's poor semi-transparent RGBA handling.
         base = Image.new("RGBA", (size, size), (0, 0, 0, 0))
         base_draw = ImageDraw.Draw(base)
         base_draw.ellipse((0, 0, size - 1, size - 1), fill=(*NAVY, 255))
         composited = Image.alpha_composite(base, decor)
 
-        # ── Rotate 14° — CSS transform: rotate(14deg) ───────────────────
-        rotated = composited.rotate(14, resample=Image.Resampling.BICUBIC,
+        # ── Rotate −14° (CSS rotate(14deg) = clockwise; PIL positive = CCW) ─
+        rotated = composited.rotate(-14, resample=Image.Resampling.BICUBIC,
                                     expand=True)
 
         tmp_path = None
