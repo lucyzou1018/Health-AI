@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import logging
+import os
 import secrets
 import threading
 import time
@@ -122,6 +124,16 @@ class WalletAuthResponse(BaseModel):
     token: str
     wallet_address: str = Field(alias="walletAddress")
     expires_at: int = Field(alias="expiresAt")
+
+
+class GoogleAuthRequest(BaseModel):
+    email: str
+    name: str = ""
+    google_id: str = Field(alias="googleId")
+    access_token: str = Field(alias="accessToken")
+
+    class Config:
+        allow_population_by_field_name = True
 
 
 class HistoryQueryParams(BaseModel):
@@ -264,6 +276,7 @@ def download_report_pdf(task_id: str):
         raise HTTPException(status_code=404, detail="report file missing")
 
     from .pdf_generator import generate_pdf
+    pdf_generator_path = Path(__file__).with_name("pdf_generator.py")
     pdf_path = md_path.with_suffix(".pdf")
 
     # Acquire a per-task lock so concurrent requests don't write the same file
@@ -274,6 +287,10 @@ def download_report_pdf(task_id: str):
         needs_regen = (
             not pdf_path.exists()
             or pdf_path.stat().st_mtime < md_path.stat().st_mtime
+            or (
+                pdf_generator_path.exists()
+                and pdf_path.stat().st_mtime < pdf_generator_path.stat().st_mtime
+            )
         )
         if needs_regen:
             try:
@@ -345,6 +362,58 @@ def verify_wallet_login(payload: WalletAuthRequest) -> WalletAuthResponse:
         walletAddress=wallet_address,
         expiresAt=expires_at
     )
+
+
+# --------------------------- Google OAuth Authentication ---------------------------
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+
+
+@app.post("/api/auth/google")
+def google_login(payload: GoogleAuthRequest):
+    """Verify Google OAuth access token and return a session token."""
+    import urllib.request
+    import json as _json
+
+    # Verify the access token with Google's userinfo endpoint
+    try:
+        req = urllib.request.Request(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {payload.access_token}"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            user_info = _json.loads(resp.read().decode())
+    except Exception:
+        raise HTTPException(status_code=401, detail="Failed to verify Google access token.")
+
+    # Verify the email matches
+    verified_email = user_info.get("email", "").lower()
+    if not verified_email or verified_email != payload.email.lower():
+        raise HTTPException(status_code=401, detail="Email mismatch in Google verification.")
+
+    # Generate a deterministic wallet-like address from the Google ID for compatibility
+    google_wallet = "0x" + hashlib.sha256(f"google:{payload.google_id}".encode()).hexdigest()[:40]
+
+    token = secrets.token_urlsafe(32)
+    expires_at = int(time.time()) + 7 * 24 * 3600  # 7-day session
+
+    with _sessions_lock:
+        if len(wallet_sessions) >= MAX_WALLET_SESSIONS:
+            now = int(time.time())
+            expired_keys = [k for k, v in wallet_sessions.items() if v.get("expires_at", 0) < now]
+            for k in expired_keys:
+                wallet_sessions.pop(k, None)
+        wallet_sessions[token] = {
+            "wallet_address": google_wallet,
+            "expires_at": expires_at,
+        }
+
+    return {
+        "token": token,
+        "walletAddress": google_wallet,
+        "email": verified_email,
+        "expiresAt": expires_at,
+    }
 
 
 @app.get("/api/wallet/history", response_model=List[TaskResponse])

@@ -8,7 +8,118 @@
   <link rel="stylesheet" href="styles.css?v=20260356" />
   <style>
     .report-container { max-width: 1000px; margin: 0 auto; padding: 24px; }
-    .report-header { text-align: center; padding: 32px 24px; background: var(--bg-secondary); border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); margin-bottom: 24px; }
+    .report-header {
+      position: relative;
+      text-align: center;
+      padding: 40px 24px 48px;
+      background: var(--bg-secondary);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    .report-badge {
+      position: absolute;
+      top: 18px;
+      right: 26px;
+      width: 116px;
+      height: 116px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      transform: rotate(14deg);
+      opacity: 0.9;
+      mix-blend-mode: screen;
+      box-shadow:
+        inset 0 0 0 2px currentColor,
+        inset 0 0 0 11px rgba(255,255,255,0.02),
+        0 14px 30px rgba(0,0,0,0.24);
+      background:
+        repeating-radial-gradient(circle at center, rgba(255,255,255,0.06) 0 1px, transparent 1px 4px),
+        radial-gradient(circle at center, rgba(255,255,255,0.03) 0 34%, transparent 35%),
+        radial-gradient(circle at center, transparent 0 66%, currentColor 67%, currentColor 69%, transparent 70%),
+        radial-gradient(circle at center, transparent 0 81%, currentColor 82%, currentColor 84%, transparent 85%);
+      isolation: isolate;
+    }
+    .report-badge::before {
+      content: '';
+      position: absolute;
+      inset: 14px;
+      border-radius: 50%;
+      border: 1px dashed currentColor;
+      opacity: 0.35;
+    }
+    .report-badge::after {
+      content: '';
+      position: absolute;
+      inset: 5px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(255,255,255,0.16), transparent 42%),
+        repeating-linear-gradient(135deg, transparent 0 6px, rgba(255,255,255,0.035) 6px 8px);
+      opacity: 0.52;
+      pointer-events: none;
+    }
+    .report-badge-inner {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      max-width: 70px;
+      filter: saturate(0.9);
+    }
+    .report-badge-kicker {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      opacity: 0.75;
+    }
+    .report-badge-main {
+      font-size: 17px;
+      line-height: 0.95;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .report-badge-sub {
+      font-size: 7px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      opacity: 0.72;
+    }
+    .report-badge.skill-security-audit {
+      color: #61d9ff;
+      background-color: rgba(14, 165, 233, 0.08);
+    }
+    .report-badge.multichain-contract-vuln {
+      color: #f7c66a;
+      background-color: rgba(245, 158, 11, 0.08);
+    }
+    .report-badge.skill-stress-lab {
+      color: #ff8d7a;
+      background-color: rgba(249, 115, 22, 0.08);
+    }
+    @media (max-width: 640px) {
+      .report-badge {
+        top: 12px;
+        right: 12px;
+        width: 84px;
+        height: 84px;
+      }
+      .report-badge-inner { max-width: 58px; }
+      .report-badge-main { font-size: 13px; }
+      .report-badge-kicker { font-size: 7px; }
+      .report-badge-sub { font-size: 6px; }
+      .report-header {
+        padding: 84px 16px 28px;
+      }
+    }
     .report-header h1 { margin: 0 0 8px; font-size: 24px; font-weight: 600; }
     .report-meta { color: var(--text-secondary); font-size: 14px; }
     .risk-dashboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
@@ -315,6 +426,18 @@
       
       return html;
     }
+
+    const REPORT_BADGES = {
+      'skill-security-audit': { kicker: 'Certified', main: 'Security', sub: 'Audit' },
+      'multichain-contract-vuln': { kicker: 'Verified', main: 'Contract', sub: 'Review' },
+      'skill-stress-lab': { kicker: 'Benchmarked', main: 'Stress', sub: 'Tested' }
+    };
+
+    function getReportBadgeHtml(skillType) {
+      const badge = REPORT_BADGES[skillType];
+      if (!badge) return '';
+      return '<div class="report-badge ' + skillType + '"><div class="report-badge-inner"><div class="report-badge-kicker">' + badge.kicker + '</div><div class="report-badge-main">' + badge.main + '</div><div class="report-badge-sub">' + badge.sub + '</div></div></div>';
+    }
     
     async function loadReport() {
       const taskId = getTaskId();
@@ -452,7 +575,7 @@
           const supplyChainScore = scores['SupplyChain'] || scores['supplyChainScore']|| 0;
           const failureScore     = scores['Failure']     || scores['failureScore']    || 0;
 
-          let html = '<div class="report-header"><h1>🔒 Skill Security Audit Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
+          let html = '<div class="report-header">' + getReportBadgeHtml(task.skillType) + '<h1>🔒 Skill Security Audit Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
 
           // Score dashboard — all 6 dimensions (higher = safer)
           function getScoreClass(score) {
@@ -563,7 +686,7 @@
           }
 
           // --- Build HTML ---
-          let html = '<div class="report-header"><h1>🧪 Stress Test Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
+          let html = '<div class="report-header">' + getReportBadgeHtml(task.skillType) + '<h1>🧪 Stress Test Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
 
           // Score dashboard — 6 cards
           html += '<div class="risk-dashboard" style="grid-template-columns: repeat(6, 1fr);">';
@@ -698,7 +821,7 @@
             { key:'Logic',      icon:'🛡️', label:'Business Logic' },
           ];
           let html = '';
-          html += '<div class="report-header"><h1>📋 Contract Audit Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
+          html += '<div class="report-header">' + getReportBadgeHtml(task.skillType) + '<h1>📋 Contract Audit Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
           html += '<div class="score-cards-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0;">';
           for (const d of dims) {
             const s = scoreMap[d.key] ?? 0;
@@ -739,7 +862,7 @@
         const low = detectors.filter(d => d.level === 'low');
 
         let html = '';
-        html += '<div class="report-header"><h1>📋 Contract Audit Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Chain: EVM · Scanned: ' + updatedAt + '</div></div>';
+        html += '<div class="report-header">' + getReportBadgeHtml(task.skillType) + '<h1>📋 Contract Audit Report</h1><div class="report-meta">Task ID: ' + task.taskId + ' · Chain: EVM · Scanned: ' + updatedAt + '</div></div>';
 
         html += `<div class="risk-dashboard"><div class="risk-card high"><div class="risk-number">${high.length}</div><div class="risk-label">🔴 High</div></div><div class="risk-card medium"><div class="risk-number">${medium.length}</div><div class="risk-label">🟡 Medium</div></div><div class="risk-card low"><div class="risk-number">${low.length}</div><div class="risk-label">🟢 Low</div></div><div class="risk-card total"><div class="risk-number">${detectors.length}</div><div class="risk-label">📊 Total</div></div></div>`;
 

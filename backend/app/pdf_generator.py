@@ -1,9 +1,13 @@
 """Convert markdown audit / stress-test reports into professional-style PDFs."""
 from __future__ import annotations
 
+import math
+import os
 import re
+import tempfile
 from pathlib import Path
 from fpdf import FPDF
+from PIL import Image, ImageDraw, ImageFont
 
 
 # ─── Color constants ─────────────────────────────────────────────────────────
@@ -17,6 +21,38 @@ GREEN_SOFT = (34,  197, 94)
 YELLOW     = (234, 179, 8)
 TEXT_DARK  = (30,  40,  80)
 ROW_ALT    = (240, 243, 255)
+
+REPORT_BADGES = {
+    "skill-security-audit": {
+        "kicker": "CERTIFIED",
+        "main": "SECURITY",
+        "sub": "AUDIT",
+        "color": (97, 217, 255),
+        "fill": (24, 43, 74),
+    },
+    "multichain-contract-vuln": {
+        "kicker": "VERIFIED",
+        "main": "CONTRACT",
+        "sub": "REVIEW",
+        "color": (247, 198, 106),
+        "fill": (72, 48, 20),
+    },
+    "skill-stress-lab": {
+        "kicker": "BENCHMARKED",
+        "main": "STRESS",
+        "sub": "TESTED",
+        "color": (255, 141, 122),
+        "fill": (82, 34, 34),
+    },
+}
+
+BADGE_FONT_CANDIDATES = [
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/System/Library/Fonts/Supplemental/Helvetica.ttc",
+    "/Library/Fonts/Arial Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+]
 
 # Score → color mapping
 def score_color(score: int):
@@ -76,6 +112,18 @@ def _safe(text: str) -> str:
         text = text.replace(k, v)
     # Fallback: strip remaining unencodable characters (including emoji)
     return text.encode("latin-1", errors="ignore").decode("latin-1")
+
+
+def _load_badge_font(size: int) -> ImageFont.ImageFont:
+    for font_path in BADGE_FONT_CANDIDATES:
+        if os.path.exists(font_path):
+            try:
+                return ImageFont.truetype(font_path, size=size)
+            except OSError:
+                continue
+    return ImageFont.load_default()
+
+
 
 
 class AuditPDF(FPDF):
@@ -230,6 +278,108 @@ class AuditPDF(FPDF):
         self.set_text_color(*TEXT_DARK)
         self.multi_cell(163, 5.5, text)
         self.ln(1)
+
+    def cover_badge(self, skill_type: str, *, x: float = 26, y: float | None = None):
+        """Render badge matching the HTML report.html CSS badge exactly.
+
+        HTML uses mix-blend-mode:screen + opacity:0.9 which makes everything
+        very light and glassy.  PIL has no blend-mode, so we compensate by
+        keeping all alpha values very low — thin, airy lines instead of heavy
+        stamp-like strokes.
+        """
+        badge = REPORT_BADGES.get(skill_type)
+        if not badge:
+            return
+        if y is None:
+            y = self.get_y()
+
+        size = 480  # High-res canvas for crisp output
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        r, g, b = badge["color"]
+        cx = size // 2
+
+        # ── Background fill  ─  CSS: background-color: rgba(color, 0.08)
+        # Keep extremely light; screen-blend on dark bg would brighten this.
+        draw.ellipse((0, 0, size - 1, size - 1), fill=(r, g, b, 14))
+
+        # ── Outer thin border  ─  CSS: inset box-shadow 2px currentColor
+        # In HTML this is a 2px inset shadow at currentColor (≈ alpha 0.9).
+        # We draw it thin and light.
+        draw.ellipse((1, 1, size - 2, size - 2), outline=(r, g, b, 70), width=2)
+
+        # ── Outer concentric ring  ─  CSS radial-gradient 81%–85%
+        # Ring band is 82%–84% of radius → ~3% width → very thin
+        outer_r1 = int(size * 0.41)   # 82% of radius
+        outer_r2 = int(size * 0.42)   # 84% of radius
+        inset_o = cx - outer_r2
+        draw.ellipse(
+            (inset_o, inset_o, size - inset_o, size - inset_o),
+            outline=(r, g, b, 65), width=max(2, outer_r2 - outer_r1),
+        )
+
+        # ── Inner concentric ring  ─  CSS radial-gradient 66%–70%
+        inner_r1 = int(size * 0.335)  # 67% of radius
+        inner_r2 = int(size * 0.345)  # 69% of radius
+        inset_i = cx - inner_r2
+        draw.ellipse(
+            (inset_i, inset_i, size - inset_i, size - inset_i),
+            outline=(r, g, b, 65), width=max(2, inner_r2 - inner_r1),
+        )
+
+        # ── Dashed inner circle  ─  CSS ::before  inset:14px, dashed, opacity 0.35
+        dash_inset = int(size * 0.12)   # 14/116 ≈ 12%
+        dash_box = (dash_inset, dash_inset, size - dash_inset, size - dash_inset)
+        for angle in range(0, 360, 12):
+            draw.arc(dash_box, start=angle, end=angle + 4,
+                     fill=(r, g, b, 40), width=1)
+
+        # ── Soft highlight  ─  CSS ::after radial-gradient at 30% 30%
+        highlight_r = size // 5
+        hx, hy = int(size * 0.3), int(size * 0.3)
+        for i in range(highlight_r, 0, -3):
+            alpha = int(6 * (i / highlight_r))
+            draw.ellipse((hx - i, hy - i, hx + i, hy + i),
+                         fill=(255, 255, 255, alpha))
+
+        # ── Text  ─  CSS font sizes 8px/17px/7px on 116px badge → scale ×4.14
+        font_kicker = _load_badge_font(33)   # 8px × 4.14
+        font_main   = _load_badge_font(70)   # 17px × 4.14
+        font_sub    = _load_badge_font(29)   # 7px × 4.14
+
+        kicker_bb = draw.textbbox((0, 0), badge["kicker"], font=font_kicker)
+        main_bb   = draw.textbbox((0, 0), badge["main"],   font=font_main)
+        sub_bb    = draw.textbbox((0, 0), badge["sub"],     font=font_sub)
+
+        kicker_w, kicker_h = kicker_bb[2] - kicker_bb[0], kicker_bb[3] - kicker_bb[1]
+        main_w,   main_h   = main_bb[2]   - main_bb[0],   main_bb[3]   - main_bb[1]
+        sub_w,    sub_h     = sub_bb[2]    - sub_bb[0],    sub_bb[3]    - sub_bb[1]
+
+        gap = 10
+        group_h = kicker_h + gap + main_h + gap + sub_h
+        ty = cx - group_h // 2
+
+        # Text alpha kept moderate — HTML has opacity 0.75/1.0/0.72 on top of
+        # the badge's own 0.9 opacity and screen blend.  We approximate.
+        draw.text((cx - kicker_w // 2, ty),
+                  badge["kicker"], font=font_kicker, fill=(r, g, b, 140))
+        draw.text((cx - main_w // 2, ty + kicker_h + gap),
+                  badge["main"],   font=font_main,   fill=(r, g, b, 200))
+        draw.text((cx - sub_w // 2, ty + kicker_h + gap + main_h + gap),
+                  badge["sub"],    font=font_sub,    fill=(r, g, b, 130))
+
+        # ── Rotate 14°  ─  CSS transform: rotate(14deg)
+        rotated = img.rotate(14, resample=Image.Resampling.BICUBIC, expand=True)
+
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                tmp_path = tmp.name
+            rotated.save(tmp_path, format="PNG")
+            self.image(tmp_path, x=x, y=y, w=38, h=38)
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
 
 
 # ─── Markdown parsing ─────────────────────────────────────────────────────────
@@ -525,7 +675,7 @@ def _contract_score_label(score: int) -> str:
     return "Risk"
 
 
-def _generate_contract_pdf(md: str, out_path: Path) -> None:
+def _generate_contract_pdf(md: str, out_path: Path, *, skill_type: str = "multichain-contract-vuln") -> None:
     """Generate a professional PDF for a Contract Audit report."""
     pdf = AuditPDF(header_title="Contract Audit Report")
     pdf.add_page()
@@ -540,6 +690,8 @@ def _generate_contract_pdf(md: str, out_path: Path) -> None:
     pdf.set_font("Helvetica", "B", 20)
     pdf.set_text_color(*WHITE)
     pdf.cell(0, 12, "Contract Audit Report", ln=True)
+
+    pdf.cover_badge(skill_type, x=154, y=25)
 
     scanned_m = re.search(r"\*\*Scanned:\*\*\s*(.+)", md)
     pdf.set_x(26)
@@ -557,7 +709,7 @@ def _generate_contract_pdf(md: str, out_path: Path) -> None:
         pdf.set_font("Helvetica", "B", 8)
         pdf.set_text_color(*INDIGO)
         pdf.cell(0, 7, "  |  ".join(badges))
-    pdf.set_y(66)
+    pdf.set_y(70)
 
     # ── Security Verdict ─────────────────────────────────────────────────────
     verdict_block = _extract_between(md, "## Security Verdict", ["## "])
@@ -715,7 +867,7 @@ def _generate_contract_pdf(md: str, out_path: Path) -> None:
     pdf.output(str(out_path))
 
 
-def _generate_stress_pdf(md: str, out_path: Path) -> None:
+def _generate_stress_pdf(md: str, out_path: Path, *, skill_type: str = "skill-stress-lab") -> None:
     """Generate a professional PDF for a Stress Test report."""
     pdf = AuditPDF(header_title="Stress Test Report")
     pdf.add_page()
@@ -731,6 +883,8 @@ def _generate_stress_pdf(md: str, out_path: Path) -> None:
     pdf.set_text_color(*WHITE)
     pdf.cell(0, 12, "Skill Stress Test Report", ln=True)
 
+    pdf.cover_badge(skill_type, x=154, y=25)
+
     gen_match = re.search(r"Generated:\s*(\S+)", md)
     gen_date = gen_match.group(1)[:19].replace("T", "  ") if gen_match else ""
     pdf.set_x(26)
@@ -745,7 +899,7 @@ def _generate_stress_pdf(md: str, out_path: Path) -> None:
         pdf.set_font("Helvetica", "B", 8)
         pdf.set_text_color(*INDIGO)
         pdf.cell(0, 7, f"[ {badge_text} ]")
-    pdf.set_y(66)
+    pdf.set_y(70)
 
     # ── Five-Dimension Scores ──
     scores = _parse_stress_scores(md)
@@ -902,7 +1056,7 @@ def generate_pdf(md_path: Path, out_path: Path, *, skill_type: str = "") -> None
         or "Five-Dimension Scores" in md
     )
     if is_stress:
-        _generate_stress_pdf(md, out_path)
+        _generate_stress_pdf(md, out_path, skill_type=skill_type or "skill-stress-lab")
         return
 
     is_contract = (
@@ -911,7 +1065,7 @@ def generate_pdf(md_path: Path, out_path: Path, *, skill_type: str = "") -> None
         or "Total Risk Scores" in md
     )
     if is_contract:
-        _generate_contract_pdf(md, out_path)
+        _generate_contract_pdf(md, out_path, skill_type=skill_type or "multichain-contract-vuln")
         return
 
     pdf = AuditPDF()
@@ -930,6 +1084,8 @@ def generate_pdf(md_path: Path, out_path: Path, *, skill_type: str = "") -> None
     pdf.set_text_color(*WHITE)
     pdf.cell(0, 12, "Skill Security Audit", ln=True)
 
+    pdf.cover_badge(skill_type or "skill-security-audit", x=154, y=25)
+
     # Generation date
     gen_match = re.search(r"Generated:\s*(\S+)", md)
     gen_date  = gen_match.group(1)[:19].replace("T", "  ") if gen_match else ""
@@ -946,7 +1102,7 @@ def generate_pdf(md_path: Path, out_path: Path, *, skill_type: str = "") -> None
         pdf.set_font("Helvetica", "B", 8)
         pdf.set_text_color(*INDIGO)
         pdf.cell(0, 7, f"[ {badge_text} ]")
-    pdf.set_y(66)
+    pdf.set_y(70)
 
     # ── Security Verdict ──────────────────────────────────────────────────────
     verdict_block = _extract_between(md, "## Security Verdict", ["## "])

@@ -899,6 +899,9 @@ function renderArtifacts(task) {
     return;
   }
 
+  // Add Share button
+  items.push(`<button class="share-results-btn" data-task-id="${tid}" data-skill-type="${task.skillType}">Share to <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></button>`);
+
   artifactBox.classList.remove("hidden");
   artifactBox.innerHTML = items.join("");
 
@@ -908,6 +911,17 @@ function renderArtifacts(task) {
       triggerDownload(btn.dataset.url, btn.dataset.filename);
     });
   });
+
+  // 绑定分享按钮事件
+  const shareBtn = artifactBox.querySelector(".share-results-btn");
+  if (shareBtn) {
+    shareBtn.addEventListener("click", () => {
+      fetch(`${API_BASE}/api/tasks/${tid}/report`)
+        .then(r => r.ok ? r.text() : "")
+        .then(text => showShareModal(buildShareText(task, text)))
+        .catch(() => showShareModal(buildShareText(task, "")));
+    });
+  }
 }
 
 async function fetchTask(taskId) {
@@ -1319,6 +1333,160 @@ function buildStressLabSummary(text) {
   return html;
 }
 
+// ── Share Results Feature ──────────────────────────────────────
+
+function buildShareText(task, reportText) {
+  const SITE_URL = "https://codeautrix.com";
+  const scores = {};
+  const lines = (reportText || "").split(/\r?\n/);
+
+  if (task.skillType === "skill-security-audit") {
+    // Parse overall + dimension scores
+    for (const line of lines) {
+      if (/Overall Security/.test(line)) { const m = line.match(/(\d+)\/100/); if (m) scores.overall = m[1]; }
+      if (/Privacy/.test(line))   { const m = line.match(/(\d+)\/100/); if (m) scores.privacy = m[1]; }
+      if (/Privilege/.test(line)) { const m = line.match(/(\d+)\/100/); if (m) scores.privilege = m[1]; }
+      if (/Integrity/.test(line)) { const m = line.match(/(\d+)\/100/); if (m) scores.integrity = m[1]; }
+    }
+    const s = scores.overall || "—";
+    return `🛡️ One click. Risks exposed. My Skill scored ${s}/100 on @CodeAutrix.\n\n` +
+      `📊 Privacy: ${scores.privacy || "—"} · Privilege: ${scores.privilege || "—"} · Integrity: ${scores.integrity || "—"}\n\n` +
+      `AI-powered one-click audit — secure your code before it goes live 👇\n${SITE_URL}\n\n` +
+      `#CodeAutrix #Web3Security #SecureByDefault`;
+  }
+
+  if (task.skillType === "multichain-contract-vuln") {
+    // Parse severity counts or overall score
+    let critical = 0, high = 0, medium = 0, low = 0, overall = "";
+    for (const line of lines) {
+      if (/Overall/.test(line)) { const m = line.match(/(\d+)\/100/); if (m) overall = m[1]; }
+      const sevMatch = line.match(/\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|/);
+      if (sevMatch) { critical = sevMatch[1]; high = sevMatch[2]; medium = sevMatch[3]; low = sevMatch[4]; }
+    }
+    const total = parseInt(critical) + parseInt(high) + parseInt(medium) + parseInt(low);
+    const totalStr = total > 0 ? `${total} vulnerabilities caught` : "Contract analyzed";
+    return `📋 One click. ${totalStr} before deployment. @CodeAutrix keeps my contract safe.\n\n` +
+      `🔴 ${critical} Critical · 🟠 ${high} High · 🟡 ${medium} Medium · 🟢 ${low} Low\n\n` +
+      `One-click smart contract audit — ship with confidence 👇\n${SITE_URL}\n\n` +
+      `#CodeAutrix #SmartContract #SecureByDefault`;
+  }
+
+  if (task.skillType === "skill-stress-lab") {
+    let overall = "", stability = "", performance = "";
+    for (const line of lines) {
+      if (/(?:Overall|综合)/.test(line)) { const m = line.match(/(\d+)\/100/); if (m) overall = m[1]; }
+      if (/(?:Stability|稳定性)/.test(line)) { const m = line.match(/(\d+)\/100/); if (m) stability = m[1]; }
+      if (/(?:Performance|性能)/.test(line)) { const m = line.match(/(\d+)\/100/); if (m) performance = m[1]; }
+    }
+    return `⚡ One click. Score: ${overall || "—"}/100. Stability: ${stability || "—"}. Performance: ${performance || "—"}. My Skill is production-ready.\n\n` +
+      `Tested on @CodeAutrix — one-click stress test, real reliability data ⏱️\n${SITE_URL}\n\n` +
+      `#CodeAutrix #StressTest #ProductionReady`;
+  }
+
+  return `🔒 Just scanned my project on @CodeAutrix — one-click security audit for Web3.\n\n${SITE_URL}\n\n#CodeAutrix`;
+}
+
+function showShareModal(shareText) {
+  // Remove existing modal
+  const existing = document.querySelector(".share-modal-overlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.className = "share-modal-overlay";
+  overlay.innerHTML = `
+    <div class="share-modal-backdrop"></div>
+    <div class="share-modal-content">
+      <div class="share-modal-header">
+        <h3>Share Results</h3>
+        <button class="share-modal-close">&times;</button>
+      </div>
+      <p class="share-modal-subtitle">Preview and share your scan results on X (Twitter)</p>
+      <textarea class="share-modal-textarea" rows="8">${shareText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+      <div class="share-modal-charcount"><span class="share-char-num">${shareText.length}</span>/280</div>
+      <button class="share-modal-twitter-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        Share on X
+      </button>
+    </div>
+  `;
+
+  const style = document.createElement("style");
+  style.className = "share-modal-style";
+  style.textContent = `
+    .share-modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 1100; display: flex; align-items: center; justify-content: center;
+    }
+    .share-modal-backdrop {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+    }
+    .share-modal-content {
+      position: relative; background: var(--bg-secondary, #0f1629);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 16px;
+      padding: 24px; width: 440px; max-width: 90vw;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .share-modal-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;
+    }
+    .share-modal-header h3 { margin: 0; font-size: 18px; font-weight: 600; color: #f3f4f6; }
+    .share-modal-close {
+      background: none; border: none; color: #94a3b8; font-size: 22px;
+      cursor: pointer; padding: 0 4px; line-height: 1; transition: color 0.2s;
+    }
+    .share-modal-close:hover { color: #fff; }
+    .share-modal-subtitle {
+      color: #94a3b8; font-size: 13px; margin: 0 0 16px 0;
+    }
+    .share-modal-textarea {
+      width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px; padding: 12px; color: #e2e8f0; font-size: 13px;
+      line-height: 1.6; resize: vertical; font-family: inherit;
+      transition: border-color 0.2s; box-sizing: border-box;
+    }
+    .share-modal-textarea:focus { outline: none; border-color: rgba(99,102,241,0.5); }
+    .share-modal-charcount {
+      text-align: right; font-size: 11px; color: #64748b; margin: 6px 0 16px;
+    }
+    .share-modal-charcount .share-char-num.over { color: #ef4444; }
+    .share-modal-twitter-btn {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px; background: #000; color: #fff; border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .share-modal-twitter-btn:hover {
+      background: #1a1a2e; border-color: rgba(255,255,255,0.25);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+  `;
+  document.head.appendChild(style);
+  document.body.appendChild(overlay);
+
+  const textarea = overlay.querySelector(".share-modal-textarea");
+  const charNum = overlay.querySelector(".share-char-num");
+
+  // Live char count
+  textarea.addEventListener("input", () => {
+    const len = textarea.value.length;
+    charNum.textContent = len;
+    charNum.classList.toggle("over", len > 280);
+  });
+
+  // Share on X
+  overlay.querySelector(".share-modal-twitter-btn").addEventListener("click", () => {
+    const text = textarea.value;
+    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  });
+
+  // Close handlers
+  const cleanup = () => { overlay.remove(); style.remove(); };
+  overlay.querySelector(".share-modal-close").addEventListener("click", cleanup);
+  overlay.querySelector(".share-modal-backdrop").addEventListener("click", cleanup);
+}
+
 // 统一的问题提取函数
 function extractAllIssues(text) {
   const items = [];
@@ -1627,7 +1795,7 @@ function showLoginModal() {
           </button>
           <button class="wallet-option" data-method="wallet">
             <span class="wallet-option-icon">
-              <svg width="20" height="20" viewBox="0 0 48 48" fill="none"><rect x="2" y="10" width="36" height="30" rx="4" fill="#4285F4"/><path d="M38 10H8C4.69 10 2 12.69 2 16V10C2 6.69 4.69 4 8 4H34C37.31 4 38 6.69 38 10Z" fill="#EA4335"/><rect x="30" y="22" width="16" height="12" rx="3" fill="#FBBC05"/><circle cx="38" cy="28" r="2.5" fill="#34A853"/></svg>
+              <svg width="20" height="20" viewBox="0 0 48 48" fill="none"><defs><linearGradient id="wg" x1="0" y1="0" x2="48" y2="48"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient></defs><rect x="2" y="10" width="36" height="30" rx="4" fill="url(#wg)"/><path d="M38 10H8C4.69 10 2 12.69 2 16V10C2 6.69 4.69 4 8 4H34C37.31 4 38 6.69 38 10Z" fill="#a78bfa"/><rect x="30" y="22" width="16" height="12" rx="3" fill="#22d3ee"/><circle cx="38" cy="28" r="2.5" fill="#fff"/></svg>
             </span>
             <span class="wallet-option-name">Connect Wallet</span>
           </button>
@@ -2115,7 +2283,10 @@ function createHistoryItem(task) {
     '</div>' +
     '<div class="history-col3">' +
       (isCompleted ?
-        '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">View Report</a>' +
+        '<div class="history-row">' +
+          '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">View Report</a>' +
+          '<button class="history-share-btn" data-task-id="' + task.taskId + '" data-skill-type="' + (task.skillType || '') + '" title="Share to X">Share to <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></button>' +
+        '</div>' +
         '<button class="history-dl-btn" data-task-id="' + task.taskId + '" data-skill="' + (task.skillType || 'audit') + '" title="Download PDF">↓ PDF</button>' :
         '<span class="history-no-report">-</span>') +
     '</div>';
@@ -2209,19 +2380,37 @@ historyFilters.forEach(function(btn) {
   });
 });
 
-// History list — PDF download via event delegation
+// History list — PDF download & Share via event delegation
 if (historyList) {
   historyList.addEventListener("click", function(e) {
-    var btn = e.target.closest(".history-dl-btn");
-    if (!btn) return;
-    var taskId = btn.dataset.taskId;
-    var skill  = btn.dataset.skill || "audit";
-    var slug   = skill.replace(/^skill-/, "");
-    btn.textContent = "…";
-    btn.disabled = true;
-    triggerDownload(API_BASE + "/api/tasks/" + taskId + "/report/pdf", slug + "-report.pdf")
-      .then(function() { btn.textContent = "↓ PDF"; btn.disabled = false; })
-      .catch(function() { btn.textContent = "↓ PDF"; btn.disabled = false; });
+    // PDF download
+    var dlBtn = e.target.closest(".history-dl-btn");
+    if (dlBtn) {
+      var taskId = dlBtn.dataset.taskId;
+      var skill  = dlBtn.dataset.skill || "audit";
+      var slug   = skill.replace(/^skill-/, "");
+      dlBtn.textContent = "…";
+      dlBtn.disabled = true;
+      triggerDownload(API_BASE + "/api/tasks/" + taskId + "/report/pdf", slug + "-report.pdf")
+        .then(function() { dlBtn.textContent = "↓ PDF"; dlBtn.disabled = false; })
+        .catch(function() { dlBtn.textContent = "↓ PDF"; dlBtn.disabled = false; });
+      return;
+    }
+
+    // Share to X
+    var shareBtn = e.target.closest(".history-share-btn");
+    if (shareBtn) {
+      var tid = shareBtn.dataset.taskId;
+      var skillType = shareBtn.dataset.skillType;
+      fetch(API_BASE + "/api/tasks/" + tid + "/report")
+        .then(function(r) { return r.ok ? r.text() : ""; })
+        .then(function(text) {
+          showShareModal(buildShareText({ taskId: tid, skillType: skillType }, text));
+        })
+        .catch(function() {
+          showShareModal(buildShareText({ taskId: tid, skillType: skillType }, ""));
+        });
+    }
   });
 }
 
