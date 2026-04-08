@@ -282,17 +282,11 @@ class AuditPDF(FPDF):
     def cover_badge(self, skill_type: str, *, x: float = 26, y: float | None = None):
         """Render badge matching the HTML report.html CSS badge.
 
-        HTML uses mix-blend-mode:screen on a dark background, which means
-        colours ADD to the background — bright colours glow, dark areas
-        become transparent.  To simulate this in PIL (no blend-mode support)
-        we manually composite: render the badge onto a copy of the dark
-        header background using screen-blend math, then paste that patch
-        into the final PNG.
-
-        Simpler approach chosen here: we skip the opaque background fill
-        entirely (= fully transparent centre) and draw only the bright
-        decorative lines & text at high alpha so they "glow" on the dark
-        PDF header just like the HTML version does.
+        fpdf2 doesn't reliably composite semi-transparent RGBA pixels over
+        existing PDF content.  To work around this we pre-composite the badge
+        onto a circular patch of the NAVY header colour in PIL, then place
+        the resulting RGBA image (opaque circle + transparent surround) into
+        the PDF.  This guarantees bright, vivid lines on the dark header.
         """
         badge = REPORT_BADGES.get(skill_type)
         if not badge:
@@ -301,78 +295,68 @@ class AuditPDF(FPDF):
             y = self.get_y()
 
         size = 480
-        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(img)
         r, g, b = badge["color"]
         cx = size // 2
 
-        # ── NO background fill ──
-        # HTML background-color rgba(color,0.08) is nearly invisible with
-        # screen blend on dark bg, so we skip it entirely to avoid the
-        # "dark stamp" artifact.
+        # ── Draw badge decorations on a transparent layer ────────────────
+        decor = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(decor)
 
-        # ── Outer border  ─  CSS: inset box-shadow 2px currentColor
+        # Outer border — CSS: inset box-shadow 2px currentColor
         draw.ellipse((2, 2, size - 3, size - 3),
-                     outline=(r, g, b, 160), width=2)
+                     outline=(r, g, b, 255), width=2)
 
-        # ── Outer concentric ring  ─  CSS radial-gradient 81%–85%
-        outer_inset = int(size * 0.075)  # 85% → 15%/2
-        draw.ellipse(
-            (outer_inset, outer_inset, size - outer_inset, size - outer_inset),
-            outline=(r, g, b, 130), width=2,
-        )
+        # Outer concentric ring — CSS radial-gradient 81%–85%
+        oi = int(size * 0.075)
+        draw.ellipse((oi, oi, size - oi, size - oi),
+                     outline=(r, g, b, 220), width=2)
 
-        # ── Inner concentric ring  ─  CSS radial-gradient 66%–70%
-        inner_inset = int(size * 0.15)   # 70% → 30%/2
-        draw.ellipse(
-            (inner_inset, inner_inset, size - inner_inset, size - inner_inset),
-            outline=(r, g, b, 130), width=2,
-        )
+        # Inner concentric ring — CSS radial-gradient 66%–70%
+        ii = int(size * 0.15)
+        draw.ellipse((ii, ii, size - ii, size - ii),
+                     outline=(r, g, b, 220), width=2)
 
-        # ── Dashed inner circle  ─  CSS ::before  inset:14px, dashed, opacity 0.35
-        dash_inset = int(size * 0.12)
-        dash_box = (dash_inset, dash_inset, size - dash_inset, size - dash_inset)
+        # Dashed inner circle — CSS ::before  inset:14px, dashed, opacity 0.35
+        di = int(size * 0.12)
+        dash_box = (di, di, size - di, size - di)
         for angle in range(0, 360, 12):
             draw.arc(dash_box, start=angle, end=angle + 4,
-                     fill=(r, g, b, 80), width=1)
+                     fill=(r, g, b, 160), width=1)
 
-        # ── Soft highlight  ─  CSS ::after radial-gradient at 30% 30%
-        highlight_r = size // 5
-        hx, hy = int(size * 0.3), int(size * 0.3)
-        for i in range(highlight_r, 0, -3):
-            alpha = int(18 * (i / highlight_r))
-            draw.ellipse((hx - i, hy - i, hx + i, hy + i),
-                         fill=(255, 255, 255, alpha))
-
-        # ── Text  ─  CSS font sizes 8px / 17px / 7px on 116px → ×4.14
+        # ── Text — CSS font sizes 8px / 17px / 7px on 116px → ×4.14 ────
         font_kicker = _load_badge_font(33)
         font_main   = _load_badge_font(70)
         font_sub    = _load_badge_font(29)
 
-        kicker_bb = draw.textbbox((0, 0), badge["kicker"], font=font_kicker)
-        main_bb   = draw.textbbox((0, 0), badge["main"],   font=font_main)
-        sub_bb    = draw.textbbox((0, 0), badge["sub"],     font=font_sub)
+        kbb = draw.textbbox((0, 0), badge["kicker"], font=font_kicker)
+        mbb = draw.textbbox((0, 0), badge["main"],   font=font_main)
+        sbb = draw.textbbox((0, 0), badge["sub"],     font=font_sub)
 
-        kicker_w, kicker_h = kicker_bb[2] - kicker_bb[0], kicker_bb[3] - kicker_bb[1]
-        main_w,   main_h   = main_bb[2]   - main_bb[0],   main_bb[3]   - main_bb[1]
-        sub_w,    sub_h     = sub_bb[2]    - sub_bb[0],    sub_bb[3]    - sub_bb[1]
+        kw, kh = kbb[2] - kbb[0], kbb[3] - kbb[1]
+        mw, mh = mbb[2] - mbb[0], mbb[3] - mbb[1]
+        sw, sh = sbb[2] - sbb[0], sbb[3] - sbb[1]
 
         gap = 10
-        group_h = kicker_h + gap + main_h + gap + sub_h
+        group_h = kh + gap + mh + gap + sh
         ty = cx - group_h // 2
 
-        # Screen blend on dark bg ≈ foreground colour at full brightness.
-        # HTML opacity per layer: kicker 0.75, main 1.0, sub 0.72,
-        # times badge opacity 0.9.
-        draw.text((cx - kicker_w // 2, ty),
-                  badge["kicker"], font=font_kicker, fill=(r, g, b, 170))
-        draw.text((cx - main_w // 2, ty + kicker_h + gap),
-                  badge["main"],   font=font_main,   fill=(r, g, b, 230))
-        draw.text((cx - sub_w // 2, ty + kicker_h + gap + main_h + gap),
-                  badge["sub"],    font=font_sub,    fill=(r, g, b, 165))
+        draw.text((cx - kw // 2, ty),
+                  badge["kicker"], font=font_kicker, fill=(r, g, b, 210))
+        draw.text((cx - mw // 2, ty + kh + gap),
+                  badge["main"],   font=font_main,   fill=(r, g, b, 255))
+        draw.text((cx - sw // 2, ty + kh + gap + mh + gap),
+                  badge["sub"],    font=font_sub,    fill=(r, g, b, 200))
 
-        # ── Rotate 14°  ─  CSS transform: rotate(14deg)
-        rotated = img.rotate(14, resample=Image.Resampling.BICUBIC, expand=True)
+        # ── Pre-composite onto dark circular base ────────────────────────
+        # This avoids fpdf2's poor semi-transparent RGBA handling.
+        base = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        base_draw = ImageDraw.Draw(base)
+        base_draw.ellipse((0, 0, size - 1, size - 1), fill=(*NAVY, 255))
+        composited = Image.alpha_composite(base, decor)
+
+        # ── Rotate 14° — CSS transform: rotate(14deg) ───────────────────
+        rotated = composited.rotate(14, resample=Image.Resampling.BICUBIC,
+                                    expand=True)
 
         tmp_path = None
         try:
