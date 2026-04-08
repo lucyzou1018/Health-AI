@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Health AI — Backend startup script
+# CodeAutrix — Backend startup script
 # Usage:
 #   ./start.sh          — production mode (stable, no auto-reload)
 #   ./start.sh --dev    — development mode (auto-reloads on Python file changes)
@@ -18,7 +18,7 @@ if [[ "$1" == "--dev" ]]; then
   source .venv/bin/activate
   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 else
-  echo "🚀 Starting Health AI backend (stable mode, no auto-reload)..."
+  echo "🚀 Starting CodeAutrix backend (stable mode, no auto-reload)..."
   source .venv/bin/activate
   uvicorn app.main:app --host 0.0.0.0 --port 8000
 fi

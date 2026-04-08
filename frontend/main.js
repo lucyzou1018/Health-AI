@@ -434,7 +434,7 @@ function updateContextBanner() {
   if (copy) {
     if (contextTitle) contextTitle.textContent = copy.title;
     if (contextDesc) contextDesc.textContent = copy.desc;
-    document.title = `Health AI · ${copy.title}`;
+    document.title = `CodeAutrix · ${copy.title}`;
   }
 }
 

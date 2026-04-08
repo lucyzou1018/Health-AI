@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Health AI — Intelligent Skill Security Platform</title>
+  <title>CodeAutrix — Intelligent Skill Security Platform</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="styles.css?v=20260364" />
 </head>
@@ -48,14 +48,14 @@
           <path d="M14 17L15 15L16 18L17 16L18 17" stroke="#22d3ee" stroke-width="0.6" stroke-linecap="round" fill="none" opacity="0.8"/>
         </svg>
       </span>
-      <span class="brand-name">Health AI</span>
+      <span class="brand-name">CodeAutrix</span>
     </div>
     <nav class="lp-nav-links">
       <a href="#features" class="lp-nav-item">Features</a>
       <a href="#how-it-works" class="lp-nav-item">How It Works</a>
-      <a href="#stats" class="lp-nav-item">Stats</a>
-      <a class="lp-nav-cta" href="workspace.html">Work Space →</a>
+      <a href="#faq" class="lp-nav-item">FAQ</a>
     </nav>
+    <a class="lp-nav-cta" href="workspace.html">Launch App →</a>
   </header>
 
   <!-- ── Hero ── -->
@@ -66,7 +66,7 @@
         Smart Risk Control · Audit · Stress Test · Full-Stack Protection
       </div>
       <h1 class="hero-title">
-        <span class="title-gradient">Health AI</span>
+        <span class="title-gradient">CodeAutrix</span>
       </h1>
       <p class="hero-subtitle">Comprehensive Security for Your Skills &amp; Contracts</p>
       <p class="hero-desc">
@@ -432,6 +432,117 @@
     </div>
   </section>
 
+  <!-- ── FAQ ── -->
+  <section id="faq" class="lp-section lp-section--alt">
+    <div class="lp-container">
+      <div class="section-header fade-up">
+        <div class="section-eyebrow">FAQ</div>
+        <h2 class="section-title">Frequently Asked Questions</h2>
+        <p class="section-desc">Everything you need to know about CodeAutrix — clear answers, no fluff.</p>
+      </div>
+
+      <div class="faq-list fade-up">
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span>What file formats does CodeAutrix support for upload?</span>
+            <svg class="faq-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M4 6l4 4 4-4"/>
+            </svg>
+          </button>
+          <div class="faq-a">
+            <p>Skill Security Audit accepts <strong>.zip</strong> archives containing your Skill or Agent code. Contract Audit supports raw <strong>.sol</strong> Solidity source files, as well as on-chain contract addresses for live analysis. All uploads are processed server-side and never shared with third parties.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span>Is my uploaded code stored or shared after scanning?</span>
+            <svg class="faq-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M4 6l4 4 4-4"/>
+            </svg>
+          </button>
+          <div class="faq-a">
+            <p>Your code is stored only for the duration of the scan task and its associated report. It is never shared with other users or used for training. You can delete any task and its artifacts at any time from the Workspace panel.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span>Do I need to register or connect a wallet to use CodeAutrix?</span>
+            <svg class="faq-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M4 6l4 4 4-4"/>
+            </svg>
+          </button>
+          <div class="faq-a">
+            <p>No registration is required to run scans. Connecting a wallet (MetaMask or WalletConnect) is optional — it links your session to a persistent identity so your scan history is preserved across devices. Without a wallet, your tasks are tied to your browser session only.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span>Is there a daily task limit?</span>
+            <svg class="faq-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M4 6l4 4 4-4"/>
+            </svg>
+          </button>
+          <div class="faq-a">
+            <p>Yes. Each IP address may submit up to <strong>3 scan tasks per UTC calendar day</strong> across all scan types combined (Skill Audit, Contract Audit, and Stress Test). The counter resets at midnight UTC. This limit ensures fair usage and service stability for all users.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span>How is the security score calculated?</span>
+            <svg class="faq-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M4 6l4 4 4-4"/>
+            </svg>
+          </button>
+          <div class="faq-a">
+            <p>The Skill Security Audit produces five independent dimension scores — <strong>Privacy, Privilege, Integrity, Supply Chain, and Stability</strong> — each rated 0–100. The overall score is their arithmetic mean. Scores ≥ 80 are considered healthy; scores below 60 indicate significant risk. Each dimension deducts points based on matched risk patterns weighted by severity.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span>Which blockchains does Contract Audit support?</span>
+            <svg class="faq-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M4 6l4 4 4-4"/>
+            </svg>
+          </button>
+          <div class="faq-a">
+            <p>Contract Audit currently supports all <strong>EVM-compatible chains</strong> (Ethereum, BNB Chain, Polygon, Arbitrum, Base, etc.) via Solidity source code or on-chain address. Solana / Anchor contract support is on the roadmap. More chains will be added in future releases.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span>Can I export the scan report?</span>
+            <svg class="faq-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M4 6l4 4 4-4"/>
+            </svg>
+          </button>
+          <div class="faq-a">
+            <p>Yes. Every completed scan generates a structured report viewable in the browser. For Skill Security Audit, a professional <strong>PDF report</strong> can be downloaded directly from the report page — suitable for sharing with your team, clients, or auditors.</p>
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <button class="faq-q" aria-expanded="false">
+            <span>What is the difference between Skill Audit and Contract Audit?</span>
+            <svg class="faq-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M4 6l4 4 4-4"/>
+            </svg>
+          </button>
+          <div class="faq-a">
+            <p><strong>Skill Security Audit</strong> targets OpenClaw Skills and Agents — Python-based AI tool packages. It checks permissions, privilege escalation, data leakage, obfuscation, supply chain risks, and more, producing a 5-dimension health score.<br><br><strong>Contract Audit</strong> targets on-chain smart contracts written in Solidity. It detects reentrancy, integer overflow, access control flaws, gas inefficiencies, and other EVM-specific vulnerabilities using AI-powered analysis.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
   <!-- ── CTA Banner ── -->
   <section class="lp-cta-section">
     <div class="lp-container">
@@ -454,21 +565,43 @@
     <div class="lp-container">
       <div class="footer-inner">
         <div class="footer-brand">
-          <span class="brand-name">Health AI</span>
+          <span class="brand-name">CodeAutrix</span>
           <p class="footer-tagline">Intelligent Skill Security Platform</p>
         </div>
         <div class="footer-links">
           <a href="#features">Features</a>
           <a href="#how-it-works">How It Works</a>
-          <a href="workspace.html">Work Space</a>
+          <a href="#faq">FAQ</a>
+          <a href="workspace.html">Launch App</a>
         </div>
-        <div class="footer-copy">© 2026 Health AI · All rights reserved</div>
+        <div class="footer-copy">© 2026 CodeAutrix · All rights reserved</div>
       </div>
     </div>
   </footer>
 
 <script>
 (function () {
+  /* ── FAQ accordion ─────────────────────────── */
+  document.querySelectorAll('.faq-q').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var item = btn.closest('.faq-item');
+      var isOpen = btn.getAttribute('aria-expanded') === 'true';
+      // close all
+      document.querySelectorAll('.faq-item').forEach(function (el) {
+        el.querySelector('.faq-q').setAttribute('aria-expanded', 'false');
+        el.querySelector('.faq-a').style.maxHeight = '0';
+        el.classList.remove('faq-open');
+      });
+      // open clicked if it was closed
+      if (!isOpen) {
+        btn.setAttribute('aria-expanded', 'true');
+        var ans = item.querySelector('.faq-a');
+        ans.style.maxHeight = ans.scrollHeight + 'px';
+        item.classList.add('faq-open');
+      }
+    });
+  });
+
   /* ── Scroll fade-up ─────────────────────────── */
   var fadeObs = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {

@@ -65,7 +65,7 @@ def verify_wallet_token(token: str = Header(None, alias="X-Wallet-Token")) -> Op
             return None
         return session.get("wallet_address")
 
-app = FastAPI(title="Health AI", version="0.2.0")
+app = FastAPI(title="CodeAutrix", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://www.healthaionline.com"],
@@ -298,7 +298,7 @@ def download_report_pdf(task_id: str):
 def get_wallet_nonce(wallet_address: str):
     """Return a one-time message for the client to sign with their wallet."""
     nonce = secrets.token_hex(16)
-    message = f"Health AI Login\nAddress: {wallet_address}\nNonce: {nonce}\nTimestamp: {int(time.time())}"
+    message = f"CodeAutrix Login\nAddress: {wallet_address}\nNonce: {nonce}\nTimestamp: {int(time.time())}"
     return {"message": message, "nonce": nonce}
 
 

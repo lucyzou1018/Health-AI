@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Audit Report - Health AI</title>
+  <title>Audit Report - CodeAutrix</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="styles.css?v=20260356" />
   <style>
@@ -63,7 +63,7 @@
   <header class="brand-nav workspace-header">
     <div class="brand-stack">
       <span class="brand-logo">AI</span>
-      <h1 class="brand-name">Health AI</h1>
+      <h1 class="brand-name">CodeAutrix</h1>
     </div>
     <a class="ghost-btn" href="workspace.html" id="back-link">← Back to Dashboard</a>
   </header>
@@ -441,7 +441,7 @@
           }
           
           // Render security audit dashboard
-          document.title = 'Skill Security Audit Report - Health AI';
+          document.title = 'Skill Security Audit Report - CodeAutrix';
           const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown';
 
           // Get scores (0-100, higher = safer)
@@ -496,7 +496,7 @@
           return;
         } else if (task.skillType === 'skill-stress-lab') {
           // Render stress test report — enhanced dashboard like security audit
-          document.title = 'Stress Test Report - Health AI';
+          document.title = 'Stress Test Report - CodeAutrix';
           const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown';
 
           // --- Parse 5-dimension scores ---
@@ -668,7 +668,7 @@
         }
 
         // Default: contract audit report
-        document.title = 'Contract Audit Report - Health AI';
+        document.title = 'Contract Audit Report - CodeAutrix';
         const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown';
 
         // ── New format: dimension score table (per CONTRACT_AUDIT_GUIDE.md) ───

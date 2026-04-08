@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Task manager for Health AI web service."""
+"""Task manager for CodeAutrix web service."""
 from __future__ import annotations
 
 import json

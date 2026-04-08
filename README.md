@@ -1,6 +1,6 @@
-# Health AI
+# CodeAutrix
 
-Health AI 是一个 AI Agent 安全审计平台，提供三类扫描能力：
+CodeAutrix 是一个 AI Agent 安全审计平台，提供三类扫描能力：
 
 - **Skill Security Audit** — 对 OpenClaw Skill/Agent ZIP 包进行多维安全检查，覆盖权限、隐私、混淆、高危工具、副作用、数据访问、调用深度、日志卫生、配置与 Manifest 等维度，**强制执行 AI 代码审查**，输出量化健康评分（5 维 0–100 分）+ 专业 PDF 报告
 - **Contract Audit** — 对 EVM 智能合约（本地文件或链上地址）进行漏洞分析，基于 AI 大模型进行多维度安全评分
@@ -120,9 +120,9 @@ set -a && source backend/.env && set +a
 **方式三：systemd 服务（EC2 / Linux 服务器）**
 
 ```ini
-# /etc/systemd/system/health-ai.service
+# /etc/systemd/system/codeautrix.service
 [Unit]
-Description=Health AI Backend
+Description=CodeAutrix Backend
 
 [Service]
 WorkingDirectory=/home/ec2-user/Health-AI/backend
@@ -147,8 +147,8 @@ WantedBy=multi-user.target
 ### 1. 克隆仓库
 
 ```bash
-git clone <repo-url> Health-AI
-cd Health-AI
+git clone <repo-url> CodeAutrix
+cd CodeAutrix
 ```
 
 ### 2. 安装 Python 依赖
@@ -191,12 +191,12 @@ export SKILL_AUDIT_AI_MODEL="gpt-4o-mini"
 ### 直接构建
 
 ```bash
-docker build -t health-ai .
+docker build -t codeautrix .
 docker run -p 8000:8000 \
   -e OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx \
   -e SKILL_AUDIT_AI_MODEL=gpt-4o-mini \
   -v $(pwd)/backend/storage:/app/backend/storage \
-  health-ai
+  codeautrix
 ```
 
 ### 使用 docker-compose
@@ -205,7 +205,7 @@ docker run -p 8000:8000 \
 
 ```yaml
 services:
-  health-ai:
+  codeautrix:
     build: .
     ports:
       - "8000:8000"

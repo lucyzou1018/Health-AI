@@ -1,6 +1,6 @@
 version: "3.9"
 services:
-  health-ai:
+  codeautrix:
     build: .
     ports:
       - "80:8000"
