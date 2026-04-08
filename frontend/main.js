@@ -90,9 +90,14 @@ let activeTab = (function () {
   return VALID_TABS.includes(hash) ? hash : "skill-security-audit";
 })();
 
-// Wallet State
+// Login State
 let currentWallet = null;
 let walletToken = localStorage.getItem("wallet_token");
+let loginType = localStorage.getItem("login_type"); // "wallet" or "google"
+let loginEmail = localStorage.getItem("login_email");
+
+// Google OAuth Client ID
+const GOOGLE_CLIENT_ID = window.HEALTH_AI_GOOGLE_CLIENT_ID || "744175699896-h7k636bv5g8bggvgdumdoqt3om6pcpk9.apps.googleusercontent.com";
 const SKILL_LABELS = {
   "skill-security-audit": "Skill Security Audit",
   "multichain-contract-vuln": "Contract Audit",
@@ -341,7 +346,7 @@ function updateRunButtonState() {
   
   if (!hasWallet) {
     runBtn.disabled = true;
-    runBtn.textContent = "Connect Wallet First";
+    runBtn.textContent = "Sign In First";
   } else if (!hasFile) {
     runBtn.disabled = true;
     runBtn.textContent = "Start Analysis";
@@ -1369,53 +1374,83 @@ function formatWalletAddress(address) {
 function updateWalletUI() {
   if (currentWallet && walletBtn && walletText) {
     walletBtn.classList.add("connected");
-    walletText.textContent = formatWalletAddress(currentWallet);
+    if (loginType === "google" && loginEmail) {
+      const email = loginEmail;
+      if (email.length > 18) {
+        walletText.textContent = email.slice(0, 14) + "...";
+      } else {
+        walletText.textContent = email;
+      }
+    } else {
+      walletText.textContent = formatWalletAddress(currentWallet);
+    }
   } else if (walletBtn && walletText) {
     walletBtn.classList.remove("connected");
-    walletText.textContent = "Connect Wallet";
+    walletText.textContent = "Sign In";
   }
 }
 
-// 检测可用的钱包提供者
+// ── EIP-6963 钱包发现 + 传统注入检测 ──
+// 收集通过 EIP-6963 协议注册的钱包
+const eip6963Providers = [];
+if (typeof window !== "undefined") {
+  window.addEventListener("eip6963:announceProvider", (event) => {
+    if (event.detail && event.detail.provider) {
+      eip6963Providers.push(event.detail);
+    }
+  });
+  window.dispatchEvent(new Event("eip6963:requestProvider"));
+}
+
 function detectWalletProviders() {
   const providers = [];
-  
-  // 检测 OKX Wallet
-  if (window.okxwallet) {
+  const seenRdns = new Set();
+
+  // 1) EIP-6963 detected wallets (modern standard, wallets provide their own name + icon)
+  for (const detail of eip6963Providers) {
+    const rdns = detail.info && detail.info.rdns;
+    const key = rdns || detail.info.name;
+    if (seenRdns.has(key)) continue;
+    seenRdns.add(key);
     providers.push({
-      name: "OKX Wallet",
-      icon: "🔵",
-      provider: window.okxwallet
+      name: detail.info.name,
+      icon: detail.info.icon, // data URI provided by the wallet itself
+      provider: detail.provider,
+      rdns: rdns
     });
   }
-  
-  // 检测 MetaMask
-  if (window.ethereum) {
-    // 检查是否是 MetaMask
-    const isMetaMask = window.ethereum.isMetaMask || 
-                       (window.ethereum.providers && window.ethereum.providers.some(p => p.isMetaMask));
-    
-    if (isMetaMask && !window.ethereum.providers) {
-      // 单一 MetaMask
-      providers.push({
-        name: "MetaMask",
-        icon: "🦊",
-        provider: window.ethereum
-      });
-    } else if (window.ethereum.providers) {
-      // 多个钱包插件
-      window.ethereum.providers.forEach(provider => {
-        if (provider.isMetaMask && !providers.some(p => p.name === "MetaMask")) {
-          providers.push({
-            name: "MetaMask",
-            icon: "🦊",
-            provider: provider
-          });
-        }
-      });
-    }
+
+  // 2) Legacy fallback: check known window injection points for wallets that don't support EIP-6963
+  const legacyWallets = [
+    { rdns: "io.metamask",          name: "MetaMask",        get: () => { if (window.ethereum) { const ps = window.ethereum.providers || [window.ethereum]; return ps.find(p => p.isMetaMask); } return null; } },
+    { rdns: "com.okex.wallet",      name: "OKX Wallet",      get: () => window.okxwallet },
+    { rdns: "com.coinbase.wallet",   name: "Coinbase Wallet", get: () => window.coinbaseWalletExtension || (window.ethereum && window.ethereum.isCoinbaseWallet ? window.ethereum : null) },
+    { rdns: "app.phantom",          name: "Phantom",         get: () => window.phantom && window.phantom.ethereum },
+    { rdns: "com.bitget.web3",      name: "Bitget Wallet",   get: () => window.bitkeep && window.bitkeep.ethereum },
+    { rdns: "com.trustwallet.app",  name: "Trust Wallet",    get: () => window.trustwallet || (window.ethereum && window.ethereum.isTrust ? window.ethereum : null) },
+    { rdns: "io.rabby",             name: "Rabby Wallet",    get: () => window.rabby },
+    { rdns: "io.zerion.wallet",     name: "Zerion",          get: () => window.zerion },
+    { rdns: "com.brave.wallet",     name: "Brave Wallet",    get: () => (window.ethereum && window.ethereum.isBraveWallet) ? window.ethereum : null },
+    { rdns: "pro.tokenpocket",      name: "TokenPocket",     get: () => { if (window.ethereum) { const ps = window.ethereum.providers || [window.ethereum]; return ps.find(p => p.isTokenPocket); } return null; } },
+    { rdns: "im.token",             name: "imToken",         get: () => { if (window.ethereum) { const ps = window.ethereum.providers || [window.ethereum]; return ps.find(p => p.isImToken); } return null; } },
+  ];
+
+  for (const w of legacyWallets) {
+    if (seenRdns.has(w.rdns) || seenRdns.has(w.name)) continue;
+    try {
+      const provider = w.get();
+      if (provider) {
+        seenRdns.add(w.rdns);
+        providers.push({ name: w.name, icon: null, provider });
+      }
+    } catch (_) {}
   }
-  
+
+  // 3) Final fallback: generic browser wallet
+  if (providers.length === 0 && window.ethereum) {
+    providers.push({ name: "Browser Wallet", icon: null, provider: window.ethereum });
+  }
+
   return providers;
 }
 
@@ -1432,7 +1467,10 @@ function showWalletSelector(providers) {
         <div class="wallet-list">
           ${providers.map((p, i) => `
             <button class="wallet-option" data-index="${i}">
-              <span class="wallet-option-icon">${p.icon}</span>
+              ${p.icon
+                ? `<img class="wallet-option-icon-img" src="${p.icon}" alt="${p.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';" /><span class="wallet-option-icon wallet-option-badge" style="display:none;">${(p.name||'W').slice(0,2).toUpperCase()}</span>`
+                : `<span class="wallet-option-icon wallet-option-badge">${(p.name||'W').slice(0,2).toUpperCase()}</span>`
+              }
               <span class="wallet-option-name">${p.name}</span>
             </button>
           `).join("")}
@@ -1501,7 +1539,29 @@ function showWalletSelector(providers) {
         background: var(--accent-subtle);
       }
       .wallet-option-icon {
-        font-size: 20px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .wallet-option-badge {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,0.08);
+        color: #f3f4f6;
+        border: 1px solid rgba(255,255,255,0.10);
+        font-family: Inter, sans-serif;
+        letter-spacing: 0.02em;
+      }
+      .wallet-option-icon-img {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        object-fit: cover;
+        border: 1px solid rgba(255,255,255,0.10);
+        background: rgba(255,255,255,0.06);
       }
       .wallet-modal-close {
         width: 100%;
@@ -1546,10 +1606,180 @@ function showWalletSelector(providers) {
   });
 }
 
+// ── Login Method Selection Modal ──
+function showLoginModal() {
+  return new Promise((resolve, reject) => {
+    const modal = document.createElement("div");
+    modal.className = "wallet-modal";
+    modal.innerHTML = `
+      <div class="wallet-modal-backdrop"></div>
+      <div class="wallet-modal-content">
+        <h3>Sign In</h3>
+        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px; text-align: center;">
+          Choose a login method to continue
+        </p>
+        <div class="wallet-list">
+          <button class="wallet-option" data-method="google">
+            <span class="wallet-option-icon">
+              <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.93 23.93 0 000 24c0 3.77.89 7.35 2.56 10.56l7.97-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg>
+            </span>
+            <span class="wallet-option-name">Continue with Google</span>
+          </button>
+          <button class="wallet-option" data-method="wallet">
+            <span class="wallet-option-icon">
+              <svg width="20" height="20" viewBox="0 0 48 48" fill="none"><rect x="2" y="10" width="36" height="30" rx="4" fill="#4285F4"/><path d="M38 10H8C4.69 10 2 12.69 2 16V10C2 6.69 4.69 4 8 4H34C37.31 4 38 6.69 38 10Z" fill="#EA4335"/><rect x="30" y="22" width="16" height="12" rx="3" fill="#FBBC05"/><circle cx="38" cy="28" r="2.5" fill="#34A853"/></svg>
+            </span>
+            <span class="wallet-option-name">Connect Wallet</span>
+          </button>
+        </div>
+        <button class="wallet-modal-close">Cancel</button>
+      </div>
+    `;
+
+    const style = document.createElement("style");
+    style.textContent = `
+      .wallet-modal {
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 1000; display: flex; align-items: center; justify-content: center;
+      }
+      .wallet-modal-backdrop {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+      }
+      .wallet-modal-content {
+        position: relative; background: var(--bg-secondary);
+        border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+        padding: 24px; min-width: 320px; max-width: 90vw;
+      }
+      .wallet-modal-content h3 {
+        margin: 0 0 16px 0; font-size: 18px; text-align: center;
+      }
+      .wallet-list {
+        display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;
+      }
+      .wallet-option {
+        display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+        background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
+        border-radius: var(--radius); color: var(--text-primary);
+        font-size: 14px; cursor: pointer; transition: all 150ms ease;
+        text-decoration: none;
+      }
+      .wallet-option:hover {
+        border-color: var(--accent); background: var(--accent-subtle);
+      }
+      .wallet-option-icon { font-size: 20px; display: flex; align-items: center; }
+      .wallet-modal-close {
+        width: 100%; padding: 10px; background: transparent;
+        border: 1px solid var(--border-subtle); border-radius: var(--radius);
+        color: var(--text-secondary); font-size: 13px; cursor: pointer;
+      }
+      .wallet-modal-close:hover {
+        border-color: var(--border-default); color: var(--text-primary);
+      }
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(modal);
+
+    function cleanup() {
+      if (modal.parentNode) document.body.removeChild(modal);
+      if (style.parentNode) document.head.removeChild(style);
+    }
+
+    modal.querySelectorAll(".wallet-option").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const method = btn.dataset.method;
+        cleanup();
+        resolve(method);
+      });
+    });
+    modal.querySelector(".wallet-modal-close").addEventListener("click", () => { cleanup(); reject(new Error("Cancelled")); });
+    modal.querySelector(".wallet-modal-backdrop").addEventListener("click", () => { cleanup(); reject(new Error("Cancelled")); });
+  });
+}
+
+// ── Google OAuth Login (full-page redirect) ──
+function loginWithGoogle() {
+  if (!GOOGLE_CLIENT_ID) {
+    alert("Google Login is not configured. Please set GOOGLE_CLIENT_ID.");
+    return;
+  }
+
+  // Save current page to return after login
+  localStorage.setItem("google_oauth_redirect", window.location.href);
+
+  // Redirect to Google OAuth
+  const redirectUri = window.location.origin + "/workspace.html";
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "token",
+    scope: "email profile",
+    prompt: "select_account"
+  });
+  window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
+}
+
+// Handle Google OAuth redirect callback
+async function handleGoogleCallback() {
+  const hash = window.location.hash;
+  if (!hash || !hash.includes("access_token")) return false;
+
+  // Parse access_token from URL fragment
+  const params = new URLSearchParams(hash.substring(1));
+  const accessToken = params.get("access_token");
+  if (!accessToken) return false;
+
+  // Clear the hash from URL
+  history.replaceState(null, "", window.location.pathname + window.location.search);
+
+  try {
+    // Get user info from Google
+    const userResp = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!userResp.ok) throw new Error("Failed to get Google user info");
+    const userInfo = await userResp.json();
+
+    // Verify with our backend
+    const verifyResp = await fetch(`${API_BASE}/api/auth/google`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: userInfo.email,
+        name: userInfo.name || "",
+        googleId: userInfo.sub,
+        accessToken: accessToken
+      })
+    });
+    if (!verifyResp.ok) throw new Error("Google verification failed");
+    const { token, walletAddress } = await verifyResp.json();
+
+    // Save login state
+    localStorage.setItem("wallet_token", token);
+    localStorage.setItem("wallet_address", walletAddress);
+    localStorage.setItem("login_type", "google");
+    localStorage.setItem("login_email", userInfo.email);
+    walletToken = token;
+    currentWallet = walletAddress;
+    loginType = "google";
+    loginEmail = userInfo.email;
+
+    updateWalletUI();
+    updateRunButtonState();
+    loadWalletHistory();
+    return true;
+  } catch (err) {
+    console.error("Google login failed:", err);
+    alert("Google login failed: " + err.message);
+    return false;
+  }
+}
+
+// ── Wallet Connection ──
 async function connectWallet() {
   // 检测可用的钱包
   const providers = detectWalletProviders();
-  
+
   if (providers.length === 0) {
     // 没有安装任何钱包
     const installModal = document.createElement("div");
@@ -1559,7 +1789,7 @@ async function connectWallet() {
       <div class="wallet-modal-content">
         <h3>No Wallet Detected</h3>
         <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px;">
-          Please install one of the following wallets:
+          Please install an EVM-compatible wallet extension:
         </p>
         <div class="wallet-list">
           <a href="https://www.okx.com/web3" target="_blank" class="wallet-option">
@@ -1635,7 +1865,29 @@ async function connectWallet() {
         background: var(--accent-subtle);
       }
       .wallet-option-icon {
-        font-size: 20px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .wallet-option-badge {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,0.08);
+        color: #f3f4f6;
+        border: 1px solid rgba(255,255,255,0.10);
+        font-family: Inter, sans-serif;
+        letter-spacing: 0.02em;
+      }
+      .wallet-option-icon-img {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        object-fit: cover;
+        border: 1px solid rgba(255,255,255,0.10);
+        background: rgba(255,255,255,0.06);
       }
       .wallet-modal-close {
         width: 100%;
@@ -1719,9 +1971,13 @@ async function connectWallet() {
     // 保存 token 和钱包地址
     localStorage.setItem("wallet_token", token);
     localStorage.setItem("wallet_address", walletAddress);
+    localStorage.setItem("login_type", "wallet");
+    localStorage.removeItem("login_email");
     walletToken = token;
     currentWallet = walletAddress;
-    
+    loginType = "wallet";
+    loginEmail = null;
+
     updateWalletUI();
     updateRunButtonState();
     loadWalletHistory();
@@ -1735,14 +1991,18 @@ async function connectWallet() {
 function disconnectWallet() {
   localStorage.removeItem("wallet_token");
   localStorage.removeItem("wallet_address");
+  localStorage.removeItem("login_type");
+  localStorage.removeItem("login_email");
   walletToken = null;
   currentWallet = null;
+  loginType = null;
+  loginEmail = null;
   updateWalletUI();
   updateRunButtonState();
-  
+
   // Clear history list
   if (historyList) {
-    historyList.innerHTML = '<li class="empty" id="history-empty">Connect wallet to view history</li>';
+    historyList.innerHTML = '<li class="empty" id="history-empty">Sign In to view history</li>';
   }
 }
 
@@ -1877,17 +2137,21 @@ function goToPage(page) {
   renderHistoryPage();
 }
 
-// 自定义断开钱包 Modal
+// 自定义登出 Modal
 function showDisconnectModal() {
   const overlay = document.getElementById("disconnect-modal");
   const addrEl  = document.getElementById("modal-addr");
   const cancelBtn  = document.getElementById("modal-cancel");
   const confirmBtn = document.getElementById("modal-confirm");
-  if (!overlay) { if (confirm("Disconnect wallet?")) disconnectWallet(); return; }
+  if (!overlay) { if (confirm("Logout?")) disconnectWallet(); return; }
 
-  // 显示截断地址
-  if (addrEl && currentWallet) {
-    addrEl.textContent = currentWallet.slice(0, 6) + "..." + currentWallet.slice(-4);
+  // Show user identifier based on login type
+  if (addrEl) {
+    if (loginType === "google" && loginEmail) {
+      addrEl.textContent = loginEmail;
+    } else if (currentWallet) {
+      addrEl.textContent = currentWallet.slice(0, 6) + "..." + currentWallet.slice(-4);
+    }
   }
 
   overlay.classList.add("is-open");
@@ -1912,13 +2176,25 @@ function showDisconnectModal() {
   document.addEventListener("keydown", onEsc);
 }
 
-// 钱包按钮事件
+// 登录按钮事件
 if (walletBtn) {
-  walletBtn.addEventListener("click", function() {
+  walletBtn.addEventListener("click", async function() {
     if (currentWallet) {
       showDisconnectModal();
     } else {
-      connectWallet();
+      try {
+        const method = await showLoginModal();
+        if (method === "google") {
+          await loginWithGoogle();
+        } else if (method === "wallet") {
+          await connectWallet();
+        }
+      } catch (err) {
+        if (err.message !== "Cancelled") {
+          console.error("Login failed:", err);
+          alert("Login failed: " + err.message);
+        }
+      }
     }
   });
 }
@@ -1974,13 +2250,17 @@ if (pageNextBtn) {
   });
 }
 
-// 检查本地存储的钱包登录状态
+// 检查本地存储的登录状态
 function initWallet() {
   const savedAddress = localStorage.getItem("wallet_address");
   const savedToken = localStorage.getItem("wallet_token");
+  const savedLoginType = localStorage.getItem("login_type");
+  const savedEmail = localStorage.getItem("login_email");
   if (savedAddress && savedToken) {
     currentWallet = savedAddress;
     walletToken = savedToken;
+    loginType = savedLoginType || "wallet";
+    loginEmail = savedEmail || null;
     updateWalletUI();
     updateRunButtonState();
     loadWalletHistory();
