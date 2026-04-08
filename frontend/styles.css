@@ -1737,29 +1737,59 @@ body:not(.landing-only) .ambient-glow {
 
 /* 钱包按钮 */
 .wallet-btn {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  padding: 9px 20px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(59, 130, 246, 0.10), rgba(139, 92, 246, 0.06));
+  border: 1px solid transparent;
+  border-radius: 10px;
   color: var(--text-primary);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.35s ease;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background-clip: padding-box;
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+/* 微光扫过动画 */
+.wallet-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+  animation: wallet-shimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes wallet-shimmer {
+  0%   { left: -100%; }
+  50%  { left: 100%; }
+  100% { left: 100%; }
 }
 
 .wallet-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.22), rgba(59, 130, 246, 0.18), rgba(139, 92, 246, 0.12));
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.45), 0 4px 16px rgba(139, 92, 246, 0.18), 0 0 20px rgba(139, 92, 246, 0.08);
+  transform: translateY(-1px);
 }
 
 .wallet-btn.connected {
-  background: rgba(34, 197, 94, 0.15);
-  border-color: rgba(34, 197, 94, 0.3);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(16, 185, 129, 0.10));
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.35), 0 2px 8px rgba(34, 197, 94, 0.12);
   color: #4ade80;
+}
+
+.wallet-btn.connected:hover {
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.5), 0 4px 16px rgba(34, 197, 94, 0.2), 0 0 20px rgba(34, 197, 94, 0.08);
 }
 
 /* 幽灵按钮 */
