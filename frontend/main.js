@@ -1544,8 +1544,11 @@ function updateWalletUI() {
     walletBtn.classList.add("connected");
     if (loginType === "google" && loginEmail) {
       const email = loginEmail;
-      if (email.length > 18) {
-        walletText.textContent = email.slice(0, 14) + "...";
+      if (email.length > 14) {
+        var parts = email.split(".");
+        var last = parts[parts.length - 1];
+        var front = email.slice(0, 4);
+        walletText.textContent = front + "..." + last;
       } else {
         walletText.textContent = email;
       }
@@ -1890,54 +1893,89 @@ function loginWithGoogle() {
 // Handle Google OAuth redirect callback
 async function handleGoogleCallback() {
   const hash = window.location.hash;
-  if (!hash || !hash.includes("access_token")) return false;
+  if (!hash || hash.length < 2) return false;
 
-  // Parse access_token from URL fragment
-  const params = new URLSearchParams(hash.substring(1));
+  const hashStr = hash.substring(1);
+  const params = new URLSearchParams(hashStr);
+
+  // Google returned an error (e.g. access_denied, popup_closed)
+  if (params.get("error")) {
+    console.error("[GoogleAuth] OAuth error:", params.get("error"), params.get("error_description") || "");
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    localStorage.removeItem("google_oauth_redirect");
+    return false;
+  }
+
   const accessToken = params.get("access_token");
   if (!accessToken) return false;
 
-  // Clear the hash from URL
+  // Clear the hash from URL immediately
   history.replaceState(null, "", window.location.pathname + window.location.search);
+  localStorage.removeItem("google_oauth_redirect");
 
   try {
-    // Get user info from Google
+    // Step 1: Get user info from Google
+    console.log("[GoogleAuth] Fetching user info from Google...");
     const userResp = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
-    if (!userResp.ok) throw new Error("Failed to get Google user info");
+    if (!userResp.ok) {
+      const errText = await userResp.text().catch(function() { return ""; });
+      throw new Error("Google userinfo failed (" + userResp.status + "): " + errText);
+    }
     const userInfo = await userResp.json();
+    console.log("[GoogleAuth] Got user:", userInfo.email);
 
-    // Verify with our backend
-    const verifyResp = await fetch(`${API_BASE}/api/auth/google`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: userInfo.email,
-        name: userInfo.name || "",
-        googleId: userInfo.sub,
-        accessToken: accessToken
-      })
-    });
-    if (!verifyResp.ok) throw new Error("Google verification failed");
-    const { token, walletAddress } = await verifyResp.json();
-
-    // Save login state
-    localStorage.setItem("wallet_token", token);
-    localStorage.setItem("wallet_address", walletAddress);
-    localStorage.setItem("login_type", "google");
-    localStorage.setItem("login_email", userInfo.email);
-    walletToken = token;
-    currentWallet = walletAddress;
+    // Step 2: Show email in UI immediately (before backend verification)
+    var tempAddr = "0xG" + userInfo.sub.slice(0, 39);
     loginType = "google";
     loginEmail = userInfo.email;
-
+    currentWallet = tempAddr;
+    localStorage.setItem("login_type", "google");
+    localStorage.setItem("login_email", userInfo.email);
+    localStorage.setItem("wallet_address", tempAddr);
     updateWalletUI();
     updateRunButtonState();
+    console.log("[GoogleAuth] UI updated, verifying with backend...");
+
+    // Step 3: Verify with backend in background (5s timeout)
+    try {
+      var abortCtrl = new AbortController();
+      var timeoutId = setTimeout(function() { abortCtrl.abort(); }, 5000);
+      var verifyResp = await fetch(API_BASE + "/api/auth/google", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: abortCtrl.signal,
+        body: JSON.stringify({
+          email: userInfo.email,
+          name: userInfo.name || "",
+          googleId: userInfo.sub,
+          accessToken: accessToken
+        })
+      });
+      clearTimeout(timeoutId);
+
+      if (verifyResp.ok) {
+        var data = await verifyResp.json();
+        if (data.token && data.walletAddress) {
+          localStorage.setItem("wallet_token", data.token);
+          localStorage.setItem("wallet_address", data.walletAddress);
+          walletToken = data.token;
+          currentWallet = data.walletAddress;
+          console.log("[GoogleAuth] Backend verified, wallet:", data.walletAddress);
+        }
+      } else {
+        console.warn("[GoogleAuth] Backend error:", verifyResp.status);
+      }
+    } catch (backendErr) {
+      console.warn("[GoogleAuth] Backend unreachable:", backendErr.message);
+    }
+
+    console.log("[GoogleAuth] Login complete:", userInfo.email);
     loadWalletHistory();
     return true;
   } catch (err) {
-    console.error("Google login failed:", err);
+    console.error("[GoogleAuth] Login failed:", err);
     alert("Google login failed: " + err.message);
     return false;
   }
@@ -2449,9 +2487,13 @@ function initWallet() {
   const savedToken = localStorage.getItem("wallet_token");
   const savedLoginType = localStorage.getItem("login_type");
   const savedEmail = localStorage.getItem("login_email");
-  if (savedAddress && savedToken) {
+  // Wallet login requires both address and token;
+  // Google login only needs address + email (token is optional if backend was unreachable)
+  var isWalletLogin = savedAddress && savedToken && savedLoginType !== "google";
+  var isGoogleLogin = savedAddress && savedLoginType === "google" && savedEmail;
+  if (isWalletLogin || isGoogleLogin) {
     currentWallet = savedAddress;
-    walletToken = savedToken;
+    walletToken = savedToken || null;
     loginType = savedLoginType || "wallet";
     loginEmail = savedEmail || null;
     updateWalletUI();
@@ -2460,5 +2502,10 @@ function initWallet() {
   }
 }
 
-// 页面加载时初始化钱包
-initWallet();
+// 页面加载时初始化：先处理 Google OAuth 回调，再恢复 localStorage
+(async function initAuth() {
+  const handled = await handleGoogleCallback();
+  if (!handled) {
+    initWallet();
+  }
+})();
