@@ -98,8 +98,8 @@ body {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: rgba(10, 10, 15, 0.6);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  background: transparent;
+  border: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1929,14 +1929,16 @@ body:not(.landing-only) .ambient-glow {
 
 .help-switch {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .help-switch__trigger {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 50%;
   background: transparent;
@@ -1954,7 +1956,7 @@ body:not(.landing-only) .ambient-glow {
 }
 
 .help-switch__icon {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 1;
   transform: translateY(-0.5px);
@@ -1964,7 +1966,8 @@ body:not(.landing-only) .ambient-glow {
   position: absolute;
   top: calc(100% + 8px);
   right: -12px;
-  width: 220px;
+  width: auto;
+  white-space: nowrap;
   padding: 8px;
   border-radius: 14px;
   background: rgba(12, 17, 32, 0.96);
@@ -2008,10 +2011,12 @@ body:not(.landing-only) .ambient-glow {
 
 .lang-switch {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .lang-switch__trigger {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 16px;
@@ -2025,8 +2030,8 @@ body:not(.landing-only) .ambient-glow {
 
 .lang-switch__trigger--icon {
   justify-content: center;
-  width: 52px;
-  height: 52px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 0;
   background: transparent;
@@ -2045,8 +2050,8 @@ body:not(.landing-only) .ambient-glow {
 
 .lang-switch__icon {
   display: inline-flex;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   color: #c7d2fe;
 }
 
@@ -4410,6 +4415,14 @@ button#run-task:hover:not(:disabled) {
   align-items: flex-start;
 }
 
+.plan-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 0;
+}
+
 .plan-name {
   font-size: 28px;
   font-weight: 700;
@@ -4424,7 +4437,7 @@ button#run-task:hover:not(:disabled) {
 }
 
 .plan-price {
-  text-align: right;
+  text-align: left;
   flex-shrink: 0;
 }
 
@@ -4645,9 +4658,6 @@ button#run-task:hover:not(:disabled) {
     flex-direction: column;
   }
 
-  .plan-price {
-    text-align: left;
-  }
 
   .pricing-title {
     font-size: 40px;

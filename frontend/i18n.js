@@ -462,6 +462,24 @@
     window.dispatchEvent(new CustomEvent("codeautrix:langchange", { detail: { lang: nextLang } }));
   }
 
+  /* ── Close all nav dropdowns (both help and lang) ── */
+  function closeAllDropdowns() {
+    document.querySelectorAll('[data-lang-switch]').forEach(function (sw) {
+      sw.classList.remove('is-open');
+      var t = sw.querySelector('.lang-switch__trigger');
+      var m = sw.querySelector('.lang-switch__menu');
+      if (t) t.setAttribute('aria-expanded', 'false');
+      if (m) m.setAttribute('aria-hidden', 'true');
+    });
+    document.querySelectorAll('[data-help-switch]').forEach(function (sw) {
+      sw.classList.remove('is-open');
+      var t = sw.querySelector('.help-switch__trigger');
+      var m = sw.querySelector('.help-switch__menu');
+      if (t) t.setAttribute('aria-expanded', 'false');
+      if (m) m.setAttribute('aria-hidden', 'true');
+    });
+  }
+
   document.querySelectorAll('[data-lang-switch]').forEach(function (switcher) {
     var trigger = switcher.querySelector('.lang-switch__trigger');
     var menu = switcher.querySelector('.lang-switch__menu');
@@ -475,9 +493,13 @@
 
     trigger.addEventListener('click', function (event) {
       event.stopPropagation();
-      var open = switcher.classList.toggle('is-open');
-      trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
-      menu.setAttribute('aria-hidden', open ? 'false' : 'true');
+      var willOpen = !switcher.classList.contains('is-open');
+      closeAllDropdowns(); // close everything first (including help-switch)
+      if (willOpen) {
+        switcher.classList.add('is-open');
+        trigger.setAttribute('aria-expanded', 'true');
+        menu.setAttribute('aria-hidden', 'false');
+      }
     });
 
     options.forEach(function (option) {
@@ -506,9 +528,13 @@
 
     trigger.addEventListener('click', function (event) {
       event.stopPropagation();
-      var open = switcher.classList.toggle('is-open');
-      trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
-      menu.setAttribute('aria-hidden', open ? 'false' : 'true');
+      var willOpen = !switcher.classList.contains('is-open');
+      closeAllDropdowns(); // close everything first (including lang-switch)
+      if (willOpen) {
+        switcher.classList.add('is-open');
+        trigger.setAttribute('aria-expanded', 'true');
+        menu.setAttribute('aria-hidden', 'false');
+      }
     });
 
     document.addEventListener('click', function (event) {
