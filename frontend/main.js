@@ -84,6 +84,41 @@ const FEATURE_COPY = {
   }
 };
 
+function workspaceI18n(key) {
+  const dict = {
+    en: {
+      signInFirst: "Sign In First",
+      startAnalysis: "Start Analysis",
+      analyzing: "Analyzing...",
+      notStarted: "Not Started",
+      emptySummary: "Upload a Skill package to view status and download reports here.",
+      scanComplete: "Scan Complete",
+      scanFailed: "Scan Failed",
+      analyzingEllipsis: "Analyzing…",
+      queued: "Queued",
+      loading: "Loading…",
+      refreshing: "Refreshing task status…",
+      titlePrefix: "CodeAutrix · "
+    },
+    "zh-CN": {
+      signInFirst: "请先登录",
+      startAnalysis: "开始分析",
+      analyzing: "分析中...",
+      notStarted: "未开始",
+      emptySummary: "上传 Skill 代码包后，可在这里查看状态并下载报告。",
+      scanComplete: "扫描完成",
+      scanFailed: "扫描失败",
+      analyzingEllipsis: "分析中…",
+      queued: "排队中",
+      loading: "加载中…",
+      refreshing: "正在刷新任务状态…",
+      titlePrefix: "CodeAutrix · "
+    }
+  };
+  const lang = getCurrentUILang();
+  return (dict[lang] || dict.en)[key] || dict.en[key] || key;
+}
+
 const VALID_TABS = Object.keys(PARAM_SCHEMA);
 let activeTab = (function () {
   const hash = window.location.hash.replace("#", "");
@@ -132,6 +167,51 @@ const pageInfoEl = document.getElementById("page-info");
 const recordedHistory = new Set();
 let previewTaskId = null;
 let currentFile = null;
+
+function getCurrentUILang() {
+  try {
+    return localStorage.getItem("codeautrix_lang") || "en";
+  } catch (_) {
+    return "en";
+  }
+}
+
+function historyI18n(key) {
+  const dict = {
+    en: {
+      signInToViewHistory: "Sign In to view history",
+      sessionUnavailable: "Session unavailable. Refresh later to reload history.",
+      records: "records",
+      noAnalysisRecords: "No analysis records found",
+      done: "Done",
+      failed: "Failed",
+      processing: "Processing",
+      viewReport: "View Report",
+      shareToX: "Share to X",
+      downloadPdf: "Download PDF",
+      pdfButton: "↓ PDF",
+      pagePrefix: "Page ",
+      pageSuffix: ""
+    },
+    "zh-CN": {
+      signInToViewHistory: "登录后查看历史记录",
+      sessionUnavailable: "当前会话不可用，请稍后刷新重新加载历史记录。",
+      records: "条记录",
+      noAnalysisRecords: "暂无分析记录",
+      done: "已完成",
+      failed: "失败",
+      processing: "处理中",
+      viewReport: "查看报告",
+      shareToX: "分享到",
+      downloadPdf: "下载 PDF",
+      pdfButton: "↓ PDF",
+      pagePrefix: "第 ",
+      pageSuffix: " 页"
+    }
+  };
+  const lang = getCurrentUILang();
+  return (dict[lang] || dict.en)[key] || dict.en[key] || key;
+}
 // 每个 skill 类型是否有任务正在运行
 const runningTabs = {
   "skill-security-audit": false,
@@ -305,10 +385,10 @@ function clearCurrentFile() {
 function clearResults() {
   // 清除任务状态
   if (statusBox) {
-    statusBox.textContent = "Not Started";
+    statusBox.textContent = workspaceI18n("notStarted");
     statusBox.className = "status";
   }
-  if (summaryBox) summaryBox.textContent = "Upload a Skill package to view status and download reports here.";
+  if (summaryBox) summaryBox.textContent = workspaceI18n("emptySummary");
   if (artifactBox) artifactBox.classList.add("hidden");
   if (reportPreviewBox) {
     reportPreviewBox.classList.add("hidden");
@@ -346,19 +426,19 @@ function updateRunButtonState() {
   
   if (!hasWallet) {
     runBtn.disabled = true;
-    runBtn.textContent = "Sign In First";
+    runBtn.textContent = workspaceI18n("signInFirst");
   } else if (!hasFile) {
     runBtn.disabled = true;
-    runBtn.textContent = "Start Analysis";
+    runBtn.textContent = workspaceI18n("startAnalysis");
   } else if (activeTab === "skill-stress-lab" && !hasValidParams) {
     runBtn.disabled = true;
-    runBtn.textContent = "Start Analysis";
+    runBtn.textContent = workspaceI18n("startAnalysis");
   } else if (isRunning) {
     runBtn.disabled = true;
-    runBtn.textContent = "Analyzing...";
+    runBtn.textContent = workspaceI18n("analyzing");
   } else {
     runBtn.disabled = false;
-    runBtn.textContent = "Start Analysis";
+    runBtn.textContent = workspaceI18n("startAnalysis");
   }
   
   runBtn.style.opacity = runBtn.disabled ? "0.5" : "1";
@@ -400,7 +480,7 @@ function selectTab(tab, opts = {}) {
           lastTaskPerTab[tab] = fresh;
           if (activeTab === tab) {
             const v = fresh.status === "failed" ? "error" : fresh.status === "completed" ? "success" : "running";
-            const label = { completed:"Scan Complete", failed:"Scan Failed", running:"Analyzing…", pending:"Queued" }[fresh.status] || fresh.status;
+            const label = { completed:workspaceI18n("scanComplete"), failed:workspaceI18n("scanFailed"), running:workspaceI18n("analyzingEllipsis"), pending:workspaceI18n("queued") }[fresh.status] || fresh.status;
             setStatus(label, v);
             setSummary(describeTask(fresh));
             renderArtifacts(fresh);
@@ -409,18 +489,18 @@ function selectTab(tab, opts = {}) {
         })
         .catch(() => {});
       // Show a neutral loading state while fetching
-      setStatus("Loading…", "info");
-      setSummary("Refreshing task status…");
+      setStatus(workspaceI18n("loading"), "info");
+      setSummary(workspaceI18n("refreshing"));
       return;
     }
     const variant = lastTask.status === "failed" ? "error"
                   : lastTask.status === "completed" ? "success"
                   : "running";
     const statusLabel = {
-      completed: "Scan Complete",
-      failed:    "Scan Failed",
-      running:   "Analyzing…",
-      pending:   "Queued",
+      completed: workspaceI18n("scanComplete"),
+      failed:    workspaceI18n("scanFailed"),
+      running:   workspaceI18n("analyzingEllipsis"),
+      pending:   workspaceI18n("queued"),
     }[lastTask.status] || lastTask.status;
     setStatus(statusLabel, variant);
     const msg = (!FINAL_STATUSES.has(lastTask.status) && pollingMsgPerTab[tab])
@@ -435,11 +515,15 @@ function selectTab(tab, opts = {}) {
 }
 
 function updateContextBanner() {
+  if (typeof window.applyWorkspaceLocale === "function") {
+    window.applyWorkspaceLocale(getCurrentUILang());
+    return;
+  }
   const copy = FEATURE_COPY[activeTab];
   if (copy) {
     if (contextTitle) contextTitle.textContent = copy.title;
     if (contextDesc) contextDesc.textContent = copy.desc;
-    document.title = `CodeAutrix · ${copy.title}`;
+    document.title = workspaceI18n("titlePrefix") + copy.title;
   }
 }
 
@@ -1336,7 +1420,7 @@ function buildStressLabSummary(text) {
 // ── Share Results Feature ──────────────────────────────────────
 
 function buildShareText(task, reportText) {
-  const SITE_URL = "https://codeautrix.com";
+  const REPORT_URL = window.location.origin + "/report.html?task=" + task.taskId;
   const scores = {};
   const lines = (reportText || "").split(/\r?\n/);
 
@@ -1351,7 +1435,7 @@ function buildShareText(task, reportText) {
     const s = scores.overall || "—";
     return `🛡️ One click. Risks exposed. My Skill scored ${s}/100 on @CodeAutrix.\n\n` +
       `📊 Privacy: ${scores.privacy || "—"} · Privilege: ${scores.privilege || "—"} · Integrity: ${scores.integrity || "—"}\n\n` +
-      `AI-powered one-click audit — secure your code before it goes live 👇\n${SITE_URL}\n\n` +
+      `AI-powered one-click audit — secure your code before it goes live 👇\n${REPORT_URL}\n\n` +
       `#CodeAutrix #Web3Security #SecureByDefault`;
   }
 
@@ -1367,7 +1451,7 @@ function buildShareText(task, reportText) {
     const totalStr = total > 0 ? `${total} vulnerabilities caught` : "Contract analyzed";
     return `📋 One click. ${totalStr} before deployment. @CodeAutrix keeps my contract safe.\n\n` +
       `🔴 ${critical} Critical · 🟠 ${high} High · 🟡 ${medium} Medium · 🟢 ${low} Low\n\n` +
-      `One-click smart contract audit — ship with confidence 👇\n${SITE_URL}\n\n` +
+      `One-click smart contract audit — ship with confidence 👇\n${REPORT_URL}\n\n` +
       `#CodeAutrix #SmartContract #SecureByDefault`;
   }
 
@@ -1379,11 +1463,11 @@ function buildShareText(task, reportText) {
       if (/(?:Performance|性能)/.test(line)) { const m = line.match(/(\d+)\/100/); if (m) performance = m[1]; }
     }
     return `⚡ One click. Score: ${overall || "—"}/100. Stability: ${stability || "—"}. Performance: ${performance || "—"}. My Skill is production-ready.\n\n` +
-      `Tested on @CodeAutrix — one-click stress test, real reliability data ⏱️\n${SITE_URL}\n\n` +
+      `Tested on @CodeAutrix — one-click stress test, real reliability data ⏱️\n${REPORT_URL}\n\n` +
       `#CodeAutrix #StressTest #ProductionReady`;
   }
 
-  return `🔒 Just scanned my project on @CodeAutrix — one-click security audit for Web3.\n\n${SITE_URL}\n\n#CodeAutrix`;
+  return `🔒 Just scanned my project on @CodeAutrix — one-click security audit for Web3.\n\n${REPORT_URL}\n\n#CodeAutrix`;
 }
 
 function showShareModal(shareText) {
@@ -2208,7 +2292,7 @@ function disconnectWallet() {
 
   // Clear history list
   if (historyList) {
-    historyList.innerHTML = '<li class="empty" id="history-empty">Sign In to view history</li>';
+    historyList.innerHTML = '<li class="empty" id="history-empty">' + historyI18n("signInToViewHistory") + '</li>';
   }
 }
 
@@ -2231,9 +2315,9 @@ async function loadWalletHistory(skillType = "all") {
         // Preserve the visible login state on refresh/reload.
         // A transient backend restart should not immediately sign the user out.
         if (historyList) {
-          historyList.innerHTML = '<li class="empty" id="history-empty">Session unavailable. Refresh later to reload history.</li>';
+          historyList.innerHTML = '<li class="empty" id="history-empty">' + historyI18n("sessionUnavailable") + '</li>';
         }
-        if (historyCount) historyCount.textContent = "0 records";
+        if (historyCount) historyCount.textContent = "0 " + historyI18n("records");
         return;
       }
       throw new Error("Failed to load history");
@@ -2254,7 +2338,7 @@ function renderWalletHistory(tasks) {
   tasks.forEach(function(t) { recordedHistory.add(t.taskId); });
   currentPage = 1;
   renderHistoryPage();
-  if (historyCount) historyCount.textContent = tasks.length + " records";
+  if (historyCount) historyCount.textContent = tasks.length + " " + historyI18n("records");
 }
 
 function renderHistoryPage() {
@@ -2280,7 +2364,7 @@ function renderHistoryPage() {
   historyList.innerHTML = '';
   
   if (pageTasks.length === 0) {
-    historyList.innerHTML = '<li class="empty">No analysis records found</li>';
+    historyList.innerHTML = '<li class="empty">' + historyI18n("noAnalysisRecords") + '</li>';
     if (paginationEl) paginationEl.style.display = 'none';
     return;
   }
@@ -2304,7 +2388,7 @@ function createHistoryItem(task) {
   var isCompleted = task.status === "completed";
   var isFailed = task.status === "failed";
   var isProcessing = !isCompleted && !isFailed;
-  var statusText = isCompleted ? "Done" : isFailed ? "Failed" : "Processing";
+  var statusText = isCompleted ? historyI18n("done") : isFailed ? historyI18n("failed") : historyI18n("processing");
   var statusClass = isCompleted ? "success" : isFailed ? "error" : "processing";
   var skillLabel = SKILL_LABELS[task.skillType] || task.skillType;
   var fullName = task.fileName ? task.fileName + '-' + skillLabel : skillLabel;
@@ -2326,10 +2410,10 @@ function createHistoryItem(task) {
     '<div class="history-col3">' +
       (isCompleted ?
         '<div class="history-row">' +
-          '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">View Report</a>' +
-          '<button class="history-share-btn" data-task-id="' + task.taskId + '" data-skill-type="' + (task.skillType || '') + '" title="Share to X">Share to <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></button>' +
+          '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">' + historyI18n("viewReport") + '</a>' +
+          '<button class="history-share-btn" data-task-id="' + task.taskId + '" data-skill-type="' + (task.skillType || '') + '" title="' + historyI18n("shareToX") + '">' + historyI18n("shareToX") + ' <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></button>' +
         '</div>' +
-        '<button class="history-dl-btn" data-task-id="' + task.taskId + '" data-skill="' + (task.skillType || 'audit') + '" title="Download PDF">↓ PDF</button>' :
+        '<button class="history-dl-btn" data-task-id="' + task.taskId + '" data-skill="' + (task.skillType || 'audit') + '" title="' + historyI18n("downloadPdf") + '">' + historyI18n("pdfButton") + '</button>' :
         '<span class="history-no-report">-</span>') +
     '</div>';
   
@@ -2342,7 +2426,7 @@ function updatePagination(totalPages, totalItems) {
   pagePrevBtn.disabled = currentPage <= 1;
   pageNextBtn.disabled = currentPage >= totalPages || totalPages <= 1;
   
-  pageInfoEl.textContent = 'Page ' + currentPage + '/' + totalPages;
+  pageInfoEl.textContent = historyI18n("pagePrefix") + currentPage + '/' + totalPages + historyI18n("pageSuffix");
 }
 
 function goToPage(page) {
@@ -2434,8 +2518,8 @@ if (historyList) {
       dlBtn.textContent = "…";
       dlBtn.disabled = true;
       triggerDownload(API_BASE + "/api/tasks/" + taskId + "/report/pdf", slug + "-report.pdf")
-        .then(function() { dlBtn.textContent = "↓ PDF"; dlBtn.disabled = false; })
-        .catch(function() { dlBtn.textContent = "↓ PDF"; dlBtn.disabled = false; });
+        .then(function() { dlBtn.textContent = historyI18n("pdfButton"); dlBtn.disabled = false; })
+        .catch(function() { dlBtn.textContent = historyI18n("pdfButton"); dlBtn.disabled = false; });
       return;
     }
 
@@ -2480,6 +2564,10 @@ if (pageNextBtn) {
     }
   });
 }
+
+window.addEventListener("codeautrix:langchange", function() {
+  if (historyList) renderHistoryPage();
+});
 
 // 检查本地存储的登录状态
 function initWallet() {

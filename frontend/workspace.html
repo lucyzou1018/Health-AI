@@ -8,22 +8,58 @@
   <link rel="apple-touch-icon" href="caLogo.svg" />
   <meta property="og:image" content="caLogo.svg" />
   <meta name="twitter:image" content="caLogo.svg" />
-  <link rel="stylesheet" href="styles.css?v=20260408c" />
+  <link rel="stylesheet" href="styles.css?v=20260409f" />
 </head>
 <body>
   <div class="ambient-glow"></div>
   <div class="grid-overlay"></div>
 
   <header class="brand-nav workspace-header">
-    <div class="brand-stack">
-      <span class="brand-logo">
-        <span class="logo-pulse"></span>
-        <img class="brand-logo__img" src="caLogo.svg" alt="CodeAutrix logo" />
-      </span>
-      <h1 class="brand-name">CodeAutrix</h1>
-      <a class="nav-link" href="index.html">Home</a>
+    <div class="lp-nav-left">
+      <a class="brand-stack brand-stack--link" href="index.html" aria-label="CodeAutrix home">
+        <span class="brand-logo">
+          <span class="logo-pulse"></span>
+          <img class="brand-logo__img" src="caLogo.svg" alt="CodeAutrix logo" />
+        </span>
+        <h1 class="brand-name">CodeAutrix</h1>
+      </a>
+      <nav class="lp-nav-links">
+        <a href="index.html#features" class="lp-nav-item">Features</a>
+        <a href="index.html#how-it-works" class="lp-nav-item">How It Works</a>
+        <a href="index.html#faq" class="lp-nav-item">FAQ</a>
+        <a href="pricing.html" class="lp-nav-item">Pricing</a>
+        <a href="workspace.html" class="lp-nav-item is-active">Dashboard</a>
+      </nav>
     </div>
-    <div class="header-actions">
+    <div class="lp-nav-right">
+      <div class="help-switch" data-help-switch>
+        <button class="help-switch__trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Community Help">
+          <span class="help-switch__icon" aria-hidden="true">?</span>
+        </button>
+        <div class="help-switch__menu" role="menu" aria-hidden="true">
+          <div class="help-switch__title">Community</div>
+          <a class="help-switch__link" href="https://t.me/+4lSNlbSEZEtlOGVl" target="_blank" rel="noopener noreferrer" role="menuitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            Telegram @nebulaclaw
+          </a>
+        </div>
+      </div>
+      <div class="lang-switch" data-lang-switch>
+        <button class="lang-switch__trigger lang-switch__trigger--icon" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Language">
+          <span class="lang-switch__icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="10" cy="10" r="7"></circle>
+              <path d="M3 10h14"></path>
+              <path d="M10 3c2.1 2.1 3.2 4.4 3.2 7S12.1 14.9 10 17c-2.1-2.1-3.2-4.4-3.2-7S7.9 5.1 10 3z"></path>
+            </svg>
+          </span>
+        </button>
+        <div class="lang-switch__menu" role="menu" aria-hidden="true">
+          <div class="lang-switch__title">Language</div>
+          <button class="lang-switch__option is-active" type="button" role="menuitem" data-lang-option="en">English</button>
+          <button class="lang-switch__option" type="button" role="menuitem" data-lang-option="zh-CN">简体中文</button>
+        </div>
+      </div>
       <button id="wallet-connect" class="wallet-btn">
         <span class="wallet-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
         <span id="wallet-text">Sign In</span>
@@ -327,69 +363,247 @@
     </div>
   </div>
 
-  <script src="main.js?v=20260409a" type="module"></script>
+  <script src="main.js?v=20260409c" type="module"></script>
 
   <!-- Tab content sync — all dynamic copy managed here -->
   <script>
     (function() {
-      // ── Per-tab data ──────────────────────────────────────────
-      var TAB_DATA = {
-        "skill-security-audit": {
-          badge:        "Security Audit",
-          badgeText:    "ZIP · 10 MB",
-          subtitleText: "Supports .zip format · Max 10 MB",
-          panelTitle:   "Upload Code Package",
-          panelDesc: "Upload your Skill or Agent zip package to run a full permission, API exposure and configuration security scan.",
-          checks: [
-            "Permission & config vulnerability scan",
-            "AI-powered API exposure analysis",
-            "Multi-dimensional health score report"
-          ],
-          feat: [
-            { name: "Permission Scanner",  chips: ["Overreach", "Config Leak", "API Exposure"], color: "feat-purple" },
-            { name: "Behavior Analysis",   chips: ["Tool Call Depth", "Side-Effects", "Data Access"], color: "feat-blue" },
-            { name: "Health Report",       chips: ["Risk Score", "Remediation", "PDF Export"], color: "feat-green" }
-          ]
+      var STORAGE_KEY = 'codeautrix_lang';
+      var WORKSPACE_COPY = {
+        en: {
+          title: 'CodeAutrix Console',
+          tabs: ['Skill Security Audit', 'Contract Audit', 'Stress Test'],
+          resultTitle: 'Task Results',
+          taskStatus: 'Not Started',
+          rivTitle: 'Ready to Scan',
+          rivSub: 'Upload a package and click Start Analysis',
+          taskSummary: 'Upload a Skill package to view status and download reports here.',
+          historyTitle: 'Analysis History',
+          filters: ['All', 'Skill Audit', 'Contract', 'Stress Test'],
+          historyLabel: 'History',
+          historyHead: ['Task / Time', 'Status', 'Report'],
+          historyEmpty: 'Login to view history',
+          pagePrev: 'Prev',
+          pageInfo: 'Page 1',
+          pageNext: 'Next',
+          modalTitle: 'Logout',
+          modalDesc: "You'll be signed out and will need to login again to access scan history.",
+          modalCancel: 'Cancel',
+          modalConfirm: 'Logout',
+          walletText: 'Sign In',
+          languageTitle: 'Language',
+          helpTitle: 'Community',
+          helpLink: 'Official Telegram',
+          tabData: {
+            "skill-security-audit": {
+              banner: "One-click comprehensive scan for Skill security risks — intelligently detects permission vulnerabilities and configuration issues, outputs a multi-dimensional health score.",
+              badgeText: "ZIP · 10 MB",
+              subtitleText: "Supports .zip format · Max 10 MB",
+              panelTitle: "Upload Code Package",
+              panelDesc: "Upload your Skill or Agent zip package to run a full permission, API exposure and configuration security scan.",
+              uploadTitle: "Drop archive here or click to browse",
+              checks: [
+                "Permission & config vulnerability scan",
+                "AI-powered API exposure analysis",
+                "Multi-dimensional health score report"
+              ],
+              feat: [
+                { name: "Permission Scanner",  chips: ["Overreach", "Config Leak", "API Exposure"], color: "feat-purple" },
+                { name: "Behavior Analysis",   chips: ["Tool Call Depth", "Side-Effects", "Data Access"], color: "feat-blue" },
+                { name: "Health Report",       chips: ["Risk Score", "Remediation", "PDF Export"], color: "feat-green" }
+              ]
+            },
+            "multichain-contract-vuln": {
+              banner: "Upload contract packages to detect vulnerabilities across EVM-compatible networks and security-critical execution paths.",
+              badgeText: "ZIP · 10 MB",
+              subtitleText: "Supports .zip format · Max 10 MB",
+              panelTitle: "Upload Contract Package",
+              panelDesc: "Upload your smart contract source code zip to detect vulnerabilities across EVM and Solana chains.",
+              uploadTitle: "Drop contract archive here or click to browse",
+              checks: [
+                "Reentrancy & integer overflow detection",
+                "Logic flaw & access control audit",
+                "Multi-chain bytecode & source analysis"
+              ],
+              feat: [
+                { name: "Vulnerability Scan",  chips: ["Reentrancy", "Overflow", "Logic Flaw"], color: "feat-purple" },
+                { name: "Multi-chain Support", chips: ["EVM", "Solana", "Cross-chain"], color: "feat-blue" },
+                { name: "Audit Report",        chips: ["Severity Rating", "Fix Suggestions", "PDF Export"], color: "feat-green" }
+              ]
+            },
+            "skill-stress-lab": {
+              banner: "Benchmark uploaded code under real load with configurable concurrency, throughput measurement, and capacity analysis.",
+              badgeText: "ZIP · 10 MB",
+              subtitleText: "Supports .zip format · Max 10 MB",
+              panelTitle: "Upload & Configure",
+              panelDesc: "Upload your Skill package and set concurrency parameters to benchmark real-world performance under load.",
+              uploadTitle: "Drop stress test archive here or click to browse",
+              checks: [
+                "Concurrent load simulation & queue pressure",
+                "Real-time latency P95 & throughput metrics",
+                "System capacity evaluation report"
+              ],
+              feat: [
+                { name: "Load Simulation",     chips: ["Concurrent Calls", "Queue Pressure", "Timeout"], color: "feat-purple" },
+                { name: "Live Metrics",        chips: ["Latency P95", "Throughput", "Error Rate"], color: "feat-blue" },
+                { name: "Performance Report",  chips: ["Bottleneck", "Capacity", "Charts"], color: "feat-green" }
+              ]
+            }
+          }
         },
-        "multichain-contract-vuln": {
-          badge:        "Contract Audit",
-          badgeText:    "ZIP · 10 MB",
-          subtitleText: "Supports .zip format · Max 10 MB",
-          panelTitle:   "Upload Contract Package",
-          panelDesc: "Upload your smart contract source code zip to detect vulnerabilities across EVM and Solana chains.",
-          checks: [
-            "Reentrancy & integer overflow detection",
-            "Logic flaw & access control audit",
-            "Multi-chain bytecode & source analysis"
-          ],
-          feat: [
-            { name: "Vulnerability Scan",  chips: ["Reentrancy", "Overflow", "Logic Flaw"], color: "feat-purple" },
-            { name: "Multi-chain Support", chips: ["EVM", "Solana", "Cross-chain"], color: "feat-blue" },
-            { name: "Audit Report",        chips: ["Severity Rating", "Fix Suggestions", "PDF Export"], color: "feat-green" }
-          ]
-        },
-        "skill-stress-lab": {
-          badge:        "Stress Test",
-          badgeText:    "ZIP · 10 MB",
-          subtitleText: "Supports .zip format · Max 10 MB",
-          panelTitle:   "Upload & Configure",
-          panelDesc: "Upload your Skill package and set concurrency parameters to benchmark real-world performance under load.",
-          checks: [
-            "Concurrent load simulation & queue pressure",
-            "Real-time latency P95 & throughput metrics",
-            "System capacity evaluation report"
-          ],
-          feat: [
-            { name: "Load Simulation",     chips: ["Concurrent Calls", "Queue Pressure", "Timeout"], color: "feat-purple" },
-            { name: "Live Metrics",        chips: ["Latency P95", "Throughput", "Error Rate"], color: "feat-blue" },
-            { name: "Performance Report",  chips: ["Bottleneck", "Capacity", "Charts"], color: "feat-green" }
-          ]
+        "zh-CN": {
+          title: 'CodeAutrix 控制台',
+          tabs: ['Skill 安全审计', '合约审计', '压力测试'],
+          resultTitle: '任务结果',
+          taskStatus: '未开始',
+          rivTitle: '准备开始扫描',
+          rivSub: '上传代码包并点击开始分析',
+          taskSummary: '上传 Skill 代码包后，可在这里查看状态并下载报告。',
+          historyTitle: '分析历史',
+          filters: ['全部', 'Skill 审计', '合约', '压力测试'],
+          historyLabel: '历史记录',
+          historyHead: ['任务 / 时间', '状态', '报告'],
+          historyEmpty: '登录后查看历史记录',
+          pagePrev: '上一页',
+          pageInfo: '第 1 页',
+          pageNext: '下一页',
+          modalTitle: '退出登录',
+          modalDesc: '退出后你需要重新登录，才能继续查看扫描历史。',
+          modalCancel: '取消',
+          modalConfirm: '退出登录',
+          walletText: '登录',
+          languageTitle: 'Language',
+          helpTitle: 'Community',
+          helpLink: 'Official Telegram',
+          tabData: {
+            "skill-security-audit": {
+              banner: "一键扫描 Skill 安全风险，智能识别权限越界、配置问题，并输出多维健康评分。",
+              badgeText: "ZIP · 10 MB",
+              subtitleText: "支持 .zip 格式 · 最大 10 MB",
+              panelTitle: "上传代码包",
+              panelDesc: "上传 Skill 或 Agent 的 zip 压缩包，执行完整的权限、API 暴露和配置安全检查。",
+              uploadTitle: "将压缩包拖放到这里，或点击浏览文件",
+              checks: [
+                "权限与配置漏洞扫描",
+                "AI 驱动的 API 暴露分析",
+                "多维健康评分报告"
+              ],
+              feat: [
+                { name: "权限扫描器", chips: ["越权", "配置泄露", "API 暴露"], color: "feat-purple" },
+                { name: "行为分析", chips: ["工具调用深度", "副作用", "数据访问"], color: "feat-blue" },
+                { name: "健康报告", chips: ["风险评分", "修复建议", "PDF 导出"], color: "feat-green" }
+              ]
+            },
+            "multichain-contract-vuln": {
+              banner: "上传合约代码包，检测 EVM 兼容网络中的关键漏洞与高风险执行路径。",
+              badgeText: "ZIP · 10 MB",
+              subtitleText: "支持 .zip 格式 · 最大 10 MB",
+              panelTitle: "上传合约代码包",
+              panelDesc: "上传智能合约源码 zip 压缩包，检测 EVM 与 Solana 场景中的安全漏洞。",
+              uploadTitle: "将合约压缩包拖放到这里，或点击浏览文件",
+              checks: [
+                "重入与整数溢出检测",
+                "逻辑缺陷与访问控制审计",
+                "多链字节码与源码分析"
+              ],
+              feat: [
+                { name: "漏洞扫描", chips: ["重入", "溢出", "逻辑缺陷"], color: "feat-purple" },
+                { name: "多链支持", chips: ["EVM", "Solana", "跨链"], color: "feat-blue" },
+                { name: "审计报告", chips: ["严重级别", "修复建议", "PDF 导出"], color: "feat-green" }
+              ]
+            },
+            "skill-stress-lab": {
+              banner: "在真实负载下测试上传代码，支持并发配置、吞吐观测与系统容量评估。",
+              badgeText: "ZIP · 10 MB",
+              subtitleText: "支持 .zip 格式 · 最大 10 MB",
+              panelTitle: "上传并配置",
+              panelDesc: "上传 Skill 代码包并设置并发参数，评估真实负载下的性能表现。",
+              uploadTitle: "将压缩包拖放到这里，或点击浏览文件",
+              checks: [
+                "并发负载模拟与队列压力测试",
+                "实时延迟 P95 与吞吐指标",
+                "系统容量评估报告"
+              ],
+              feat: [
+                { name: "负载模拟", chips: ["并发调用", "队列压力", "超时"], color: "feat-purple" },
+                { name: "实时指标", chips: ["延迟 P95", "吞吐量", "错误率"], color: "feat-blue" },
+                { name: "性能报告", chips: ["瓶颈", "容量", "图表"], color: "feat-green" }
+              ]
+            }
+          }
         }
       };
 
+      function getCurrentLang() {
+        return localStorage.getItem(STORAGE_KEY) || 'en';
+      }
+
+      function getCopy(lang) {
+        return WORKSPACE_COPY[lang] || WORKSPACE_COPY.en;
+      }
+
+      function applyWorkspaceStatic(lang) {
+        var copy = getCopy(lang);
+        document.title = copy.title;
+        var tabButtons = document.querySelectorAll('#workspace-tabs button');
+        tabButtons.forEach(function(button, index) {
+          var label = copy.tabs[index];
+          if (!label) return;
+          var icon = button.querySelector('.tab-icon');
+          button.childNodes[button.childNodes.length - 1].textContent = '\n      ' + label + '\n    ';
+        });
+        var resultTitle = document.querySelector('#result-panel .rp-top h2');
+        if (resultTitle) resultTitle.textContent = copy.resultTitle;
+        var taskStatus = document.getElementById('task-status');
+        if (taskStatus && (taskStatus.textContent === 'Not Started' || taskStatus.textContent === '未开始')) taskStatus.textContent = copy.taskStatus;
+        var rivTitle = document.querySelector('.riv-title');
+        if (rivTitle) rivTitle.textContent = copy.rivTitle;
+        var rivSub = document.querySelector('.riv-sub');
+        if (rivSub) rivSub.textContent = copy.rivSub;
+        var taskSummary = document.getElementById('task-summary');
+        if (taskSummary && (taskSummary.textContent.indexOf('Upload a Skill package') === 0 || taskSummary.textContent.indexOf('上传 Skill 代码包') === 0)) taskSummary.textContent = copy.taskSummary;
+        var historyTitle = document.querySelector('#history-panel .history-head h2');
+        if (historyTitle) historyTitle.textContent = copy.historyTitle;
+        document.querySelectorAll('#history-filters .filter-btn').forEach(function(button, index) {
+          var icon = button.querySelector('svg');
+          if (icon) {
+            button.innerHTML = icon.outerHTML + '\n              ' + copy.filters[index] + '\n            ';
+          } else if (copy.filters[index]) {
+            button.textContent = copy.filters[index];
+          }
+        });
+        var hsLabel = document.querySelector('.hs-label');
+        if (hsLabel) hsLabel.textContent = copy.historyLabel;
+        document.querySelectorAll('.history-thead span').forEach(function(span, index) {
+          if (copy.historyHead[index]) span.textContent = copy.historyHead[index];
+        });
+        var empty = document.getElementById('history-empty');
+        if (empty) empty.lastChild.textContent = '\n          ' + copy.historyEmpty + '\n        ';
+        var prev = document.getElementById('page-prev');
+        if (prev) prev.innerHTML = prev.querySelector('svg').outerHTML + '\n          ' + copy.pagePrev + '\n        ';
+        var pageInfo = document.getElementById('page-info');
+        if (pageInfo && (pageInfo.textContent === 'Page 1' || pageInfo.textContent === '第 1 页')) pageInfo.textContent = copy.pageInfo;
+        var next = document.getElementById('page-next');
+        if (next) next.innerHTML = '\n          ' + copy.pageNext + '\n          ' + next.querySelector('svg').outerHTML + '\n        ';
+        var modalTitle = document.getElementById('modal-title');
+        if (modalTitle) modalTitle.textContent = copy.modalTitle;
+        var modalDesc = document.querySelector('.modal-desc');
+        if (modalDesc) modalDesc.textContent = copy.modalDesc;
+        var modalCancel = document.getElementById('modal-cancel');
+        if (modalCancel) modalCancel.textContent = copy.modalCancel;
+        var modalConfirm = document.getElementById('modal-confirm');
+        if (modalConfirm) {
+          var iconSvg = modalConfirm.querySelector('svg');
+          modalConfirm.innerHTML = iconSvg.outerHTML + '\n          ' + copy.modalConfirm + '\n        ';
+        }
+        var walletText = document.getElementById('wallet-text');
+        if (walletText && (walletText.textContent === 'Sign In' || walletText.textContent === '登录')) walletText.textContent = copy.walletText;
+      }
+
       // ── Apply data for a given tab ────────────────────────────
-      function applyTab(tab) {
-        var d = TAB_DATA[tab];
+      function applyTab(tab, lang) {
+        var copy = getCopy(lang);
+        var d = copy.tabData[tab];
         if (!d) return;
 
         // Panel size badge + upload subtitle
@@ -401,8 +615,12 @@
         // Panel title & desc
         var pt = document.getElementById('input-panel-title');
         var pd = document.getElementById('upload-panel-desc');
+        var banner = document.getElementById('current-skill-desc');
+        var uploadTitle = document.querySelector('.upload-title');
         if (pt) pt.textContent = d.panelTitle;
         if (pd) pd.textContent = d.panelDesc;
+        if (banner) banner.textContent = d.banner;
+        if (uploadTitle) uploadTitle.textContent = d.uploadTitle;
 
         // Scan checklist
         var checks = document.querySelectorAll('.sc-item span:last-child');
@@ -425,20 +643,27 @@
         });
       }
 
+      window.applyWorkspaceLocale = function(lang) {
+        var currentLang = lang || getCurrentLang();
+        applyWorkspaceStatic(currentLang);
+        var hash = window.location.hash.replace('#', '') || 'skill-security-audit';
+        applyTab(hash, currentLang);
+      };
+
       function onHashChange() {
         var hash = window.location.hash.replace('#', '');
-        if (TAB_DATA[hash]) applyTab(hash);
+        if (getCopy(getCurrentLang()).tabData[hash]) applyTab(hash, getCurrentLang());
       }
 
       window.addEventListener('hashchange', onHashChange);
       // initial sync — wait for main.js to set the hash
       setTimeout(function() {
-        var hash = window.location.hash.replace('#', '') || 'skill-security-audit';
-        applyTab(hash);
+        window.applyWorkspaceLocale(getCurrentLang());
       }, 50);
     })();
   </script>
 
+  <script src="i18n.js?v=20260409g"></script>
   <!-- Vercel Web Analytics -->
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
