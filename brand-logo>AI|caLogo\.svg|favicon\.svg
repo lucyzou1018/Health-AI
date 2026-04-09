@@ -1,0 +1,9 @@
+frontend/index.html:17:      <span class="brand-logo">
+frontend/index.html:19:        <img class="brand-logo__img" src="caLogo.svg" alt="CodeAutrix logo" />
+frontend/workspace.html:15:      <span class="brand-logo">
+frontend/workspace.html:17:        <img class="brand-logo__img" src="caLogo.svg" alt="CodeAutrix logo" />
+frontend/report.html:176:      <span class="brand-logo"><img class="brand-logo__img" src="caLogo.svg" alt="CodeAutrix logo" /></span>
+frontend/styles.css:96:.brand-logo {
+frontend/styles.css:113:.lobster-icon {
+frontend/styles.css:1239:.brand-logo {
+frontend/styles.css:1251:.brand-logo__img {
