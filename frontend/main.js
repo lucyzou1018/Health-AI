@@ -187,7 +187,7 @@ function historyI18n(key) {
       failed: "Failed",
       processing: "Processing",
       viewReport: "View Report",
-      shareToX: "Share to X",
+      shareToX: "Share to",
       downloadPdf: "Download PDF",
       pdfButton: "↓ PDF",
       pagePrefix: "Page ",
@@ -1433,10 +1433,10 @@ function buildShareText(task, reportText) {
       if (/Integrity/.test(line)) { const m = line.match(/(\d+)\/100/); if (m) scores.integrity = m[1]; }
     }
     const s = scores.overall || "—";
-    return `🛡️ One click. Risks exposed. My Skill scored ${s}/100 on @CodeAutrix.\n\n` +
-      `📊 Privacy: ${scores.privacy || "—"} · Privilege: ${scores.privilege || "—"} · Integrity: ${scores.integrity || "—"}\n\n` +
-      `AI-powered one-click audit — secure your code before it goes live 👇\n${REPORT_URL}\n\n` +
-      `#CodeAutrix #Web3Security #SecureByDefault`;
+    return `🛡️ My Skill scored ${s}/100 on @CodeAutrix.\n` +
+      `Privacy: ${scores.privacy || "—"} · Privilege: ${scores.privilege || "—"} · Integrity: ${scores.integrity || "—"}\n\n` +
+      `One-click AI security audit 👇\n${REPORT_URL}\n\n` +
+      `#CodeAutrix #Web3Security`;
   }
 
   if (task.skillType === "multichain-contract-vuln") {
@@ -1449,10 +1449,10 @@ function buildShareText(task, reportText) {
     }
     const total = parseInt(critical) + parseInt(high) + parseInt(medium) + parseInt(low);
     const totalStr = total > 0 ? `${total} vulnerabilities caught` : "Contract analyzed";
-    return `📋 One click. ${totalStr} before deployment. @CodeAutrix keeps my contract safe.\n\n` +
+    return `📋 ${totalStr} caught by @CodeAutrix.\n` +
       `🔴 ${critical} Critical · 🟠 ${high} High · 🟡 ${medium} Medium · 🟢 ${low} Low\n\n` +
-      `One-click smart contract audit — ship with confidence 👇\n${REPORT_URL}\n\n` +
-      `#CodeAutrix #SmartContract #SecureByDefault`;
+      `One-click contract audit 👇\n${REPORT_URL}\n\n` +
+      `#CodeAutrix #SmartContract`;
   }
 
   if (task.skillType === "skill-stress-lab") {
@@ -1462,9 +1462,10 @@ function buildShareText(task, reportText) {
       if (/(?:Stability|稳定性)/.test(line)) { const m = line.match(/(\d+)\/100/); if (m) stability = m[1]; }
       if (/(?:Performance|性能)/.test(line)) { const m = line.match(/(\d+)\/100/); if (m) performance = m[1]; }
     }
-    return `⚡ One click. Score: ${overall || "—"}/100. Stability: ${stability || "—"}. Performance: ${performance || "—"}. My Skill is production-ready.\n\n` +
-      `Tested on @CodeAutrix — one-click stress test, real reliability data ⏱️\n${REPORT_URL}\n\n` +
-      `#CodeAutrix #StressTest #ProductionReady`;
+    return `⚡ Stress tested on @CodeAutrix.\n` +
+      `Score: ${overall || "—"}/100 · Stability: ${stability || "—"} · Performance: ${performance || "—"}\n\n` +
+      `One-click reliability test 👇\n${REPORT_URL}\n\n` +
+      `#CodeAutrix #StressTest`;
   }
 
   return `🔒 Just scanned my project on @CodeAutrix — one-click security audit for Web3.\n\n${REPORT_URL}\n\n#CodeAutrix`;
@@ -1486,7 +1487,7 @@ function showShareModal(shareText) {
       </div>
       <p class="share-modal-subtitle">Preview and share your scan results on X (Twitter)</p>
       <textarea class="share-modal-textarea" rows="8">${shareText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
-      <div class="share-modal-charcount"><span class="share-char-num">${shareText.length}</span>/280</div>
+      <div class="share-modal-charcount"><span class="share-char-num">${xCharCount(shareText)}</span>/280</div>
       <button class="share-modal-twitter-btn">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
         Share on X
@@ -1551,9 +1552,14 @@ function showShareModal(shareText) {
   const textarea = overlay.querySelector(".share-modal-textarea");
   const charNum = overlay.querySelector(".share-char-num");
 
+  // X counts all URLs as 23 chars regardless of actual length (t.co shortening)
+  function xCharCount(text) {
+    return text.replace(/https?:\/\/\S+/g, "X".repeat(23)).length;
+  }
+
   // Live char count
   textarea.addEventListener("input", () => {
-    const len = textarea.value.length;
+    const len = xCharCount(textarea.value);
     charNum.textContent = len;
     charNum.classList.toggle("over", len > 280);
   });
