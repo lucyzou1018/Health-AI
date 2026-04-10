@@ -46,6 +46,47 @@ REPORT_BADGES = {
     },
 }
 
+CODE_PROFILES = {
+    "skill-security-audit": {
+        "theme_color": (97, 217, 255),
+        "fill": (24, 43, 74),
+        "tiers": [
+            {"min": 80, "label": "\u5f3a\u8feb\u75c7\u5ba1\u8ba1\u5e08", "code": "OCD"},
+            {"min": 60, "label": "\u8868\u9762\u5b89\u5168", "code": "MASK"},
+            {"min": 30, "label": "\u88f8\u5954\u4fa0", "code": "NAKED"},
+            {"min": 0,  "label": "\u4eba\u8089\u9776\u573a", "code": "TARGET"},
+        ],
+    },
+    "multichain-contract-vuln": {
+        "theme_color": (247, 198, 106),
+        "fill": (72, 48, 20),
+        "tiers": [
+            {"min": 80, "label": "\u62c6\u5f39\u4e13\u5bb6", "code": "DEFUSE"},
+            {"min": 60, "label": "\u5e26\u4f24\u4e0a\u94fe", "code": "RISK"},
+            {"min": 30, "label": "\u94fe\u4e0a\u8d4c\u5f92", "code": "GAMBLE"},
+            {"min": 0,  "label": "\u6148\u5584\u57fa\u91d1\u4f1a", "code": "CHARITY"},
+        ],
+    },
+    "skill-stress-lab": {
+        "theme_color": (255, 141, 122),
+        "fill": (82, 34, 34),
+        "tiers": [
+            {"min": 80, "label": "\u6c38\u52a8\u673a", "code": "MOTOR"},
+            {"min": 60, "label": "\u8001\u9ec4\u725b", "code": "OX"},
+            {"min": 30, "label": "\u5fc3\u7535\u56fe\u60a3\u8005", "code": "ECG"},
+            {"min": 0,  "label": "\u5f00\u673a\u5373\u84dd\u5c4f", "code": "BSOD"},
+        ],
+    },
+}
+
+CJK_FONT_CANDIDATES = [
+    "/System/Library/Fonts/PingFang.ttc",
+    "/System/Library/Fonts/STHeiti Medium.ttc",
+    "/System/Library/Fonts/Supplemental/Songti.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+]
+
 BADGE_FONT_CANDIDATES = [
     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
     "/System/Library/Fonts/Supplemental/Arial.ttf",
@@ -123,6 +164,27 @@ def _load_badge_font(size: int) -> ImageFont.ImageFont:
             except OSError:
                 continue
     return ImageFont.load_default()
+
+
+def _load_cjk_font(size: int) -> ImageFont.ImageFont:
+    for font_path in CJK_FONT_CANDIDATES:
+        if os.path.exists(font_path):
+            try:
+                return ImageFont.truetype(font_path, size=size)
+            except OSError:
+                continue
+    return _load_badge_font(size)
+
+
+def _get_code_profile(skill_type: str, score: int):
+    """Return the matching tier dict for a given skill type and score."""
+    cfg = CODE_PROFILES.get(skill_type)
+    if not cfg:
+        return None, None
+    for tier in cfg["tiers"]:
+        if score >= tier["min"]:
+            return cfg, tier
+    return cfg, cfg["tiers"][-1]
 
 
 class AuditPDF(FPDF):
@@ -383,6 +445,70 @@ class AuditPDF(FPDF):
                 tmp_path = tmp.name
             rotated.save(tmp_path, format="PNG")
             self.image(tmp_path, x=x, y=y, w=32, h=32)
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+    def cover_code_profile(self, skill_type: str, score: int,
+                           *, x: float = 148, y: float = 18):
+        """Render a code-profile card in the PDF top-right corner using PIL."""
+        cfg, tier = _get_code_profile(skill_type, score)
+        if not tier:
+            return
+
+        r, g, b = cfg["theme_color"]
+        fr, fg, fb = cfg["fill"]
+
+        # Card dimensions (PIL pixels)
+        W, H = 560, 640
+        pad = 36
+        radius = 40
+
+        card = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(card)
+
+        # Rounded rect background
+        bg_color = (fr, fg, fb, 230)
+        draw.rounded_rectangle(
+            [(0, 0), (W - 1, H - 1)],
+            radius=radius, fill=bg_color,
+            outline=(r, g, b, 60), width=3,
+        )
+
+        # Fonts
+        font_kicker = _load_cjk_font(32)
+        font_label = _load_cjk_font(80)
+        font_code = _load_badge_font(48)
+        font_desc = _load_cjk_font(28)
+
+        # "你的代码画像为"
+        kicker_text = "\u4f60\u7684\u4ee3\u7801\u753b\u50cf\u4e3a"
+        kbb = draw.textbbox((0, 0), kicker_text, font=font_kicker)
+        kw = kbb[2] - kbb[0]
+        draw.text(((W - kw) // 2, pad + 10), kicker_text,
+                  font=font_kicker, fill=(255, 255, 255, 120))
+
+        # Chinese label (big)
+        lbb = draw.textbbox((0, 0), tier["label"], font=font_label)
+        lw = lbb[2] - lbb[0]
+        lh = lbb[3] - lbb[1]
+        draw.text(((W - lw) // 2, pad + 80), tier["label"],
+                  font=font_label, fill=(r, g, b, 255))
+
+        # English code
+        cbb = draw.textbbox((0, 0), tier["code"], font=font_code)
+        cw = cbb[2] - cbb[0]
+        draw.text(((W - cw) // 2, pad + 80 + lh + 30), tier["code"],
+                  font=font_code, fill=(r, g, b, 180))
+
+        # Place in PDF as image
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                tmp_path = tmp.name
+            card.save(tmp_path, format="PNG")
+            # Scale: 560px → ~36mm width
+            self.image(tmp_path, x=x, y=y, w=36, h=36 * H / W)
         finally:
             if tmp_path and os.path.exists(tmp_path):
                 os.unlink(tmp_path)
@@ -697,7 +823,8 @@ def _generate_contract_pdf(md: str, out_path: Path, *, skill_type: str = "multic
     pdf.set_text_color(*WHITE)
     pdf.cell(0, 12, "Contract Audit Report", ln=True)
 
-    pdf.cover_badge(skill_type, x=154, y=25)
+    # pdf.cover_badge(skill_type, x=154, y=25)  # temporarily hidden
+    # Code profile will be placed after overall score is parsed (see below)
 
     scanned_m = re.search(r"\*\*Scanned:\*\*\s*(.+)", md)
     pdf.set_x(26)
@@ -746,6 +873,7 @@ def _generate_contract_pdf(md: str, out_path: Path, *, skill_type: str = "multic
         pdf.section_title("Total Risk Scores")
         overall = scores.pop("Overall", None)
         if overall is not None:
+            # pdf.cover_code_profile(skill_type, overall)  # only shown in HTML report
             color = _contract_score_color(overall)
             pdf.set_font("Helvetica", "B", 11)
             pdf.set_text_color(*color)
@@ -889,7 +1017,7 @@ def _generate_stress_pdf(md: str, out_path: Path, *, skill_type: str = "skill-st
     pdf.set_text_color(*WHITE)
     pdf.cell(0, 12, "Skill Stress Test Report", ln=True)
 
-    pdf.cover_badge(skill_type, x=154, y=25)
+    # pdf.cover_badge(skill_type, x=154, y=25)  # temporarily hidden
 
     gen_match = re.search(r"Generated:\s*(\S+)", md)
     gen_date = gen_match.group(1)[:19].replace("T", "  ") if gen_match else ""
@@ -914,6 +1042,7 @@ def _generate_stress_pdf(md: str, out_path: Path, *, skill_type: str = "skill-st
         pdf.section_title("Five-Dimension Scores")
         overall = scores.pop("Overall", None)
         if overall is not None:
+            # pdf.cover_code_profile(skill_type, overall)  # only shown in HTML report
             color = score_color(overall)
             pdf.set_font("Helvetica", "B", 11)
             pdf.set_text_color(*color)
@@ -1090,7 +1219,7 @@ def generate_pdf(md_path: Path, out_path: Path, *, skill_type: str = "") -> None
     pdf.set_text_color(*WHITE)
     pdf.cell(0, 12, "Skill Security Audit", ln=True)
 
-    pdf.cover_badge(skill_type or "skill-security-audit", x=154, y=25)
+    # pdf.cover_badge(skill_type or "skill-security-audit", x=154, y=25)  # temporarily hidden
 
     # Generation date
     gen_match = re.search(r"Generated:\s*(\S+)", md)
@@ -1134,6 +1263,7 @@ def generate_pdf(md_path: Path, out_path: Path, *, skill_type: str = "") -> None
         # Overall shown separately; remaining dimensions as score cards
         overall = scores.pop("Overall", None)
         if overall is not None:
+            # pdf.cover_code_profile(skill_type or "skill-security-audit", overall)  # only shown in HTML report
             color = score_color(overall)
             pdf.set_font("Helvetica", "B", 11)
             pdf.set_text_color(*color)
