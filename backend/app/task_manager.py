@@ -76,6 +76,44 @@ class TaskManager:
     # --reload does not accidentally fail tasks that were just submitted.
     ORPHAN_GRACE_SECONDS = 30
 
+    def _detect_completed_artifacts(self, task_id: str, record: TaskRecord) -> Optional[Dict[str, Optional[str]]]:
+        """Infer a completed result from files already written to the task workspace."""
+        workspace = self.tasks_dir / task_id / "report"
+        if record.skill_type == "skill-security-audit":
+            report_md = workspace / "security_audit.md"
+            report_json = workspace / "security_audit.json"
+            log_file = workspace / "security_audit.log"
+            if report_md.exists() and report_json.exists():
+                return {
+                    "report": str(report_md.resolve()),
+                    "summary": str(report_json.resolve()),
+                    "log": str(log_file.resolve()) if log_file.exists() else None,
+                    "message": "Skill Security Audit completed.",
+                }
+        elif record.skill_type == "multichain-contract-vuln":
+            report_md = workspace / "contract_audit.md"
+            summary_json = workspace / "contract_summary.json"
+            log_file = workspace / "contract_audit.log"
+            if report_md.exists():
+                return {
+                    "report": str(report_md.resolve()),
+                    "summary": str(summary_json.resolve()) if summary_json.exists() else None,
+                    "log": str(log_file.resolve()) if log_file.exists() else None,
+                    "message": "Contract audit completed.",
+                }
+        elif record.skill_type == "skill-stress-lab":
+            report_md = workspace / "stress_report.md"
+            summary_json = workspace / "stress_summary.json"
+            log_file = workspace / "stress_runner.log"
+            if report_md.exists():
+                return {
+                    "report": str(report_md.resolve()),
+                    "summary": str(summary_json.resolve()) if summary_json.exists() else None,
+                    "log": str(log_file.resolve()) if log_file.exists() else None,
+                    "message": "Stress test completed",
+                }
+        return None
+
     def _recover_orphaned_tasks(self) -> None:
         """On startup, mark stuck running/queued tasks as failed.
         Tasks created within ORPHAN_GRACE_SECONDS are skipped to avoid
@@ -83,6 +121,7 @@ class TaskManager:
         from datetime import timezone
         now_ts = datetime.now(timezone.utc).timestamp()
         orphaned = []
+        recovered_any = False
         for task_id, record in self.tasks.items():
             if record.status not in ("running", "queued"):
                 continue
@@ -93,9 +132,19 @@ class TaskManager:
             except Exception:
                 created_ts = 0
             if now_ts - created_ts >= self.ORPHAN_GRACE_SECONDS:
-                orphaned.append(task_id)
+                recovered = self._detect_completed_artifacts(task_id, record)
+                if recovered:
+                    recovered_any = True
+                    record.status = "completed"
+                    record.message = recovered["message"] or "Completed."
+                    record.report_path = recovered["report"]
+                    record.summary_path = recovered["summary"]
+                    record.log_path = recovered["log"]
+                    record.updated_at = _now()
+                else:
+                    orphaned.append(task_id)
 
-        if not orphaned:
+        if not orphaned and not recovered_any:
             return
         for task_id in orphaned:
             record = self.tasks[task_id]
@@ -210,6 +259,7 @@ class TaskManager:
         return self._snapshot(record)
 
     def get_task(self, task_id: str) -> TaskRecord:
+        self._recover_completed_task(task_id)
         with self._lock:
             record = self.tasks.get(task_id)
             if not record:
@@ -258,6 +308,25 @@ class TaskManager:
         record.log_path = result.get("log")
         record.message = result.get("message", "")
         return result
+
+    def _recover_completed_task(self, task_id: str) -> None:
+        """Promote stale running/queued tasks to completed if artifacts exist."""
+        with self._lock:
+            record = self.tasks.get(task_id)
+            if not record or record.status not in ("running", "queued", "failed"):
+                return
+            recovered = self._detect_completed_artifacts(task_id, record)
+            if not recovered:
+                return
+
+        self._set_task_state(
+            task_id,
+            status="completed",
+            message=recovered["message"],
+            report=recovered.get("report"),
+            summary=recovered.get("summary"),
+            log=recovered.get("log"),
+        )
 
     SUBPROCESS_TIMEOUT = 600  # 10 minutes; processes exceeding this are killed
 

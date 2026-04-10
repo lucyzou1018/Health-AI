@@ -1,0 +1,32 @@
+<svg width="240" height="240" viewBox="0 70 240 170" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="1" y="1" width="238" height="238" fill="#FCFCF8" stroke="#CFCFC8" stroke-width="2"/>
+  <ellipse cx="120" cy="196" rx="34" ry="8" fill="#E7E4D9"/>
+  <g transform="translate(68 78)">
+    <polygon points="31,22 45,8 77,8 93,22 87,36 39,36" fill="#6F7078"/>
+    <polygon points="20,24 31,22 39,36 29,48 17,40" fill="#585962"/>
+    <polygon points="77,8 93,22 90,44 78,36" fill="#4F5058"/>
+    <polygon points="30,36 78,36 78,76 30,76" fill="#F2D9BF"/>
+    <polygon points="30,36 54,36 54,76 30,76" fill="#F7E1C9"/>
+    <polygon points="44,50 56,43 56,49 44,55" fill="#8C745C"/>
+    <polygon points="63,43 75,48 63,54" fill="#8C745C"/>
+    <circle cx="47" cy="57" r="3.5" fill="#3D2D22"/>
+    <circle cx="69" cy="57" r="3.5" fill="#3D2D22"/>
+    <polygon points="55,58 62,58 59,67" fill="#D1B49B"/>
+    <polygon points="49,70 59,68 67,72 61,76 51,75" fill="#C4867A"/>
+    <polygon points="23,49 30,53 30,62 21,59" fill="#DFC3A8"/>
+    <polygon points="78,53 86,49 87,59 78,62" fill="#DFC3A8"/>
+    <polygon points="53,84 65,82 72,88 63,92 54,91 48,87" fill="#7F6672"/>
+    <polygon points="45,92 65,94 65,116 46,120 36,101" fill="#E4D6C8"/>
+    <polygon points="65,94 82,98 80,116 65,116" fill="#D4C4B2"/>
+    <polygon points="36,77 46,95 38,109 22,98 20,82" fill="#A56A78"/>
+    <polygon points="46,95 65,91 64,112 48,117 38,109" fill="#B87B89"/>
+    <polygon points="22,98 38,109 35,132 24,131 15,109" fill="#7D4C59"/>
+    <polygon points="48,117 64,112 69,131 56,132 47,125" fill="#6D434E"/>
+    <polygon points="24,131 35,132 31,141 20,141" fill="#3A3940"/>
+    <polygon points="56,132 69,131 72,140 59,140" fill="#3A3940"/>
+    <polygon points="63,71 76,66 82,74 77,88 64,91 58,81" fill="#F0ECE4"/>
+    <polygon points="22,101 28,90 34,95 31,110 24,115" fill="#D5D9DD"/>
+    <path d="M84 46L98 44" stroke="#D05E52" stroke-width="4" stroke-linecap="round"/>
+    <path d="M84 53L99 56" stroke="#D05E52" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

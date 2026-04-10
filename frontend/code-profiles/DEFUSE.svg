@@ -1,0 +1,34 @@
+<svg width="240" height="240" viewBox="0 70 240 170" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="1" y="1" width="238" height="238" fill="#FCFCF8" stroke="#CFCFC8" stroke-width="2"/>
+  <ellipse cx="120" cy="196" rx="38" ry="8" fill="#E7E4D9"/>
+  <g transform="translate(60 78)">
+    <polygon points="35,22 50,8 84,8 100,23 94,37 43,37" fill="#6F7078"/>
+    <polygon points="24,24 35,22 43,37 32,49 20,40" fill="#585962"/>
+    <polygon points="84,8 100,23 97,44 85,37" fill="#4F5058"/>
+    <polygon points="34,37 84,37 84,77 34,77" fill="#F2D9BF"/>
+    <polygon points="34,37 59,37 59,77 34,77" fill="#F7E1C9"/>
+    <polygon points="48,49 61,44 61,49 48,54" fill="#8C745C"/>
+    <polygon points="67,44 80,48 67,53" fill="#8C745C"/>
+    <circle cx="52" cy="57" r="3.5" fill="#3D2D22"/>
+    <circle cx="74" cy="57" r="3.5" fill="#3D2D22"/>
+    <polygon points="60,58 67,58 64,67" fill="#D1B49B"/>
+    <polygon points="54,69 63,68 71,69 65,73 56,73" fill="#B77E70"/>
+    <polygon points="27,50 34,54 34,63 25,60" fill="#DFC3A8"/>
+    <polygon points="84,54 92,50 93,60 84,63" fill="#DFC3A8"/>
+    <polygon points="58,85 71,83 78,89 69,93 60,92 54,88" fill="#7D6671"/>
+    <polygon points="53,93 73,95 73,116 54,120 43,102" fill="#D0B56A"/>
+    <polygon points="73,95 91,100 89,116 73,116" fill="#BC9E4D"/>
+    <polygon points="43,78 54,96 46,111 30,99 27,83" fill="#E1C878"/>
+    <polygon points="54,96 73,92 72,113 56,119 46,111" fill="#E8D68F"/>
+    <polygon points="30,99 46,111 43,132 31,131 22,111" fill="#836A2B"/>
+    <polygon points="56,119 72,113 77,132 63,133 54,127" fill="#725B22"/>
+    <polygon points="31,131 43,132 39,141 27,141" fill="#3A3940"/>
+    <polygon points="63,133 77,132 80,141 66,141" fill="#3A3940"/>
+    <circle cx="98" cy="103" r="16" fill="#4B4D55"/>
+    <circle cx="98" cy="103" r="12" stroke="#767A84" stroke-width="3"/>
+    <path d="M98 87V79" stroke="#767A84" stroke-width="4" stroke-linecap="round"/>
+    <path d="M94 77C96 73 100 73 102 77" stroke="#767A84" stroke-width="3" stroke-linecap="round"/>
+    <path d="M80 88L92 98" stroke="#B63C3C" stroke-width="4" stroke-linecap="round"/>
+    <path d="M80 98L92 88" stroke="#5A9C60" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -98,7 +98,42 @@ function workspaceI18n(key) {
       queued: "Queued",
       loading: "Loading…",
       refreshing: "Refreshing task status…",
-      titlePrefix: "CodeAutrix · "
+      titlePrefix: "CodeAutrix · ",
+      viewReport: "View Report",
+      downloadReport: "Download Report",
+      shareTo: "Share to",
+      completedSecurity: "Security scan completed. Your health score report is ready.",
+      completedContract: "Contract audit completed. Vulnerability report is ready.",
+      completedStress: "Stress test completed. Performance report is ready.",
+      completedDefault: "completed. Your report is ready to download.",
+      runningSecurity: "Scanning your Skill package for vulnerabilities…",
+      runningContract: "Auditing smart contract across chains…",
+      runningStress: "Running security pre-check before stress test…",
+      runningDefault: "Analysis in progress, please wait…",
+      overall: "Overall",
+      privacy: "Privacy",
+      privilege: "Privilege",
+      integrity: "Integrity",
+      dependencyRisk: "Dependency Risk",
+      stability: "Stability",
+      accessControl: "Access Control",
+      financialSecurity: "Financial Security",
+      randomnessOracle: "Randomness & Oracle",
+      dosResistance: "DoS Resistance",
+      businessLogic: "Business Logic",
+      performance: "Performance",
+      resource: "Resource",
+      consistency: "Consistency",
+      recovery: "Recovery",
+      highRisk: "High Risk",
+      mediumRisk: "Medium Risk",
+      lowRisk: "Low Risk",
+      total: "Total",
+      scoreExcellent: "Excellent",
+      scoreGood: "Good",
+      scoreCaution: "Caution",
+      scoreRisk: "Risk",
+      downloadFailed: "Download failed"
     },
     "zh-CN": {
       signInFirst: "请先登录",
@@ -112,7 +147,42 @@ function workspaceI18n(key) {
       queued: "排队中",
       loading: "加载中…",
       refreshing: "正在刷新任务状态…",
-      titlePrefix: "CodeAutrix · "
+      titlePrefix: "CodeAutrix · ",
+      viewReport: "查看报告",
+      downloadReport: "下载报告",
+      shareTo: "分享到",
+      completedSecurity: "安全扫描完成，健康评分报告已生成。",
+      completedContract: "合约审计完成，漏洞报告已生成。",
+      completedStress: "压力测试完成，性能报告已生成。",
+      completedDefault: "分析完成，报告可下载。",
+      runningSecurity: "正在扫描 Skill 代码包中的漏洞…",
+      runningContract: "正在跨链审计智能合约…",
+      runningStress: "正在运行压力测试前安全预检…",
+      runningDefault: "分析进行中，请稍候…",
+      overall: "综合",
+      privacy: "隐私",
+      privilege: "权限",
+      integrity: "完整性",
+      dependencyRisk: "依赖风险",
+      stability: "稳定性",
+      accessControl: "访问控制",
+      financialSecurity: "金融安全",
+      randomnessOracle: "随机数与预言机",
+      dosResistance: "抗 DoS",
+      businessLogic: "业务逻辑",
+      performance: "性能",
+      resource: "资源",
+      consistency: "一致性",
+      recovery: "恢复",
+      highRisk: "高风险",
+      mediumRisk: "中风险",
+      lowRisk: "低风险",
+      total: "总计",
+      scoreExcellent: "优秀",
+      scoreGood: "良好",
+      scoreCaution: "警告",
+      scoreRisk: "风险",
+      downloadFailed: "下载失败"
     }
   };
   const lang = getCurrentUILang();
@@ -266,7 +336,7 @@ function clearUploadError() {
 }
 // Local dev: frontend runs on :3000 (static), backend on :8000 (FastAPI)
 // Production (Vercel): vercel.json rewrites /api/* to backend, so origin works fine
-const DEFAULT_API = (window.location.hostname === 'localhost' && window.location.port === '3000')
+const DEFAULT_API = (window.location.hostname === 'localhost' && ['3000','8091'].includes(window.location.port))
   ? 'http://localhost:8000'
   : window.location.origin;
 const API_BASE = window.HEALTH_AI_API || DEFAULT_API;
@@ -887,20 +957,20 @@ function describeTask(task) {
 
   if (task.status === "completed") {
     const msgs = {
-      "skill-security-audit":    "Security scan completed. Your health score report is ready.",
-      "multichain-contract-vuln": "Contract audit completed. Vulnerability report is ready.",
-      "skill-stress-lab":         "Stress test completed. Performance report is ready."
+      "skill-security-audit":    workspaceI18n("completedSecurity"),
+      "multichain-contract-vuln": workspaceI18n("completedContract"),
+      "skill-stress-lab":         workspaceI18n("completedStress")
     };
-    return msgs[task.skillType] || `${skillName} completed. Your report is ready to download.`;
+    return msgs[task.skillType] || `${skillName} ${workspaceI18n("completedDefault")}`;
   }
 
   // running / pending
   const runMsgs = {
-    "skill-security-audit":    "Scanning your Skill package for vulnerabilities…",
-    "multichain-contract-vuln": "Auditing smart contract across chains…",
-    "skill-stress-lab":         "Running security pre-check before stress test…"
+    "skill-security-audit":    workspaceI18n("runningSecurity"),
+    "multichain-contract-vuln": workspaceI18n("runningContract"),
+    "skill-stress-lab":         workspaceI18n("runningStress")
   };
-  return runMsgs[task.skillType] || "Analysis in progress, please wait…";
+  return runMsgs[task.skillType] || workspaceI18n("runningDefault");
 }
 
 const timeFormatter = new Intl.DateTimeFormat("en-US", {
@@ -954,7 +1024,7 @@ async function triggerDownload(url, filename) {
     // 短暂延迟后释放 Blob 内存
     setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000);
   } catch (err) {
-    alert(`Download failed: ${err.message}`);
+    alert(`${workspaceI18n('downloadFailed')}: ${err.message}`);
   }
 }
 
@@ -972,9 +1042,9 @@ function renderArtifacts(task) {
 
   if (task.reportPath) {
     // View Report — 正常跳转页面
-    items.push(`<a href="report.html?task=${tid}" target="_blank" rel="noopener">📊 View Report</a>`);
+    items.push(`<a href="report.html?task=${tid}" target="_blank" rel="noopener">📊 ${workspaceI18n("viewReport")}</a>`);
     // Download Report — 下载 PDF
-    items.push(`<button class="artifact-dl-btn" data-url="${API_BASE}/api/tasks/${tid}/report/pdf" data-filename="${skillSlug}-report.pdf">📄 Download Report</button>`);
+    items.push(`<button class="artifact-dl-btn" data-url="${API_BASE}/api/tasks/${tid}/report/pdf" data-filename="${skillSlug}-report.pdf">📄 ${workspaceI18n("downloadReport")}</button>`);
   }
 
   if (!items.length) {
@@ -984,7 +1054,7 @@ function renderArtifacts(task) {
   }
 
   // Add Share button
-  items.push(`<button class="share-results-btn" data-task-id="${tid}" data-skill-type="${task.skillType}">Share to <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></button>`);
+  items.push(`<button class="share-results-btn" data-task-id="${tid}" data-skill-type="${task.skillType}">${workspaceI18n("shareTo")} <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-2px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></button>`);
 
   artifactBox.classList.remove("hidden");
   artifactBox.innerHTML = items.join("");
@@ -1093,10 +1163,10 @@ function renderTask(task) {
   if (task.skillType !== activeTab) return;
   const variant = task.status === "failed" ? "error" : task.status === "completed" ? "success" : "running";
   const statusLabel = {
-    completed: "Scan Complete",
-    failed:    "Scan Failed",
-    running:   "Analyzing…",
-    pending:   "Queued"
+    completed: workspaceI18n("scanComplete"),
+    failed:    workspaceI18n("scanFailed"),
+    running:   workspaceI18n("analyzingEllipsis"),
+    pending:   workspaceI18n("queued")
   }[task.status] || task.status;
   setStatus(statusLabel, variant);
   setSummary(describeTask(task));
@@ -1186,12 +1256,12 @@ function buildContractAuditSummary(text) {
   }
 
   const dims = [
-    { key: 'Overall',    icon: '📊', label: 'Overall' },
-    { key: 'Access',     icon: '🔐', label: 'Access Control' },
-    { key: 'Financial',  icon: '💰', label: 'Financial Security' },
-    { key: 'Randomness', icon: '🎲', label: 'Randomness & Oracle' },
-    { key: 'DoS',        icon: '⚡', label: 'DoS Resistance' },
-    { key: 'Logic',      icon: '🛡️', label: 'Business Logic' },
+    { key: 'Overall',    icon: '📊', label: workspaceI18n('overall') },
+    { key: 'Access',     icon: '🔐', label: workspaceI18n('accessControl') },
+    { key: 'Financial',  icon: '💰', label: workspaceI18n('financialSecurity') },
+    { key: 'Randomness', icon: '🎲', label: workspaceI18n('randomnessOracle') },
+    { key: 'DoS',        icon: '⚡', label: workspaceI18n('dosResistance') },
+    { key: 'Logic',      icon: '🛡️', label: workspaceI18n('businessLogic') },
   ];
 
   // Contract Audit uses guide thresholds: 90/70/50 (not 80/60/40 used elsewhere)
@@ -1237,10 +1307,10 @@ function buildReportSummary(text) {
 
   // 统计卡片
   html += `<div class="report-stats-cards">`;
-  html += `<div class="stat-card high"><span class="stat-number">${highFindings.length}</span><span class="stat-label">High Risk</span></div>`;
-  html += `<div class="stat-card medium"><span class="stat-number">${mediumFindings.length}</span><span class="stat-label">Medium Risk</span></div>`;
-  html += `<div class="stat-card low"><span class="stat-number">${otherFindings.length}</span><span class="stat-label">Low Risk</span></div>`;
-  html += `<div class="stat-card total"><span class="stat-number">${detectorSummaries.length}</span><span class="stat-label">Total</span></div>`;
+  html += `<div class="stat-card high"><span class="stat-number">${highFindings.length}</span><span class="stat-label">${workspaceI18n('highRisk')}</span></div>`;
+  html += `<div class="stat-card medium"><span class="stat-number">${mediumFindings.length}</span><span class="stat-label">${workspaceI18n('mediumRisk')}</span></div>`;
+  html += `<div class="stat-card low"><span class="stat-number">${otherFindings.length}</span><span class="stat-label">${workspaceI18n('lowRisk')}</span></div>`;
+  html += `<div class="stat-card total"><span class="stat-number">${detectorSummaries.length}</span><span class="stat-label">${workspaceI18n('total')}</span></div>`;
   html += `</div>`;
 
   return html;
@@ -1260,9 +1330,10 @@ function _scoreCard(score, icon, label, classFn) {
 }
 
 function _scoreLegend(thresholds) {
+  const e = workspaceI18n('scoreExcellent'), g = workspaceI18n('scoreGood'), c = workspaceI18n('scoreCaution'), r = workspaceI18n('scoreRisk');
   const text = thresholds === 'contract'
-    ? 'Score: 90-100 = Excellent 🟢 | 70-89 = Good 🔵 | 50-69 = Caution 🟡 | &lt;50 = Risk 🔴'
-    : 'Score: 80-100 = Excellent 🟢 | 60-79 = Good 🔵 | 40-59 = Caution 🟡 | &lt;40 = Risk 🔴';
+    ? `90-100 = ${e} 🟢 | 70-89 = ${g} 🔵 | 50-69 = ${c} 🟡 | &lt;50 = ${r} 🔴`
+    : `80-100 = ${e} 🟢 | 60-79 = ${g} 🔵 | 40-59 = ${c} 🟡 | &lt;40 = ${r} 🔴`;
   return `<div style="margin-top: 8px; padding: 8px 12px; background: rgba(99, 102, 241, 0.1); border-radius: 6px; font-size: 12px; color: #94a3b8;">${text}</div>`;
 }
 
@@ -1346,12 +1417,12 @@ function buildSecurityAuditSummary(text) {
 
   // Build 6 score cards — 3-column grid (2 rows of 3)
   let html = `<div class="report-stats-cards report-stats-cards--6">`;
-  html += _scoreCard(overallScore,    '📊', 'Overall');
-  html += _scoreCard(privacyScore,    '🔏', 'Privacy');
-  html += _scoreCard(privilegeScore,  '🔐', 'Privilege');
-  html += _scoreCard(integrityScore,  '🛡️', 'Integrity');
-  html += _scoreCard(supplyChainScore,'🔗', 'Dependency Risk');
-  html += _scoreCard(failureScore,    '✅', 'Stability');
+  html += _scoreCard(overallScore,    '📊', workspaceI18n('overall'));
+  html += _scoreCard(privacyScore,    '🔏', workspaceI18n('privacy'));
+  html += _scoreCard(privilegeScore,  '🔐', workspaceI18n('privilege'));
+  html += _scoreCard(integrityScore,  '🛡️', workspaceI18n('integrity'));
+  html += _scoreCard(supplyChainScore,'🔗', workspaceI18n('dependencyRisk'));
+  html += _scoreCard(failureScore,    '✅', workspaceI18n('stability'));
   html += `</div>`;
   html += _scoreLegend();
 
@@ -1405,12 +1476,12 @@ function buildStressLabSummary(text) {
   
   // Build 6 score cards (overall + 5 dimensions) — 3-column grid (2 rows of 3)
   let html = `<div class="report-stats-cards report-stats-cards--6">`;
-  html += _scoreCard(overallScore,     '🎯', 'Overall');
-  html += _scoreCard(stabilityScore,   '🛡️', 'Stability');
-  html += _scoreCard(performanceScore, '⚡', 'Performance');
-  html += _scoreCard(resourceScore,    '💾', 'Resource');
-  html += _scoreCard(consistencyScore, '🔄', 'Consistency');
-  html += _scoreCard(recoveryScore,    '🆘', 'Recovery');
+  html += _scoreCard(overallScore,     '🎯', workspaceI18n('overall'));
+  html += _scoreCard(stabilityScore,   '🛡️', workspaceI18n('stability'));
+  html += _scoreCard(performanceScore, '⚡', workspaceI18n('performance'));
+  html += _scoreCard(resourceScore,    '💾', workspaceI18n('resource'));
+  html += _scoreCard(consistencyScore, '🔄', workspaceI18n('consistency'));
+  html += _scoreCard(recoveryScore,    '🆘', workspaceI18n('recovery'));
   html += `</div>`;
   html += _scoreLegend();
 
