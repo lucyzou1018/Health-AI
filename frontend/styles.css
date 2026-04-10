@@ -2825,6 +2825,26 @@ body:not(.landing-only) .ambient-glow {
   color: var(--text-tertiary);
 }
 
+.footer-copy--center {
+  text-align: center;
+  width: 100%;
+}
+
+.footer-powered {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.footer-powered a {
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.footer-powered a:hover {
+  color: var(--text-primary);
+}
+
 /* ── Responsive ── */
 @media (max-width: 1024px) {
   .features-grid {
