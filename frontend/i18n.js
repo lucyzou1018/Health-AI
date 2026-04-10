@@ -179,14 +179,14 @@
           'What is the difference between Skill Audit and Contract Audit?'
         ],
         faqAnswers: [
-          'Skill Security Audit accepts <strong>.zip</strong> archives containing your Skill or Agent code. Contract Audit supports raw <strong>.sol</strong> Solidity source files, as well as on-chain contract addresses for live analysis. All uploads are processed server-side and never shared with third parties.',
+          'Skill Security Audit accepts <strong>.zip</strong> archives containing your Skill or Agent code. Contract Audit supports <strong>.sol</strong> Solidity source files (EVM chains) and <strong>Rust-based</strong> Solana programs, as well as on-chain contract addresses for live analysis. All uploads are processed server-side and never shared with third parties.',
           'Your code is stored only for the duration of the scan task and its associated report. It is never shared with other users or used for training. You can delete any task and its artifacts at any time from the Workspace panel.',
           'No registration is required to run scans. Connecting a wallet (MetaMask or WalletConnect) is optional — it links your session to a persistent identity so your scan history is preserved across devices. Without a wallet, your tasks are tied to your browser session only.',
           'Yes. Each IP address may submit up to <strong>3 scan tasks per UTC calendar day</strong> across all scan types combined (Skill Audit, Contract Audit, and Stress Test). The counter resets at midnight UTC. This limit ensures fair usage and service stability for all users.',
           'The Skill Security Audit produces five independent dimension scores — <strong>Privacy, Privilege, Integrity, Supply Chain, and Stability</strong> — each rated 0–100. The overall score is their arithmetic mean. Scores ≥ 80 are considered healthy; scores below 60 indicate significant risk. Each dimension deducts points based on matched risk patterns weighted by severity.',
-          'Contract Audit currently supports all <strong>EVM-compatible chains</strong> (Ethereum, BNB Chain, Polygon, Arbitrum, Base, etc.) via Solidity source code or on-chain address. Solana / Anchor contract support is on the roadmap. More chains will be added in future releases.',
+          'Contract Audit supports all <strong>EVM-compatible chains</strong> (Ethereum, BNB Chain, Polygon, Arbitrum, Base, etc.) via Solidity source code or on-chain address, and <strong>Solana</strong> programs via Rust/Anchor source code. More chains will be added in future releases.',
           'Yes. Every completed scan generates a structured report viewable in the browser. For Skill Security Audit, a professional <strong>PDF report</strong> can be downloaded directly from the report page — suitable for sharing with your team, clients, or auditors.',
-          '<strong>Skill Security Audit</strong> targets uploaded Skill and Agent packages. It checks permissions, privilege escalation, data leakage, obfuscation, supply chain risks, and more, producing a multi-dimension health score.<br><br><strong>Contract Audit</strong> targets on-chain smart contracts written in Solidity. It detects reentrancy, integer overflow, access control flaws, gas inefficiencies, and other EVM-specific vulnerabilities using AI-powered analysis.'
+          '<strong>Skill Security Audit</strong> targets Skill and Agent packages (AI tool code). It checks permissions, privilege escalation, data leakage, obfuscation, supply chain risks, and more, producing a multi-dimension health score.<br><br><strong>Contract Audit</strong> targets smart contracts — both EVM (Solidity) and Solana (Rust/Anchor). It detects reentrancy, integer overflow, access control flaws, gas inefficiencies, and other chain-specific vulnerabilities using AI-powered analysis.'
         ],
         ctaTitle: 'Ready to Secure Your Skills?',
         ctaDesc: 'Free to start, no registration required — upload your code and get a security report instantly.',
@@ -301,14 +301,14 @@
           'Skill Audit 和 Contract Audit 有什么区别？'
         ],
         faqAnswers: [
-          'Skill Security Audit 支持上传包含 Skill 或 Agent 代码的 <strong>.zip</strong> 压缩包。Contract Audit 支持直接上传 <strong>.sol</strong> Solidity 源码，也支持填写链上合约地址进行实时分析。所有上传内容均在服务端处理，不会向第三方共享。',
+          'Skill Security Audit 支持上传包含 Skill 或 Agent 代码的 <strong>.zip</strong> 压缩包。Contract Audit 支持上传 <strong>.sol</strong> Solidity 源码（EVM 链）和基于 <strong>Rust</strong> 的 Solana 程序，也支持填写链上合约地址进行实时分析。所有上传内容均在服务端处理，不会向第三方共享。',
           '你的代码仅在扫描任务及其关联报告的生命周期内保留，不会与其他用户共享，也不会被用于训练。你可以在 Workspace 面板中随时删除任务及其产物。',
           '运行扫描不需要注册。连接钱包（MetaMask 或 WalletConnect）是可选的，它会把当前会话关联到一个持久身份上，以便跨设备保留扫描历史；不连接钱包时，任务仅绑定在当前浏览器会话中。',
           '有。每个 IP 地址在每个 UTC 自然日内最多可提交 <strong>3 次扫描任务</strong>，该配额在 Skill Audit、Contract Audit 与 Stress Test 之间共享，并会在 UTC 零点重置。',
           'Skill 安全审计会输出五个独立维度分数：<strong>隐私、权限、完整性、供应链、稳定性</strong>，每个维度为 0–100 分，总分为五项平均值。80 分以上表示健康，60 分以下表示风险较高。每个维度会根据匹配到的风险模式及严重程度进行扣分。',
-          'Contract Audit 当前支持所有 <strong>EVM 兼容链</strong>（如 Ethereum、BNB Chain、Polygon、Arbitrum、Base 等），可通过 Solidity 源码或链上地址进行分析。Solana / Anchor 支持已在规划中，后续会持续扩展。',
+          'Contract Audit 支持所有 <strong>EVM 兼容链</strong>（如 Ethereum、BNB Chain、Polygon、Arbitrum、Base 等），可通过 Solidity 源码或链上地址进行分析；同时支持 <strong>Solana</strong> 程序（Rust/Anchor 源码）。后续会持续扩展更多链。',
           '可以。每次完成扫描后都会生成结构化报告并可在浏览器中查看。针对 Skill Security Audit，还支持从报告页直接下载专业 <strong>PDF 报告</strong>，方便团队或客户共享。',
-          '<strong>Skill Security Audit</strong> 面向上传的 Skill 和 Agent 代码包，重点检测权限越界、提权、数据泄露、混淆、供应链风险等问题，并输出多维健康分数。<br><br><strong>Contract Audit</strong> 面向 Solidity 智能合约，借助 AI 分析识别重入、整数溢出、访问控制缺陷、Gas 效率问题等 EVM 特定漏洞。'
+          '<strong>Skill Security Audit</strong> 面向 Skill 和 Agent 代码包（AI 工具代码），重点检测权限越界、提权、数据泄露、混淆、供应链风险等问题，并输出多维健康分数。<br><br><strong>Contract Audit</strong> 面向智能合约，同时支持 EVM（Solidity）和 Solana（Rust/Anchor），借助 AI 分析识别重入、整数溢出、访问控制缺陷、Gas 效率问题等链特定漏洞。'
         ],
         ctaTitle: '准备好给代码做一次健康检查了吗？',
         ctaDesc: '免费即可开始，无需注册，上传代码后即可立即获得安全报告。',
