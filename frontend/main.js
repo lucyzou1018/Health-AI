@@ -907,8 +907,12 @@ async function runTask() {
 
 function setStatus(text, variant = "info") {
   if (!statusBox) return;
-  statusBox.textContent = text;
   statusBox.className = `status ${variant}`;
+  if (variant === "running") {
+    statusBox.innerHTML = `<span class="radar-icon"><span class="radar-sweep"></span><span class="radar-cross"></span><span class="radar-ping"></span><span class="radar-ping radar-ping-2"></span></span>${text}`;
+  } else {
+    statusBox.textContent = text;
+  }
   updateRunButtonState();
 }
 

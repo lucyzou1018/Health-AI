@@ -146,7 +146,7 @@
     .issue-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.6; }
     .loading { text-align: center; padding: 60px; color: var(--text-secondary); }
     .error { text-align: center; padding: 40px; color: var(--error); background: var(--error-subtle); border-radius: var(--radius); margin: 20px; }
-    .raw-report { background: var(--bg-secondary); padding: 20px; border-radius: var(--radius); white-space: pre-wrap; font-family: monospace; font-size: 12px; overflow-x: auto; max-height: 600px; overflow-y: auto; }
+    .raw-report { background: var(--bg-secondary); padding: 20px; border-radius: var(--radius); white-space: pre-wrap; font-family: monospace; font-size: 12px; overflow-x: auto; }
   </style>
 </head>
 <body>
@@ -393,6 +393,9 @@
       // Bold
       html = html.replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--text-primary);">$1</strong>');
       
+      // Horizontal rules (--- on its own line)
+      html = html.replace(/^---$/gm, '<div style="height:1px;background:linear-gradient(to right,transparent,rgba(99,102,241,0.35),transparent);margin:20px 0;"></div>');
+
       // List items (but not table separators)
       html = html.replace(/^- (.*)$/gm, '<li style="margin:4px 0;color:var(--text-secondary);">$1</li>');
       html = html.replace(/^> (.*)$/gm, '<blockquote style="border-left:3px solid var(--accent);padding-left:10px;margin:8px 0;color:var(--text-secondary);">$1</blockquote>');

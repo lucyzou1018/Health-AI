@@ -74,6 +74,7 @@
       <div class="landing-hud__mount" id="landing-hud-mount"></div>
     </div>
 
+    <div class="hero-left">
     <div class="hero-content">
       <div class="hero-badge">
         <span class="badge-dot"></span>
@@ -102,6 +103,29 @@
         <span class="trust-item"><span class="trust-dot blue"></span>Multi-chain Support</span>
         <span class="trust-sep">·</span>
         <span class="trust-item"><span class="trust-dot purple"></span>AI-Powered</span>
+      </div>
+    </div>
+
+      <!-- Stress test latency line chart card -->
+      <div class="dash-card perf-dash">
+        <div class="dash-hd">
+          <span class="dash-htitle">Stress Test · Latency</span>
+          <span class="perf-tag">P95 Latency</span>
+        </div>
+        <div class="lc-wrap">
+          <svg class="lc-svg" viewBox="0 0 260 68" fill="none" preserveAspectRatio="none">
+            <path class="lc-area" d="M0 52 C25 48 45 38 75 33 C105 28 125 44 155 30 C180 18 200 40 220 26 C238 15 250 20 260 15 L260 68 L0 68 Z" fill="url(#lcAreaGrad)"/>
+            <path class="lc-line" d="M0 52 C25 48 45 38 75 33 C105 28 125 44 155 30 C180 18 200 40 220 26 C238 15 250 20 260 15"/>
+            <circle cx="75"  cy="33" r="2.5" fill="#818cf8"/>
+            <circle cx="155" cy="30" r="2.5" fill="#818cf8"/>
+            <circle cx="260" cy="15" r="2.5" fill="#818cf8"/>
+          </svg>
+        </div>
+        <div class="lc-footer">
+          <span>Requests: <b>1K+</b></span>
+          <span>Success: <b>~99%</b></span>
+          <span>Avg: <b>&lt;100ms</b></span>
+        </div>
       </div>
     </div>
 
@@ -175,28 +199,6 @@
           <div class="sb-row"><span class="sb-lbl">Data Safety</span><div class="sb-track"><div class="sb-fill"  style="--tc:#6366f1" data-w="88"></div></div><span class="sb-pct">~88%</span></div>
         </div>
       </div>
-
-      <!-- Stress test latency line chart card -->
-      <div class="dash-card perf-dash">
-        <div class="dash-hd">
-          <span class="dash-htitle">Stress Test · Latency</span>
-          <span class="perf-tag">P95 Latency</span>
-        </div>
-        <div class="lc-wrap">
-          <svg class="lc-svg" viewBox="0 0 260 68" fill="none" preserveAspectRatio="none">
-            <path class="lc-area" d="M0 52 C25 48 45 38 75 33 C105 28 125 44 155 30 C180 18 200 40 220 26 C238 15 250 20 260 15 L260 68 L0 68 Z" fill="url(#lcAreaGrad)"/>
-            <path class="lc-line" d="M0 52 C25 48 45 38 75 33 C105 28 125 44 155 30 C180 18 200 40 220 26 C238 15 250 20 260 15"/>
-            <circle cx="75"  cy="33" r="2.5" fill="#818cf8"/>
-            <circle cx="155" cy="30" r="2.5" fill="#818cf8"/>
-            <circle cx="260" cy="15" r="2.5" fill="#818cf8"/>
-          </svg>
-        </div>
-        <div class="lc-footer">
-          <span>Requests: <b>1K+</b></span>
-          <span>Success: <b>~99%</b></span>
-          <span>Avg: <b>&lt;100ms</b></span>
-        </div>
-      </div>
     </div>
   </section>
 
@@ -204,22 +206,22 @@
   <section id="stats" class="lp-section lp-stats-section">
     <div class="lp-container">
       <div class="stats-grid fade-up">
-        <div class="stat-block">
+        <div class="stat-block" data-order="01">
           <div class="stat-num">200<span class="stat-pct">%</span></div>
           <div class="stat-label">Audit Growth Rate</div>
         </div>
         <div class="stat-divider"></div>
-        <div class="stat-block">
+        <div class="stat-block" data-order="02">
           <div class="stat-num">&gt;95<span class="stat-pct">%</span></div>
           <div class="stat-label">Vulnerability Detection Rate</div>
         </div>
         <div class="stat-divider"></div>
-        <div class="stat-block">
+        <div class="stat-block" data-order="03">
           <div class="stat-num">&lt;30<span class="stat-unit">s</span></div>
           <div class="stat-label">Average Scan Time</div>
         </div>
         <div class="stat-divider"></div>
-        <div class="stat-block">
+        <div class="stat-block" data-order="04">
           <div class="stat-num">3<span class="stat-plus">+</span></div>
           <div class="stat-label">Supported Chain Types</div>
         </div>
@@ -354,7 +356,7 @@
       </div>
 
       <div class="steps-row">
-        <div class="step-card fade-up">
+        <div class="step-card fade-up" data-step="01">
           <div class="step-num">01</div>
           <div class="step-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -372,7 +374,7 @@
             <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
-        <div class="step-card fade-up">
+        <div class="step-card fade-up" data-step="02">
           <div class="step-num">02</div>
           <div class="step-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -389,7 +391,7 @@
             <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
-        <div class="step-card fade-up">
+        <div class="step-card fade-up" data-step="03">
           <div class="step-num">03</div>
           <div class="step-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">

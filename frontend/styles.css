@@ -474,6 +474,64 @@ button#run-task:active {
   color: var(--accent);
 }
 
+/* Hide default dot when radar icon is injected */
+.status.running::before { display: none; }
+
+/* ── Radar icon ── */
+.radar-icon {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+.radar-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(transparent 70%, currentColor 100%);
+  animation: radar-spin 1.4s linear infinite;
+  opacity: 0.75;
+}
+.radar-cross {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.radar-cross::before,
+.radar-cross::after {
+  content: '';
+  position: absolute;
+  background: currentColor;
+  opacity: 0.25;
+}
+.radar-cross::before { width: 1px; height: 100%; }
+.radar-cross::after  { width: 100%; height: 1px; }
+.radar-ping {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  animation: radar-ping 1.4s ease-out infinite;
+  opacity: 0;
+}
+.radar-ping-2 { animation-delay: 0.7s; }
+@keyframes radar-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes radar-ping {
+  0%   { opacity: 0.55; transform: scale(1); }
+  100% { opacity: 0;    transform: scale(2); }
+}
+
 .status.success {
   background: var(--success-subtle);
   border-color: var(--success);
@@ -3147,20 +3205,32 @@ body:not(.landing-only) .ambient-glow {
 #landing {
   flex-direction: row;
   justify-content: center;
-  align-items: center;
-  gap: 56px;
-  padding: 80px 80px 80px;
-  min-height: 100vh;
+  align-items: stretch;
+  gap: 32px;
+  padding: 80px 80px;
   max-width: 1360px;
   margin: 0 auto;
   width: 100%;
   box-sizing: border-box;
 }
 
-.hero-content {
-  text-align: left;
+/* ── Hero left column (text + perf card) ─────── */
+.hero-left {
   flex: 0 1 500px;
   max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  z-index: 2;
+}
+
+.hero-content {
+  text-align: left;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .hero-content .hero-desc   { margin-left: 0; }
@@ -3172,9 +3242,19 @@ body:not(.landing-only) .ambient-glow {
   flex: 0 0 390px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   position: relative;
   z-index: 2;
+}
+
+.hero-visual .main-dash {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-visual .main-dash .scan-bars {
+  margin-top: auto;
+  padding-top: 14px;
 }
 
 /* ── Dashboard cards ─────────────────────────── */
@@ -4416,14 +4496,28 @@ button#run-task:hover:not(:disabled) {
   position: relative;
   border-radius: 26px;
   padding: 28px;
+  transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.plan-card:hover {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.10) 0%, rgba(139, 92, 246, 0.04) 40%, var(--bg-secondary) 100%);
+  border-color: rgba(99, 102, 241, 0.28);
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.18);
+  transform: translateY(-6px);
 }
 
 .plan-card--featured {
-  background:
-    linear-gradient(180deg, rgba(99, 102, 241, 0.10) 0%, rgba(139, 92, 246, 0.04) 40%, var(--bg-secondary) 100%);
+  background: var(--bg-secondary);
+  border-color: var(--border-subtle);
+  box-shadow: var(--shadow-sm);
+  transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.plan-card--featured:hover {
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.10) 0%, rgba(139, 92, 246, 0.04) 40%, var(--bg-secondary) 100%);
   border-color: rgba(99, 102, 241, 0.28);
-  transform: translateY(-10px);
-  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.12);
+  box-shadow: 0 8px 32px rgba(99, 102, 241, 0.18);
+  transform: translateY(-6px);
 }
 
 .plan-badge {
@@ -4693,4 +4787,225 @@ button#run-task:hover:not(:disabled) {
   .pricing-title {
     font-size: 40px;
   }
+}
+
+/* ================================================================
+   ABSTRACT PERSONALITY — 抽象个性风格（布局 & 形状，不改颜色）
+   ================================================================ */
+
+/* ── 1. 超大英雄标题 ── */
+.hero-title {
+  font-size: clamp(56px, 8vw, 100px) !important;
+  line-height: 0.95 !important;
+  letter-spacing: -0.05em !important;
+  margin-bottom: 20px !important;
+}
+
+.title-gradient {
+  display: block;
+}
+
+/* ── 2. Section 视觉分隔 — 左侧竖线装饰 ── */
+.lp-stats-section {
+  position: relative;
+  z-index: 3;
+  border-left: 3px solid transparent;
+  border-image: linear-gradient(to bottom, transparent, var(--accent), transparent) 1;
+}
+
+#features {
+  position: relative;
+}
+
+#how-it-works {
+  position: relative;
+}
+
+/* ── 3. Stats 超大字号 + 装饰数字水印 ── */
+.stat-num {
+  font-size: clamp(52px, 6vw, 76px) !important;
+  letter-spacing: -0.06em !important;
+}
+
+.stat-block {
+  padding: 48px 28px !important;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-block::before {
+  content: attr(data-order);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 130px;
+  font-weight: 900;
+  color: var(--accent);
+  opacity: 0.04;
+  letter-spacing: -0.06em;
+  pointer-events: none;
+  line-height: 1;
+  z-index: 0;
+}
+
+.stat-block > * { position: relative; z-index: 1; }
+
+/* ── 4. Section 标题更大 ── */
+.section-title {
+  font-size: clamp(30px, 4.5vw, 50px) !important;
+  letter-spacing: -0.04em !important;
+}
+
+/* ── 5. Feature cards — 不规则圆角，交替 ── */
+.feature-card:nth-child(1) { border-radius: 36px 8px 36px 8px; }
+.feature-card:nth-child(2) { border-radius: 8px 36px 8px 36px; }
+.feature-card:nth-child(3) { border-radius: 36px 8px 36px 8px; }
+.feature-card:nth-child(4) { border-radius: 8px 36px 8px 36px; }
+
+/* ── 6. Feature icon — 轻微旋转动效 ── */
+.feature-icon-wrap {
+  transform: rotate(8deg);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.feature-card:hover .feature-icon-wrap {
+  transform: rotate(0deg) scale(1.12);
+}
+
+/* ── 7. Steps — 错位 + 大号装饰数字 ── */
+.steps-row {
+  align-items: stretch !important;
+  padding: 16px 0;
+}
+
+.step-card {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.step-card::before {
+  content: attr(data-step);
+  position: absolute;
+  bottom: -16px;
+  right: -10px;
+  font-size: 110px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--accent);
+  opacity: 0.06;
+  letter-spacing: -0.04em;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.step-card > * { position: relative; z-index: 1; }
+
+/* ── 8. Tech cards — 不规则圆角，交替 ── */
+.tech-card:nth-child(odd)  { border-radius: 22px 6px 22px 6px; }
+.tech-card:nth-child(even) { border-radius: 6px 22px 6px 22px; }
+
+.tech-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+.tech-card:hover {
+  transform: translateY(-6px) scale(1.05) !important;
+  z-index: 10;
+}
+
+/* ── 9. FAQ — 悬停横向偏移 ── */
+.faq-item {
+  border-radius: 20px !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+
+.faq-item:hover {
+  transform: translateX(5px);
+}
+
+.faq-item.faq-open {
+  transform: translateX(8px);
+}
+
+/* ── 10. Hero buttons — 胶囊形状 ── */
+.hero-btn--primary {
+  border-radius: 100px !important;
+  padding: 16px 38px !important;
+}
+
+.hero-btn--ghost {
+  border-radius: 100px !important;
+  padding: 14px 32px !important;
+}
+
+/* ── 11. Landing — 点阵网格装饰背景 ── */
+#landing::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(99,102,241,0.14) 1px, transparent 1px);
+  background-size: 38px 38px;
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask-image: radial-gradient(ellipse 75% 75% at 50% 50%, black 0%, transparent 100%);
+  mask-image: radial-gradient(ellipse 75% 75% at 50% 50%, black 0%, transparent 100%);
+  opacity: 0.55;
+}
+
+/* ── 12. Hero visual — 背景光晕 ── */
+.hero-visual::before {
+  content: '';
+  position: absolute;
+  top: -80px;
+  right: -100px;
+  width: 340px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── 13. CTA banner — 角落光晕 ── */
+.cta-banner {
+  position: relative;
+  overflow: hidden;
+}
+
+.cta-banner::before {
+  content: '';
+  position: absolute;
+  top: -80px;
+  right: -100px;
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(99,102,241,0.09) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.cta-banner::after {
+  content: '';
+  position: absolute;
+  bottom: -80px;
+  left: -80px;
+  width: 300px;
+  height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139,92,246,0.09) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ── 14. Pricing cards ── */
+.plan-grid {
+  align-items: stretch !important;
+}
+
+/* ── 15. Dash cards — 圆角加大 ── */
+.dash-card {
+  border-radius: 24px !important;
 }
