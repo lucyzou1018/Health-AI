@@ -2495,9 +2495,9 @@ function createHistoryItem(task) {
       (isCompleted ?
         '<div class="history-row">' +
           '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">' + historyI18n("viewReport") + '</a>' +
-          '<button class="history-share-btn" data-task-id="' + task.taskId + '" data-skill-type="' + (task.skillType || '') + '" title="' + historyI18n("shareToX") + '">' + historyI18n("shareToX") + ' <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></button>' +
+          '<button class="history-share-btn" data-task-id="' + task.taskId + '" data-skill-type="' + (task.skillType || '') + '">' + historyI18n("shareToX") + ' <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></button>' +
         '</div>' +
-        '<button class="history-dl-btn" data-task-id="' + task.taskId + '" data-skill="' + (task.skillType || 'audit') + '" title="' + historyI18n("downloadPdf") + '">' + historyI18n("pdfButton") + '</button>' :
+        '<button class="history-dl-btn" data-task-id="' + task.taskId + '" data-skill="' + (task.skillType || 'audit') + '">' + historyI18n("pdfButton") + '</button>' :
         '<span class="history-no-report">-</span>') +
     '</div>';
   

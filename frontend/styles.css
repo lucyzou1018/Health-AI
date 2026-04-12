@@ -870,6 +870,7 @@ button#run-task:active {
   transition: all 200ms ease;
   box-sizing: border-box;
   align-self: stretch;
+  overflow: hidden;
 }
 
 .history-panel:hover {
@@ -921,15 +922,16 @@ button#run-task:active {
 
 .history-item {
   display: grid;
-  grid-template-columns: minmax(60px, 1fr) 90px 140px;
-  gap: 24px;
+  grid-template-columns: minmax(60px, 1fr) 80px 160px;
+  gap: 16px;
   align-items: center;
-  padding: 8px 14px;
+  padding: 10px 14px;
   background: transparent;
   border: none;
   border-bottom: none;
   transition: all 150ms ease;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .history-item:hover {
@@ -4081,8 +4083,8 @@ button#run-task:hover:not(:disabled) {
 
 .history-thead {
   display: grid;
-  grid-template-columns: minmax(60px, 1fr) 90px 140px;
-  gap: 24px;
+  grid-template-columns: minmax(60px, 1fr) 80px 160px;
+  gap: 16px;
   padding: 6px 14px 8px;
   border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 2px;
