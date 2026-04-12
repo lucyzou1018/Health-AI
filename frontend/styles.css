@@ -192,12 +192,34 @@ body {
   font-size: 14px;
 }
 
-/* App Shell */
+/* App Shell — 两列：左 History，右内容区 */
 #app-shell {
   position: relative;
-  max-width: 960px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 8px 20px 48px;
+  padding: 8px 24px 48px;
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.app-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  #app-shell {
+    grid-template-columns: 1fr;
+  }
+  .history-panel {
+    grid-row: 2;
+  }
+  .app-right {
+    grid-row: 1;
+  }
 }
 
 /* Workspace Grid */
@@ -206,7 +228,7 @@ body {
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   padding: 0;
-  align-items: start;
+  align-items: stretch;
   box-sizing: border-box;
 }
 
@@ -840,12 +862,14 @@ button#run-task:active {
 
 /* History Panel */
 .history-panel {
-  margin: 16px 0 0 0;
+  margin: 0;
   background: var(--bg-secondary);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 16px 20px;
   transition: all 200ms ease;
+  box-sizing: border-box;
+  align-self: stretch;
 }
 
 .history-panel:hover {
@@ -853,7 +877,7 @@ button#run-task:active {
 }
 
 .history-panel.is-empty {
-  margin: 16px 0 0 0;
+  margin: 0;
   text-align: center;
 }
 
@@ -897,7 +921,7 @@ button#run-task:active {
 
 .history-item {
   display: grid;
-  grid-template-columns: 1fr 90px 140px;
+  grid-template-columns: minmax(60px, 1fr) 90px 140px;
   gap: 24px;
   align-items: center;
   padding: 8px 14px;
@@ -1686,21 +1710,23 @@ body:not(.landing-only) .ambient-glow {
   margin: 0;
 }
 
-/* 工作区网格 */
+/* 工作区网格 — 上传面板 + 结果面板并排 */
 .workspace-grid {
   position: relative;
   z-index: 10;
   display: grid;
   grid-template-columns: 380px 1fr;
   gap: 20px;
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
+  padding: 0;
+  align-items: stretch;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1200px) {
+  #app-shell {
+    grid-template-columns: 360px 1fr;
+  }
   .workspace-grid {
-    grid-template-columns: 320px 1fr;
+    grid-template-columns: 300px 1fr;
   }
 }
 
@@ -1719,6 +1745,8 @@ body:not(.landing-only) .ambient-glow {
   backdrop-filter: blur(20px);
   transition: all 0.3s ease;
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
 }
 
 .panel:hover {
@@ -1875,10 +1903,16 @@ body:not(.landing-only) .ambient-glow {
   margin: 12px 0;
 }
 
-/* 历史记录面板 */
+/* 历史记录面板 — app-shell 左列 */
 .history-panel {
-  grid-column: 1 / -1;
-  margin-top: 8px;
+  margin-top: 0;
+  min-width: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.history-panel .pagination {
+  margin-top: auto;
 }
 
 .history-head {
@@ -4047,7 +4081,7 @@ button#run-task:hover:not(:disabled) {
 
 .history-thead {
   display: grid;
-  grid-template-columns: 1fr 90px 140px;
+  grid-template-columns: minmax(60px, 1fr) 90px 140px;
   gap: 24px;
   padding: 6px 14px 8px;
   border-bottom: 1px solid var(--border-subtle);

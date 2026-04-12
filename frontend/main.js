@@ -280,7 +280,10 @@ function historyI18n(key) {
     }
   };
   const lang = getCurrentUILang();
-  return (dict[lang] || dict.en)[key] || dict.en[key] || key;
+  const val = (dict[lang] || dict.en)[key];
+  if (val !== undefined) return val;
+  const enVal = dict.en[key];
+  return enVal !== undefined ? enVal : key;
 }
 // 每个 skill 类型是否有任务正在运行
 const runningTabs = {
