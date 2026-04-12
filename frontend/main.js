@@ -203,7 +203,12 @@ let loginEmail = localStorage.getItem("login_email");
 
 // Google OAuth Client ID
 const GOOGLE_CLIENT_ID = window.HEALTH_AI_GOOGLE_CLIENT_ID || "744175699896-h7k636bv5g8bggvgdumdoqt3om6pcpk9.apps.googleusercontent.com";
-const GITHUB_CLIENT_ID = window.HEALTH_AI_GITHUB_CLIENT_ID || "Ov23lidd5lnCSTryITS5";
+const GITHUB_CLIENT_ID = window.HEALTH_AI_GITHUB_CLIENT_ID || (function() {
+  var h = window.location.hostname;
+  if (h === "codeautrix.agentese.ai") return "Ov23liE0GA6KVy3Qs4vc";
+  if (h === "health-ai-alpha-six.vercel.app") return "Ov23livecFSIM0UymN3w";
+  return "Ov23lidd5lnCSTryITS5"; // localhost dev
+})();
 const SKILL_LABELS = {
   "skill-security-audit": "Skill Security Audit",
   "multichain-contract-vuln": "Contract Audit",
@@ -2078,10 +2083,11 @@ function loginWithGithub() {
   // Save current page to return after login
   localStorage.setItem("github_oauth_redirect", window.location.href);
 
-  // Redirect to GitHub OAuth
-  // Note: omit redirect_uri to use the callback URL configured in GitHub OAuth App settings
+  // Redirect to GitHub OAuth (redirect_uri adapts to current environment)
+  var redirectUri = window.location.origin + "/workspace.html";
   var params = new URLSearchParams({
     client_id: GITHUB_CLIENT_ID,
+    redirect_uri: redirectUri,
     scope: "user:email"
   });
   window.location.href = "https://github.com/login/oauth/authorize?" + params.toString();
@@ -2115,7 +2121,7 @@ async function handleGithubCallback() {
     var resp = await fetch(API_BASE + "/api/auth/github", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: code })
+      body: JSON.stringify({ code: code, clientId: GITHUB_CLIENT_ID })
     });
 
     if (!resp.ok) {

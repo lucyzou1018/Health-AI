@@ -181,6 +181,7 @@ class GoogleAuthRequest(BaseModel):
 
 class GitHubAuthRequest(BaseModel):
     code: str = Field(description="GitHub OAuth authorization code")
+    client_id: str = Field(default="", alias="clientId", description="GitHub OAuth client ID used by frontend")
 
     class Config:
         allow_population_by_field_name = True
@@ -480,8 +481,16 @@ def google_login(payload: GoogleAuthRequest):
 
 
 # ── GitHub OAuth Configuration ───────────────────────────────────────────────
-GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
-GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
+# Multiple GitHub OAuth Apps: localhost dev, test (vercel), production
+GITHUB_OAUTH_CONFIGS: Dict[str, str] = {
+    # client_id → client_secret
+    "Ov23lidd5lnCSTryITS5": "ec3777e5e7f40ab57b318f3e3896e2fdd22ffcce",       # localhost dev
+    "Ov23livecFSIM0UymN3w": "54ba20b863e3b85050e1fb9e435a308671ca79f2",       # test (vercel)
+    "Ov23liE0GA6KVy3Qs4vc": "a156e08f2e1043ca5e9be05ad7142110f78b1046",       # production
+}
+# Allow env var override for single-app setups
+if os.getenv("GITHUB_CLIENT_ID") and os.getenv("GITHUB_CLIENT_SECRET"):
+    GITHUB_OAUTH_CONFIGS[os.getenv("GITHUB_CLIENT_ID")] = os.getenv("GITHUB_CLIENT_SECRET")
 
 
 @app.post("/api/auth/github")
@@ -495,10 +504,16 @@ def github_login(payload: GitHubAuthRequest):
     import urllib.request
     import json as _json
 
-    if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET:
+    # Resolve client_id → client_secret
+    gh_client_id = payload.client_id
+    gh_client_secret = GITHUB_OAUTH_CONFIGS.get(gh_client_id, "") if gh_client_id else ""
+    # Fallback: if frontend didn't send client_id, try first available config
+    if not gh_client_secret and GITHUB_OAUTH_CONFIGS:
+        gh_client_id, gh_client_secret = next(iter(GITHUB_OAUTH_CONFIGS.items()))
+    if not gh_client_secret:
         raise HTTPException(
             status_code=500,
-            detail="GitHub OAuth is not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET env vars.",
+            detail="GitHub OAuth is not configured for this environment.",
         )
 
     # Use httpx for GitHub API calls (handles proxies and SSL better than urllib)
@@ -509,8 +524,8 @@ def github_login(payload: GitHubAuthRequest):
         token_resp = httpx.post(
             "https://github.com/login/oauth/access_token",
             json={
-                "client_id": GITHUB_CLIENT_ID,
-                "client_secret": GITHUB_CLIENT_SECRET,
+                "client_id": gh_client_id,
+                "client_secret": gh_client_secret,
                 "code": payload.code,
             },
             headers={"Accept": "application/json"},
