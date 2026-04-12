@@ -481,16 +481,34 @@ def google_login(payload: GoogleAuthRequest):
 
 
 # ── GitHub OAuth Configuration ───────────────────────────────────────────────
-# Multiple GitHub OAuth Apps: localhost dev, test (vercel), production
-GITHUB_OAUTH_CONFIGS: Dict[str, str] = {
-    # client_id → client_secret
-    "Ov23lidd5lnCSTryITS5": "ec3777e5e7f40ab57b318f3e3896e2fdd22ffcce",       # localhost dev
-    "Ov23livecFSIM0UymN3w": "54ba20b863e3b85050e1fb9e435a308671ca79f2",       # test (vercel)
-    "Ov23liE0GA6KVy3Qs4vc": "a156e08f2e1043ca5e9be05ad7142110f78b1046",       # production
-}
-# Allow env var override for single-app setups
-if os.getenv("GITHUB_CLIENT_ID") and os.getenv("GITHUB_CLIENT_SECRET"):
-    GITHUB_OAUTH_CONFIGS[os.getenv("GITHUB_CLIENT_ID")] = os.getenv("GITHUB_CLIENT_SECRET")
+# Secrets loaded from environment variables only — NEVER hardcode secrets in source.
+#
+# Supports multiple GitHub OAuth Apps via numbered env vars:
+#   GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET          — primary (or single-app setup)
+#   GITHUB_CLIENT_ID_2 / GITHUB_CLIENT_SECRET_2      — second app
+#   GITHUB_CLIENT_ID_3 / GITHUB_CLIENT_SECRET_3      — third app
+#
+# Example (.env):
+#   GITHUB_CLIENT_ID=Ov23li...         GITHUB_CLIENT_SECRET=abc...   # localhost
+#   GITHUB_CLIENT_ID_2=Ov23li...       GITHUB_CLIENT_SECRET_2=def... # test
+#   GITHUB_CLIENT_ID_3=Ov23li...       GITHUB_CLIENT_SECRET_3=ghi... # production
+
+def _load_github_oauth_configs() -> Dict[str, str]:
+    configs: Dict[str, str] = {}
+    # Primary
+    cid = os.getenv("GITHUB_CLIENT_ID", "")
+    sec = os.getenv("GITHUB_CLIENT_SECRET", "")
+    if cid and sec:
+        configs[cid] = sec
+    # Numbered extras (_2, _3, ...)
+    for i in range(2, 10):
+        cid = os.getenv(f"GITHUB_CLIENT_ID_{i}", "")
+        sec = os.getenv(f"GITHUB_CLIENT_SECRET_{i}", "")
+        if cid and sec:
+            configs[cid] = sec
+    return configs
+
+GITHUB_OAUTH_CONFIGS: Dict[str, str] = _load_github_oauth_configs()
 
 
 @app.post("/api/auth/github")
@@ -519,6 +537,9 @@ def github_login(payload: GitHubAuthRequest):
     # Use httpx for GitHub API calls (handles proxies and SSL better than urllib)
     import httpx
 
+    # Only disable SSL verification on localhost (dev proxy); production always verifies
+    _ssl_verify = os.getenv("GITHUB_SSL_VERIFY", "true").lower() not in ("0", "false", "no")
+
     # Step 1: Exchange code for access token
     try:
         token_resp = httpx.post(
@@ -530,7 +551,7 @@ def github_login(payload: GitHubAuthRequest):
             },
             headers={"Accept": "application/json"},
             timeout=15,
-            verify=False,
+            verify=_ssl_verify,
         )
         token_data = token_resp.json()
     except Exception as exc:
@@ -551,7 +572,7 @@ def github_login(payload: GitHubAuthRequest):
 
     # Step 2: Fetch user profile
     try:
-        user_resp = httpx.get("https://api.github.com/user", headers=gh_headers, timeout=10, verify=False)
+        user_resp = httpx.get("https://api.github.com/user", headers=gh_headers, timeout=10, verify=_ssl_verify)
         user_info = user_resp.json()
     except Exception as exc:
         logger.error("GitHub user info fetch failed: %s", exc)
@@ -567,7 +588,7 @@ def github_login(payload: GitHubAuthRequest):
     # Step 3: If email is private, fetch from /user/emails
     if not github_email:
         try:
-            emails_resp = httpx.get("https://api.github.com/user/emails", headers=gh_headers, timeout=10, verify=False)
+            emails_resp = httpx.get("https://api.github.com/user/emails", headers=gh_headers, timeout=10, verify=_ssl_verify)
             emails = emails_resp.json()
             for entry in emails:
                 if entry.get("primary") and entry.get("verified"):
