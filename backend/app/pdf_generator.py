@@ -340,6 +340,114 @@ class AuditPDF(FPDF):
         self.multi_cell(163, 5.5, text)
         self.ln(1)
 
+    # ── Warning item (yellow badge, similar to rec_item) ────────────────────
+    def warning_item(self, text: str, idx: int):
+        text = _safe(text)
+        y = self.get_y()
+        if y > 265:
+            self.add_page()
+            y = self.get_y()
+        # Numbered circle badge (yellow)
+        self.set_fill_color(*YELLOW)
+        self.ellipse(20, y + 0.5, 5, 5, "F")
+        self.set_xy(20, y)
+        self.set_font("Helvetica", "B", 7)
+        self.set_text_color(*WHITE)
+        self.cell(5, 6, str(idx), align="C")
+        # Content
+        self.set_x(27)
+        self.set_font("Helvetica", "", 9)
+        self.set_text_color(*TEXT_DARK)
+        self.multi_cell(163, 5.5, text)
+        self.ln(1)
+
+    # ── Render markdown body into PDF ─────────────────────────────────────────
+    def render_markdown(self, md_text: str):
+        """Render a block of markdown text into the PDF with basic formatting."""
+        lines = md_text.split("\n")
+        table_lines: list[str] = []
+
+        def _flush_table():
+            if not table_lines:
+                return
+            parsed_h, parsed_r = _parse_table("\n".join(table_lines))
+            if parsed_h and parsed_r:
+                n = len(parsed_h)
+                widths = [170 / n] * n
+                # Clean markdown bold from cells
+                clean_h = [re.sub(r"\*+", "", h).strip() for h in parsed_h]
+                clean_r = [[re.sub(r"\*+", "", c).strip() for c in row] for row in parsed_r]
+                self.draw_table(clean_h, clean_r, widths)
+            table_lines.clear()
+
+        for line in lines:
+            stripped = line.strip()
+
+            # Accumulate table rows
+            if stripped.startswith("|"):
+                table_lines.append(stripped)
+                continue
+            elif table_lines:
+                _flush_table()
+
+            # Page break guard
+            if self.get_y() > 270:
+                self.add_page()
+
+            # Headers
+            if stripped.startswith("#### "):
+                self.ln(1)
+                self.set_font("Helvetica", "B", 8.5)
+                self.set_text_color(*INDIGO)
+                self.cell(0, 5, _safe(stripped[5:]), ln=True)
+                self.ln(1)
+            elif stripped.startswith("### "):
+                self.subsection_title(stripped[4:])
+            elif stripped.startswith("## "):
+                self.section_title(stripped[3:])
+            elif stripped.startswith("# "):
+                self.section_title(stripped[2:])
+            # Horizontal rule
+            elif re.match(r"^-{3,}$", stripped):
+                self.set_draw_color(*LIGHT_GRAY)
+                self.set_line_width(0.3)
+                self.line(20, self.get_y(), 190, self.get_y())
+                self.ln(3)
+            # Bullet list
+            elif stripped.startswith("- "):
+                self.set_font("Helvetica", "", 9)
+                self.set_text_color(*TEXT_DARK)
+                self.set_x(25)
+                text = re.sub(r"\*\*(.*?)\*\*", r"\1", stripped[2:])
+                self.multi_cell(165, 5, _safe(f"* {text}"))
+                self.ln(0.5)
+            # Numbered list
+            elif re.match(r"^\d+\.\s", stripped):
+                self.set_font("Helvetica", "", 9)
+                self.set_text_color(*TEXT_DARK)
+                self.set_x(25)
+                text = re.sub(r"\*\*(.*?)\*\*", r"\1", stripped)
+                self.multi_cell(165, 5, _safe(text))
+                self.ln(0.5)
+            # Blockquote
+            elif stripped.startswith("> "):
+                self.set_font("Helvetica", "I", 8.5)
+                self.set_text_color(*GRAY)
+                self.set_x(25)
+                text = re.sub(r"\*\*(.*?)\*\*", r"\1", stripped[2:])
+                self.multi_cell(165, 5, _safe(text))
+                self.ln(1)
+            # Empty line
+            elif not stripped:
+                self.ln(2)
+            # Regular text
+            else:
+                text = re.sub(r"\*\*(.*?)\*\*", r"\1", stripped)
+                self.body_text(text)
+
+        # Flush remaining table rows
+        _flush_table()
+
     def cover_badge(self, skill_type: str, *, x: float = 26, y: float | None = None):
         """Render badge matching the HTML report.html CSS badge.
 
@@ -997,6 +1105,10 @@ def _generate_contract_pdf(md: str, out_path: Path, *, skill_type: str = "multic
             pdf.multi_cell(165, 5.5, _safe(f"* {item}"))
         pdf.ln(2)
 
+    # ── Full Report ──────────────────────────────────────────────────────────
+    pdf.section_title("Full Report")
+    pdf.render_markdown(md)
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pdf.output(str(out_path))
 
@@ -1174,6 +1286,10 @@ def _generate_stress_pdf(md: str, out_path: Path, *, skill_type: str = "skill-st
                 widths = [60, 40, 70]
             pdf.draw_table(score_h, clean_rows, widths)
 
+    # ── Full Report ──────────────────────────────────────────────────────────
+    pdf.section_title("Full Report")
+    pdf.render_markdown(md)
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pdf.output(str(out_path))
 
@@ -1288,6 +1404,16 @@ def generate_pdf(md_path: Path, out_path: Path, *, skill_type: str = "") -> None
             pdf.rec_item(r, i)
         pdf.ln(2)
 
+    # ── Warnings ──────────────────────────────────────────────────────────────
+    warn_block = (_extract_between(md, "## \u26a0\ufe0f Warnings", ["## "])
+                  or _extract_between(md, "## Warnings", ["## "]))
+    warns = [l[1:].strip() for l in warn_block.splitlines() if l.strip().startswith("-")]
+    if warns:
+        pdf.section_title("Warnings")
+        for i, w in enumerate(warns, 1):
+            pdf.warning_item(w, i)
+        pdf.ln(2)
+
     # ── Detailed Security Checklist ────────────────────────────────────────────
     checklist_sections = _parse_checklist_sections(md)
     if checklist_sections:
@@ -1325,6 +1451,10 @@ def generate_pdf(md_path: Path, out_path: Path, *, skill_type: str = "") -> None
         n = len(log_h)
         widths = [60, 22, 18, 18, 52] if n == 5 else [170 / n] * n
         pdf.draw_table(log_h, log_rows, widths)
+
+    # ── Full Report ──────────────────────────────────────────────────────────
+    pdf.section_title("Full Report")
+    pdf.render_markdown(md)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pdf.output(str(out_path))

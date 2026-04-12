@@ -179,6 +179,13 @@ class GoogleAuthRequest(BaseModel):
         allow_population_by_field_name = True
 
 
+class GitHubAuthRequest(BaseModel):
+    code: str = Field(description="GitHub OAuth authorization code")
+
+    class Config:
+        allow_population_by_field_name = True
+
+
 class HistoryQueryParams(BaseModel):
     skill_type: Optional[str] = Field(default=None, alias="skillType")
     limit: int = Field(default=20, ge=1, le=100)
@@ -468,6 +475,119 @@ def google_login(payload: GoogleAuthRequest):
         "token": token,
         "walletAddress": google_wallet,
         "email": verified_email,
+        "expiresAt": expires_at,
+    }
+
+
+# ── GitHub OAuth Configuration ───────────────────────────────────────────────
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET", "")
+
+
+@app.post("/api/auth/github")
+def github_login(payload: GitHubAuthRequest):
+    """Exchange GitHub OAuth authorization code for a session token.
+
+    Flow: frontend redirects user to GitHub → user authorises → GitHub
+    redirects back with a `code` → frontend POSTs the code here →
+    backend exchanges it for an access token and fetches user info.
+    """
+    import urllib.request
+    import json as _json
+
+    if not GITHUB_CLIENT_ID or not GITHUB_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=500,
+            detail="GitHub OAuth is not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET env vars.",
+        )
+
+    # Use httpx for GitHub API calls (handles proxies and SSL better than urllib)
+    import httpx
+
+    # Step 1: Exchange code for access token
+    try:
+        token_resp = httpx.post(
+            "https://github.com/login/oauth/access_token",
+            json={
+                "client_id": GITHUB_CLIENT_ID,
+                "client_secret": GITHUB_CLIENT_SECRET,
+                "code": payload.code,
+            },
+            headers={"Accept": "application/json"},
+            timeout=15,
+            verify=False,
+        )
+        token_data = token_resp.json()
+    except Exception as exc:
+        logger.error("GitHub token exchange failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Failed to exchange GitHub authorization code.")
+
+    access_token = token_data.get("access_token")
+    if not access_token:
+        error_desc = token_data.get("error_description", token_data.get("error", "unknown"))
+        logger.warning("GitHub token exchange returned error: %s", error_desc)
+        raise HTTPException(status_code=401, detail=f"GitHub auth failed: {error_desc}")
+
+    gh_headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json",
+        "User-Agent": "CodeAutrix",
+    }
+
+    # Step 2: Fetch user profile
+    try:
+        user_resp = httpx.get("https://api.github.com/user", headers=gh_headers, timeout=10, verify=False)
+        user_info = user_resp.json()
+    except Exception as exc:
+        logger.error("GitHub user info fetch failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Failed to fetch GitHub user info.")
+
+    github_id = str(user_info.get("id", ""))
+    github_login_name = user_info.get("login", "")
+    github_email = user_info.get("email") or ""
+
+    if not github_id:
+        raise HTTPException(status_code=401, detail="Invalid GitHub user info.")
+
+    # Step 3: If email is private, fetch from /user/emails
+    if not github_email:
+        try:
+            emails_resp = httpx.get("https://api.github.com/user/emails", headers=gh_headers, timeout=10, verify=False)
+            emails = emails_resp.json()
+            for entry in emails:
+                if entry.get("primary") and entry.get("verified"):
+                    github_email = entry["email"]
+                    break
+            if not github_email and emails:
+                github_email = emails[0].get("email", "")
+        except Exception as exc:
+            logger.warning("GitHub email fetch failed: %s", exc)
+
+    # Step 4: Generate deterministic wallet address (same pattern as Google)
+    github_wallet = "0x" + hashlib.sha256(f"github:{github_id}".encode()).hexdigest()[:40]
+
+    session_token = secrets.token_urlsafe(32)
+    expires_at = int(time.time()) + 7 * 24 * 3600  # 7-day session
+
+    with _sessions_lock:
+        if len(wallet_sessions) >= MAX_WALLET_SESSIONS:
+            now = int(time.time())
+            expired_keys = [k for k, v in wallet_sessions.items() if v.get("expires_at", 0) < now]
+            for k in expired_keys:
+                wallet_sessions.pop(k, None)
+        wallet_sessions[session_token] = {
+            "wallet_address": github_wallet,
+            "expires_at": expires_at,
+        }
+    _persist_wallet_sessions()
+
+    logger.info("GitHub login successful: %s (%s)", github_login_name, github_email)
+
+    return {
+        "token": session_token,
+        "walletAddress": github_wallet,
+        "email": github_email,
+        "login": github_login_name,
         "expiresAt": expires_at,
     }
 

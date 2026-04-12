@@ -203,6 +203,7 @@ let loginEmail = localStorage.getItem("login_email");
 
 // Google OAuth Client ID
 const GOOGLE_CLIENT_ID = window.HEALTH_AI_GOOGLE_CLIENT_ID || "744175699896-h7k636bv5g8bggvgdumdoqt3om6pcpk9.apps.googleusercontent.com";
+const GITHUB_CLIENT_ID = window.HEALTH_AI_GITHUB_CLIENT_ID || "Ov23lidd5lnCSTryITS5";
 const SKILL_LABELS = {
   "skill-security-audit": "Skill Security Audit",
   "multichain-contract-vuln": "Contract Audit",
@@ -1710,7 +1711,10 @@ function formatWalletAddress(address) {
 function updateWalletUI() {
   if (currentWallet && walletBtn && walletText) {
     walletBtn.classList.add("connected");
-    if (loginType === "google" && loginEmail) {
+    if (loginType === "github") {
+      var ghLogin = localStorage.getItem("github_login") || loginEmail || "";
+      walletText.textContent = ghLogin.length > 14 ? ghLogin.slice(0, 12) + ".." : (ghLogin || formatWalletAddress(currentWallet));
+    } else if (loginType === "google" && loginEmail) {
       const email = loginEmail;
       if (email.length > 14) {
         var parts = email.split(".");
@@ -1964,6 +1968,12 @@ function showLoginModal() {
             </span>
             <span class="wallet-option-name">Continue with Google</span>
           </button>
+          <button class="wallet-option" data-method="github">
+            <span class="wallet-option-icon">
+              <svg width="20" height="20" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="24" fill="#24292f"/><path d="M24 5C13.5 5 5 13.5 5 24c0 8.4 5.5 15.5 13 18 1 .2 1.3-.4 1.3-.9v-3.5c-5.3 1.1-6.4-2.2-6.4-2.2-.9-2.2-2.1-2.8-2.1-2.8-1.7-1.2.1-1.1.1-1.1 1.9.1 2.9 1.9 2.9 1.9 1.7 2.9 4.4 2.1 5.5 1.6.2-1.2.7-2.1 1.2-2.5-4.2-.5-8.7-2.1-8.7-9.3 0-2.1.7-3.7 1.9-5.1-.2-.5-.8-2.4.2-5 0 0 1.6-.5 5.1 1.9 1.5-.4 3.1-.6 4.6-.6s3.1.2 4.6.6c3.6-2.4 5.1-1.9 5.1-1.9 1 2.6.4 4.5.2 5 1.2 1.3 1.9 3 1.9 5.1 0 7.2-4.4 8.8-8.7 9.3.7.6 1.3 1.8 1.3 3.5v5.2c0 .5.3 1.1 1.3.9C37.5 39.5 43 32.4 43 24 43 13.5 34.5 5 24 5z" fill="#ffffff"/></svg>
+            </span>
+            <span class="wallet-option-name">Continue with GitHub</span>
+          </button>
           <button class="wallet-option" data-method="wallet">
             <span class="wallet-option-icon">
               <svg width="20" height="20" viewBox="0 0 48 48" fill="none"><defs><linearGradient id="wg" x1="0" y1="0" x2="48" y2="48"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient></defs><rect x="2" y="10" width="36" height="30" rx="4" fill="url(#wg)"/><path d="M38 10H8C4.69 10 2 12.69 2 16V10C2 6.69 4.69 4 8 4H34C37.31 4 38 6.69 38 10Z" fill="#a78bfa"/><rect x="30" y="22" width="16" height="12" rx="3" fill="#22d3ee"/><circle cx="38" cy="28" r="2.5" fill="#fff"/></svg>
@@ -2056,6 +2066,86 @@ function loginWithGoogle() {
     prompt: "select_account"
   });
   window.location.href = "https://accounts.google.com/o/oauth2/v2/auth?" + params.toString();
+}
+
+// ── GitHub OAuth ──
+function loginWithGithub() {
+  if (!GITHUB_CLIENT_ID) {
+    alert("GitHub Login is not configured. Please set GITHUB_CLIENT_ID.");
+    return;
+  }
+
+  // Save current page to return after login
+  localStorage.setItem("github_oauth_redirect", window.location.href);
+
+  // Redirect to GitHub OAuth
+  // Note: omit redirect_uri to use the callback URL configured in GitHub OAuth App settings
+  var params = new URLSearchParams({
+    client_id: GITHUB_CLIENT_ID,
+    scope: "user:email"
+  });
+  window.location.href = "https://github.com/login/oauth/authorize?" + params.toString();
+}
+
+// Handle GitHub OAuth redirect callback
+async function handleGithubCallback() {
+  var params = new URLSearchParams(window.location.search);
+  var code = params.get("code");
+
+  // Only handle if this is actually a GitHub callback (has code param and was initiated by us)
+  if (!code) return false;
+  // If there's no record of us initiating a GitHub login, this code param isn't for us
+  if (!localStorage.getItem("github_oauth_redirect")) return false;
+
+  // GitHub returned an error
+  var error = params.get("error");
+  if (error) {
+    console.error("[GitHubAuth] OAuth error:", error, params.get("error_description") || "");
+    history.replaceState(null, "", window.location.pathname + window.location.hash);
+    localStorage.removeItem("github_oauth_redirect");
+    return false;
+  }
+
+  // Clear the code from URL immediately (preserve hash for other handlers)
+  history.replaceState(null, "", window.location.pathname + window.location.hash);
+  localStorage.removeItem("github_oauth_redirect");
+
+  try {
+    console.log("[GitHubAuth] Exchanging code with backend...");
+    var resp = await fetch(API_BASE + "/api/auth/github", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: code })
+    });
+
+    if (!resp.ok) {
+      var errData = await resp.json().catch(function() { return {}; });
+      throw new Error(errData.detail || "GitHub login failed (" + resp.status + ")");
+    }
+
+    var data = await resp.json();
+    console.log("[GitHubAuth] Login success:", data.login, data.email);
+
+    // Store session
+    currentWallet = data.walletAddress;
+    walletToken = data.token;
+    loginType = "github";
+    loginEmail = data.email || data.login;
+    localStorage.setItem("wallet_token", data.token);
+    localStorage.setItem("wallet_address", data.walletAddress);
+    localStorage.setItem("login_type", "github");
+    localStorage.setItem("login_email", data.email || data.login);
+    localStorage.setItem("github_login", data.login || "");
+
+    updateWalletUI();
+    updateRunButtonState();
+    loadWalletHistory();
+    return true;
+  } catch (err) {
+    console.error("[GitHubAuth] Login failed:", err);
+    alert("GitHub login failed: " + err.message);
+    return false;
+  }
 }
 
 // Handle Google OAuth redirect callback
@@ -2367,6 +2457,8 @@ function disconnectWallet() {
   localStorage.removeItem("wallet_address");
   localStorage.removeItem("login_type");
   localStorage.removeItem("login_email");
+  localStorage.removeItem("github_login");
+  localStorage.removeItem("github_oauth_redirect");
   walletToken = null;
   currentWallet = null;
   loginType = null;
@@ -2567,6 +2659,8 @@ if (walletBtn) {
         const method = await showLoginModal();
         if (method === "google") {
           await loginWithGoogle();
+        } else if (method === "github") {
+          await loginWithGithub();
         } else if (method === "wallet") {
           await connectWallet();
         }
@@ -2660,10 +2754,11 @@ function initWallet() {
   const savedLoginType = localStorage.getItem("login_type");
   const savedEmail = localStorage.getItem("login_email");
   // Wallet login requires both address and token;
-  // Google login only needs address + email (token is optional if backend was unreachable)
-  var isWalletLogin = savedAddress && savedToken && savedLoginType !== "google";
+  // Google/GitHub login only needs address + email (token is optional if backend was unreachable)
+  var isWalletLogin = savedAddress && savedToken && savedLoginType !== "google" && savedLoginType !== "github";
   var isGoogleLogin = savedAddress && savedLoginType === "google" && savedEmail;
-  if (isWalletLogin || isGoogleLogin) {
+  var isGithubLogin = savedAddress && savedLoginType === "github" && savedEmail;
+  if (isWalletLogin || isGoogleLogin || isGithubLogin) {
     currentWallet = savedAddress;
     walletToken = savedToken || null;
     loginType = savedLoginType || "wallet";
@@ -2674,9 +2769,9 @@ function initWallet() {
   }
 }
 
-// 页面加载时初始化：先处理 Google OAuth 回调，再恢复 localStorage
+// 页面加载时初始化：先处理 OAuth 回调，再恢复 localStorage
 (async function initAuth() {
-  const handled = await handleGoogleCallback();
+  const handled = await handleGithubCallback() || await handleGoogleCallback();
   if (!handled) {
     initWallet();
   }
