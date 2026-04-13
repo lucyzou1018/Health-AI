@@ -37,7 +37,7 @@
       z-index: 2;
     }
     .code-profile__kicker {
-      font-size: 7px;
+      font-size: 9px;
       color: rgba(93, 77, 124, 0.64);
       letter-spacing: 0.06em;
       margin-bottom: 2px;
@@ -48,14 +48,48 @@
       line-height: 1.1;
       margin-bottom: 1px;
     }
+    .code-profile__code-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      margin-top: 2px;
+    }
     .code-profile__code {
       font-size: 9px;
       font-weight: 700;
       letter-spacing: 0.18em;
-      margin-bottom: 2px;
+    }
+    .code-profile__help {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 1px solid rgba(93, 77, 124, 0.3);
+      background: rgba(93, 77, 124, 0.08);
+      color: rgba(93, 77, 124, 0.6);
+      font-size: 8px;
+      font-weight: 700;
+      line-height: 12px;
+      text-align: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      user-select: none;
+    }
+    .code-profile__help:hover {
+      background: rgba(93, 77, 124, 0.16);
     }
     .code-profile__desc {
       display: none;
+      font-size: 9px;
+      line-height: 1.4;
+      color: rgba(93, 77, 124, 0.7);
+      margin-top: 4px;
+      padding: 3px 4px;
+      background: rgba(93, 77, 124, 0.06);
+      border-radius: 4px;
+    }
+    .code-profile__desc.is-visible {
+      display: block;
     }
     .code-profile__illustration {
       width: 72px;
@@ -492,8 +526,11 @@
       return '<div class="code-profile code-profile--' + cfg.theme + '">' +
         '<div class="code-profile__kicker">' + t('codeProfileKicker') + '</div>' +
         '<div class="code-profile__label">' + label + '</div>' +
-        '<div class="code-profile__code">' + tier.code + '</div>' +
         '<div class="code-profile__illustration"><img src="' + imageSrc + '" alt="' + label + ' image" loading="lazy" /></div>' +
+        '<div class="code-profile__code-row">' +
+          '<span class="code-profile__code">' + tier.code + '</span>' +
+          '<span class="code-profile__help" onclick="this.parentElement.nextElementSibling.classList.toggle(\'is-visible\')">?</span>' +
+        '</div>' +
         '<div class="code-profile__desc">' + desc + '</div>' +
       '</div>';
     }
