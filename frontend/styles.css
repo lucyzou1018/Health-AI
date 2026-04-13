@@ -92,6 +92,9 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 12px;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
 }
 
 .brand-logo {
@@ -1910,12 +1913,21 @@ body:not(.landing-only) .ambient-glow {
 .history-panel {
   margin-top: 0;
   min-width: 0;
-  height: 100%;
+  align-self: stretch;   /* stretches to match app-right's natural height */
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-panel .history-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .history-panel .pagination {
   margin-top: auto;
+  flex-shrink: 0;
 }
 
 .history-head {
