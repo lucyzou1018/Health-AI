@@ -196,7 +196,7 @@
         <div class="recent-checks">
           <div class="rc-header">
             <span class="rc-title">Recent Checks</span>
-            <span class="rc-badge">47 / 50 Passed</span>
+            <span class="rc-badge" id="rc-badge">47 / 50 Passed</span>
           </div>
           <div class="rc-item rc-pass"><span class="rc-icon">✓</span><span class="rc-text">No obfuscation detected</span></div>
           <div class="rc-item rc-warn"><span class="rc-icon">⚠</span><span class="rc-text">Missing version field in manifest</span></div>
@@ -985,6 +985,24 @@
     }
 
     setInterval(update, 3000);
+  })();
+
+  // ── Animated recent-checks badge ─────────────────────────────────────────
+  (function () {
+    var el = document.getElementById('rc-badge');
+    if (!el) return;
+    var vals = ['47 / 50 Passed', '48 / 50 Passed', '46 / 50 Passed',
+                '49 / 50 Passed', '47 / 50 Passed', '45 / 50 Passed'];
+    var idx = 0;
+    setInterval(function () {
+      idx = (idx + 1) % vals.length;
+      el.style.transition = 'opacity 0.25s ease';
+      el.style.opacity = '0';
+      setTimeout(function () {
+        el.textContent = vals[idx];
+        el.style.opacity = '1';
+      }, 250);
+    }, 4000);
   })();
 
   // ── Animated latency stats ────────────────────────────────────────────────
