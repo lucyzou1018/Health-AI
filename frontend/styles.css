@@ -1937,8 +1937,13 @@ body:not(.landing-only) .ambient-glow {
   margin-bottom: 16px;
 }
 
+.history-head > div {
+  flex: 1;
+}
+
 .history-head h2 {
   margin-bottom: 12px;
+  text-align: center;
 }
 
 /* 钱包按钮 */

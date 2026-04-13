@@ -1962,74 +1962,118 @@ function showLoginModal() {
     modal.innerHTML = `
       <div class="wallet-modal-backdrop"></div>
       <div class="wallet-modal-content">
-        <h3>Sign In</h3>
-        <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 16px; text-align: center;">
-          Choose a login method to continue
-        </p>
+        <button class="wallet-modal-x" aria-label="Close">&times;</button>
+        <div class="wm-logo">
+          <img src="caLogo.svg" alt="CodeAutrix" width="48" height="48" />
+        </div>
+        <h3 class="wm-title">Welcome to CodeAutrix</h3>
+        <p class="wm-sub">Secure your Skills &amp; Contracts with AI&#8209;powered analysis</p>
         <div class="wallet-list">
           <button class="wallet-option" data-method="google">
             <span class="wallet-option-icon">
-              <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.93 23.93 0 000 24c0 3.77.89 7.35 2.56 10.56l7.97-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg>
+              <svg width="22" height="22" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.93 23.93 0 000 24c0 3.77.89 7.35 2.56 10.56l7.97-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg>
             </span>
             <span class="wallet-option-name">Continue with Google</span>
           </button>
           <button class="wallet-option" data-method="github">
             <span class="wallet-option-icon">
-              <svg width="20" height="20" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="24" fill="#24292f"/><path d="M24 5C13.5 5 5 13.5 5 24c0 8.4 5.5 15.5 13 18 1 .2 1.3-.4 1.3-.9v-3.5c-5.3 1.1-6.4-2.2-6.4-2.2-.9-2.2-2.1-2.8-2.1-2.8-1.7-1.2.1-1.1.1-1.1 1.9.1 2.9 1.9 2.9 1.9 1.7 2.9 4.4 2.1 5.5 1.6.2-1.2.7-2.1 1.2-2.5-4.2-.5-8.7-2.1-8.7-9.3 0-2.1.7-3.7 1.9-5.1-.2-.5-.8-2.4.2-5 0 0 1.6-.5 5.1 1.9 1.5-.4 3.1-.6 4.6-.6s3.1.2 4.6.6c3.6-2.4 5.1-1.9 5.1-1.9 1 2.6.4 4.5.2 5 1.2 1.3 1.9 3 1.9 5.1 0 7.2-4.4 8.8-8.7 9.3.7.6 1.3 1.8 1.3 3.5v5.2c0 .5.3 1.1 1.3.9C37.5 39.5 43 32.4 43 24 43 13.5 34.5 5 24 5z" fill="#ffffff"/></svg>
+              <svg width="22" height="22" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="24" fill="#24292f"/><path d="M24 5C13.5 5 5 13.5 5 24c0 8.4 5.5 15.5 13 18 1 .2 1.3-.4 1.3-.9v-3.5c-5.3 1.1-6.4-2.2-6.4-2.2-.9-2.2-2.1-2.8-2.1-2.8-1.7-1.2.1-1.1.1-1.1 1.9.1 2.9 1.9 2.9 1.9 1.7 2.9 4.4 2.1 5.5 1.6.2-1.2.7-2.1 1.2-2.5-4.2-.5-8.7-2.1-8.7-9.3 0-2.1.7-3.7 1.9-5.1-.2-.5-.8-2.4.2-5 0 0 1.6-.5 5.1 1.9 1.5-.4 3.1-.6 4.6-.6s3.1.2 4.6.6c3.6-2.4 5.1-1.9 5.1-1.9 1 2.6.4 4.5.2 5 1.2 1.3 1.9 3 1.9 5.1 0 7.2-4.4 8.8-8.7 9.3.7.6 1.3 1.8 1.3 3.5v5.2c0 .5.3 1.1 1.3.9C37.5 39.5 43 32.4 43 24 43 13.5 34.5 5 24 5z" fill="#ffffff"/></svg>
             </span>
             <span class="wallet-option-name">Continue with GitHub</span>
           </button>
           <button class="wallet-option" data-method="wallet">
             <span class="wallet-option-icon">
-              <svg width="20" height="20" viewBox="0 0 48 48" fill="none"><defs><linearGradient id="wg" x1="0" y1="0" x2="48" y2="48"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient></defs><rect x="2" y="10" width="36" height="30" rx="4" fill="url(#wg)"/><path d="M38 10H8C4.69 10 2 12.69 2 16V10C2 6.69 4.69 4 8 4H34C37.31 4 38 6.69 38 10Z" fill="#a78bfa"/><rect x="30" y="22" width="16" height="12" rx="3" fill="#22d3ee"/><circle cx="38" cy="28" r="2.5" fill="#fff"/></svg>
+              <svg width="22" height="22" viewBox="0 0 48 48" fill="none"><defs><linearGradient id="wg2" x1="0" y1="0" x2="48" y2="48"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#8b5cf6"/></linearGradient></defs><rect x="2" y="10" width="36" height="30" rx="4" fill="url(#wg2)"/><path d="M38 10H8C4.69 10 2 12.69 2 16V10C2 6.69 4.69 4 8 4H34C37.31 4 38 6.69 38 10Z" fill="#a78bfa"/><rect x="30" y="22" width="16" height="12" rx="3" fill="#22d3ee"/><circle cx="38" cy="28" r="2.5" fill="#fff"/></svg>
             </span>
             <span class="wallet-option-name">Connect Wallet</span>
           </button>
         </div>
-        <button class="wallet-modal-close">Cancel</button>
+        <p class="wm-terms">By signing in, you agree to our <a href="#" class="wm-link">Terms</a> &middot; <a href="#" class="wm-link">Privacy</a></p>
       </div>
     `;
 
     const style = document.createElement("style");
     style.textContent = `
       .wallet-modal {
-        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        z-index: 1000; display: flex; align-items: center; justify-content: center;
+        position: fixed; inset: 0; z-index: 1000;
+        display: flex; align-items: center; justify-content: center;
       }
       .wallet-modal-backdrop {
-        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.5);
+        position: absolute; inset: 0;
+        background: radial-gradient(ellipse at 60% 40%, rgba(99,102,241,0.18) 0%, rgba(139,92,246,0.10) 40%, rgba(241,245,255,0.97) 100%);
+        backdrop-filter: blur(2px);
+      }
+      /* dot-grid pattern */
+      .wallet-modal-backdrop::after {
+        content: '';
+        position: absolute; inset: 0;
+        background-image: radial-gradient(circle, rgba(99,102,241,0.18) 1px, transparent 1px);
+        background-size: 28px 28px;
+        pointer-events: none;
       }
       .wallet-modal-content {
-        position: relative; background: var(--bg-secondary);
-        border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
-        padding: 24px; min-width: 320px; max-width: 90vw;
+        position: relative;
+        background: rgba(255,255,255,0.92);
+        border: 1px solid rgba(99,102,241,0.15);
+        border-radius: 20px;
+        padding: 44px 40px 36px;
+        width: 420px; max-width: 92vw;
+        box-shadow: 0 24px 80px rgba(99,102,241,0.18), 0 4px 24px rgba(0,0,0,0.06);
+        text-align: center;
+        backdrop-filter: blur(12px);
       }
-      .wallet-modal-content h3 {
-        margin: 0 0 16px 0; font-size: 18px; text-align: center;
+      .wallet-modal-x {
+        position: absolute; top: 16px; right: 16px;
+        width: 30px; height: 30px; border-radius: 50%;
+        border: 1px solid rgba(99,102,241,0.2);
+        background: rgba(99,102,241,0.06);
+        color: #6366f1; font-size: 18px; line-height: 1;
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: all 150ms ease;
+      }
+      .wallet-modal-x:hover { background: rgba(99,102,241,0.14); }
+      .wm-logo {
+        display: flex; align-items: center; justify-content: center;
+        margin-bottom: 20px;
+      }
+      .wm-logo img { border-radius: 12px; }
+      .wm-title {
+        margin: 0 0 10px; font-size: 28px; font-weight: 700;
+        letter-spacing: -0.03em;
+        background: linear-gradient(135deg, #3730a3 0%, #6366f1 50%, #8b5cf6 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .wm-sub {
+        margin: 0 0 28px; font-size: 14px; color: #6b7280; line-height: 1.5;
       }
       .wallet-list {
-        display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;
+        display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px;
       }
       .wallet-option {
-        display: flex; align-items: center; gap: 12px; padding: 14px 16px;
-        background: var(--bg-tertiary); border: 1px solid var(--border-subtle);
-        border-radius: var(--radius); color: var(--text-primary);
-        font-size: 14px; cursor: pointer; transition: all 150ms ease;
-        text-decoration: none;
+        display: flex; align-items: center; justify-content: center; gap: 12px;
+        padding: 14px 20px; width: 100%;
+        background: rgba(248,250,255,0.9);
+        border: 1.5px solid rgba(99,102,241,0.15);
+        border-radius: 12px; color: #1e1b4b;
+        font-size: 15px; font-weight: 500; cursor: pointer;
+        transition: all 180ms ease;
       }
       .wallet-option:hover {
-        border-color: var(--accent); background: var(--accent-subtle);
+        border-color: #6366f1;
+        background: rgba(99,102,241,0.06);
+        box-shadow: 0 4px 16px rgba(99,102,241,0.12);
+        transform: translateY(-1px);
       }
-      .wallet-option-icon { font-size: 20px; display: flex; align-items: center; }
-      .wallet-modal-close {
-        width: 100%; padding: 10px; background: transparent;
-        border: 1px solid var(--border-subtle); border-radius: var(--radius);
-        color: var(--text-secondary); font-size: 13px; cursor: pointer;
+      .wallet-option-icon { display: flex; align-items: center; flex-shrink: 0; }
+      .wallet-option-name { flex: 1; text-align: center; }
+      .wm-terms {
+        margin: 0; font-size: 12px; color: #9ca3af;
       }
-      .wallet-modal-close:hover {
-        border-color: var(--border-default); color: var(--text-primary);
+      .wm-link {
+        color: #6366f1; text-decoration: none;
       }
+      .wm-link:hover { text-decoration: underline; }
     `;
     document.head.appendChild(style);
     document.body.appendChild(modal);
@@ -2046,7 +2090,7 @@ function showLoginModal() {
         resolve(method);
       });
     });
-    modal.querySelector(".wallet-modal-close").addEventListener("click", () => { cleanup(); reject(new Error("Cancelled")); });
+    modal.querySelector(".wallet-modal-x").addEventListener("click", () => { cleanup(); reject(new Error("Cancelled")); });
     modal.querySelector(".wallet-modal-backdrop").addEventListener("click", () => { cleanup(); reject(new Error("Cancelled")); });
   });
 }
@@ -2242,6 +2286,46 @@ async function handleGoogleCallback() {
     console.error("[GoogleAuth] Login failed:", err);
     alert("Google login failed: " + err.message);
     return false;
+  }
+}
+
+// ── Direct wallet connect (from login.html, skip selector modal) ──
+async function connectWalletDirect(preferredRdns) {
+  const providers = detectWalletProviders();
+  if (providers.length === 0) {
+    alert("No wallet detected. Please install MetaMask or another EVM wallet.");
+    return;
+  }
+  // Find preferred provider, fall back to first available
+  const chosen = providers.find(p => p.rdns === preferredRdns) || providers[0];
+  await doConnectProvider(chosen);
+}
+
+// ── Core provider connection (shared by connectWallet + connectWalletDirect) ──
+async function doConnectProvider(selectedProvider) {
+  try {
+    const accounts = await selectedProvider.provider.request({ method: "eth_requestAccounts" });
+    if (accounts.length === 0) { alert("Please authorize wallet access."); return; }
+    const walletAddress = accounts[0];
+    const nonceResp = await fetch(`${API_BASE}/api/wallet/nonce?wallet_address=${walletAddress}`);
+    const { message } = await nonceResp.json();
+    const signature = await selectedProvider.provider.request({ method: "personal_sign", params: [message, walletAddress] });
+    const verifyResp = await fetch(`${API_BASE}/api/wallet/verify`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ walletAddress, signature, message })
+    });
+    if (!verifyResp.ok) throw new Error("Verification failed");
+    const { token } = await verifyResp.json();
+    localStorage.setItem("wallet_token", token);
+    localStorage.setItem("wallet_address", walletAddress);
+    localStorage.setItem("login_type", "wallet");
+    localStorage.removeItem("login_email");
+    walletToken = token; currentWallet = walletAddress; loginType = "wallet"; loginEmail = null;
+    updateWalletUI(); updateRunButtonState(); loadWalletHistory();
+  } catch (err) {
+    console.error("Wallet connection failed:", err);
+    alert("Failed to connect wallet: " + err.message);
   }
 }
 
@@ -2661,21 +2745,7 @@ if (walletBtn) {
     if (currentWallet) {
       showDisconnectModal();
     } else {
-      try {
-        const method = await showLoginModal();
-        if (method === "google") {
-          await loginWithGoogle();
-        } else if (method === "github") {
-          await loginWithGithub();
-        } else if (method === "wallet") {
-          await connectWallet();
-        }
-      } catch (err) {
-        if (err.message !== "Cancelled") {
-          console.error("Login failed:", err);
-          alert("Login failed: " + err.message);
-        }
-      }
+      window.location.href = "login.html";
     }
   });
 }
@@ -2777,6 +2847,14 @@ function initWallet() {
 
 // 页面加载时初始化：先处理 OAuth 回调，再恢复 localStorage
 (async function initAuth() {
+  // Handle wallet login redirect from login.html
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get("login") === "wallet") {
+    const preferredRdns = urlParams.get("rdns") || "";
+    history.replaceState(null, "", window.location.pathname + window.location.hash);
+    try { await connectWalletDirect(preferredRdns); } catch(e) { console.warn("Wallet connect cancelled:", e); }
+    return;
+  }
   const handled = await handleGithubCallback() || await handleGoogleCallback();
   if (!handled) {
     initWallet();

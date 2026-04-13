@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In — CodeAutrix</title>
+  <link rel="icon" type="image/svg+xml" href="caLogo.svg" />
+  <link rel="shortcut icon" href="caLogo.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+    body {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(160deg, #dde6ff 0%, #e2ecff 40%, #eff3ff 100%);
+      background-attachment: fixed;
+      position: relative; overflow: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: radial-gradient(circle, rgba(79,82,232,0.20) 1.5px, transparent 1.5px);
+      background-size: 32px 32px;
+      pointer-events: none; z-index: 0;
+    }
+    body::after {
+      content: '';
+      position: fixed;
+      width: 800px; height: 800px; border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(99,102,241,0.18) 0%, transparent 65%);
+      top: -300px; right: -300px;
+      pointer-events: none; z-index: 0;
+    }
+    .glow-bl {
+      position: fixed;
+      width: 700px; height: 700px; border-radius: 50%;
+      background: radial-gradient(ellipse, rgba(139,92,246,0.14) 0%, transparent 65%);
+      bottom: -280px; left: -200px;
+      pointer-events: none; z-index: 0;
+    }
+
+    /* Back link */
+    .back-link {
+      position: fixed; top: 28px; left: 32px;
+      display: flex; align-items: center; gap: 7px;
+      color: #3d5896; font-size: 13px; font-weight: 500;
+      text-decoration: none; z-index: 10;
+      padding: 7px 14px; border-radius: 20px;
+      border: 1px solid rgba(79,82,232,0.18);
+      background: rgba(255,255,255,0.55);
+      backdrop-filter: blur(10px);
+      transition: all 160ms ease;
+    }
+    .back-link:hover { border-color: rgba(79,82,232,0.40); background: rgba(255,255,255,0.80); color: #4f52e8; }
+
+    /* Wrapper that holds both screens */
+    .screens {
+      position: relative; z-index: 1;
+      width: 420px; max-width: 90vw;
+      overflow: hidden;
+    }
+
+    /* Each screen */
+    .screen {
+      width: 100%;
+      text-align: center;
+    }
+    .screen.hidden {
+      display: none;
+    }
+    .screen.slide-in {
+      animation: slideIn 0.35s cubic-bezier(0.22,1,0.36,1) both;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(32px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(28px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Logo */
+    .login-logo {
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 28px;
+    }
+    .login-logo img {
+      width: 60px; height: 60px;
+      filter: drop-shadow(0 6px 18px rgba(79,82,232,0.28));
+    }
+
+    /* Title */
+    .login-title {
+      font-size: 42px; font-weight: 800;
+      letter-spacing: -0.045em; line-height: 1.12;
+      margin-bottom: 14px; color: #1a1d5e;
+    }
+    .login-sub {
+      font-size: 16px; color: #4b5a8a;
+      line-height: 1.6; margin-bottom: 44px;
+    }
+
+    /* Section title (wallet screen) */
+    .section-title {
+      font-size: 20px; font-weight: 700;
+      color: #1a1d5e; margin-bottom: 8px;
+    }
+    .section-sub {
+      font-size: 14px; color: #6b7aaa;
+      margin-bottom: 32px;
+    }
+
+    /* Back-to-methods button */
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: #4f52e8; font-size: 13px; font-weight: 500;
+      background: none; border: none; cursor: pointer;
+      margin-bottom: 28px; padding: 0;
+      transition: opacity 150ms;
+    }
+    .back-btn:hover { opacity: 0.75; }
+
+    /* Auth / wallet buttons */
+    .auth-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+
+    .auth-btn {
+      display: flex; align-items: center; justify-content: center; gap: 13px;
+      width: 100%; padding: 17px 24px;
+      background: rgba(255,255,255,0.55);
+      border: 1.5px solid rgba(79,82,232,0.18);
+      border-radius: 100px;
+      color: #1a1d5e; font-family: inherit;
+      font-size: 15px; font-weight: 500;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      transition: all 200ms ease;
+    }
+    .auth-btn:hover {
+      border-color: #4f52e8;
+      background: rgba(79,82,232,0.08);
+      box-shadow: 0 8px 28px rgba(79,82,232,0.16);
+      transform: translateY(-2px);
+    }
+    .auth-btn:active { transform: translateY(0); }
+    .auth-btn-icon { display: flex; align-items: center; flex-shrink: 0; }
+    .auth-btn-label { flex: 1; text-align: center; }
+
+    /* Divider */
+    .divider { display: flex; align-items: center; gap: 14px; margin: 4px 0; }
+    .divider-line { flex: 1; height: 1px; background: rgba(79,82,232,0.14); }
+    .divider-text { font-size: 12px; color: #8896c8; }
+
+    /* Footer */
+    .login-footer { font-size: 12px; color: #8896c8; line-height: 1.6; }
+    .login-footer a { color: #4f52e8; text-decoration: none; }
+    .login-footer a:hover { text-decoration: underline; }
+
+    /* Loading */
+    .auth-btn.loading { opacity: 0.7; pointer-events: none; }
+    .auth-btn.loading::after {
+      content: ''; width: 16px; height: 16px;
+      border: 2px solid rgba(79,82,232,0.25);
+      border-top-color: #4f52e8; border-radius: 50%;
+      animation: spin 0.7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Wallet icon fallback */
+    .wallet-emoji { font-size: 20px; line-height: 1; }
+
+    #screen-main { animation: fadeUp 0.45s cubic-bezier(0.22,1,0.36,1) both; }
+  </style>
+</head>
+<body>
+  <div class="glow-bl"></div>
+
+  <a class="back-link" href="workspace.html">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+    Back
+  </a>
+
+  <div class="screens">
+
+    <!-- Screen 1: Main login options -->
+    <div class="screen" id="screen-main">
+      <div class="login-logo"><img src="caLogo.svg" alt="CodeAutrix" /></div>
+      <h1 class="login-title">Welcome to<br>CodeAutrix</h1>
+      <p class="login-sub">Secure your Skills &amp; Contracts<br>with AI&#8209;powered security analysis</p>
+
+      <div class="auth-list">
+        <button class="auth-btn" id="btn-google">
+          <span class="auth-btn-icon">
+            <svg width="22" height="22" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.93 23.93 0 000 24c0 3.77.89 7.35 2.56 10.56l7.97-5.97z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 5.97C6.51 42.62 14.62 48 24 48z"/></svg>
+          </span>
+          <span class="auth-btn-label">Continue with Google</span>
+        </button>
+
+        <button class="auth-btn" id="btn-github">
+          <span class="auth-btn-icon">
+            <svg width="22" height="22" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="24" fill="#24292f"/><path d="M24 5C13.5 5 5 13.5 5 24c0 8.4 5.5 15.5 13 18 1 .2 1.3-.4 1.3-.9v-3.5c-5.3 1.1-6.4-2.2-6.4-2.2-.9-2.2-2.1-2.8-2.1-2.8-1.7-1.2.1-1.1.1-1.1 1.9.1 2.9 1.9 2.9 1.9 1.7 2.9 4.4 2.1 5.5 1.6.2-1.2.7-2.1 1.2-2.5-4.2-.5-8.7-2.1-8.7-9.3 0-2.1.7-3.7 1.9-5.1-.2-.5-.8-2.4.2-5 0 0 1.6-.5 5.1 1.9 1.5-.4 3.1-.6 4.6-.6s3.1.2 4.6.6c3.6-2.4 5.1-1.9 5.1-1.9 1 2.6.4 4.5.2 5 1.2 1.3 1.9 3 1.9 5.1 0 7.2-4.4 8.8-8.7 9.3.7.6 1.3 1.8 1.3 3.5v5.2c0 .5.3 1.1 1.3.9C37.5 39.5 43 32.4 43 24 43 13.5 34.5 5 24 5z" fill="#fff"/></svg>
+          </span>
+          <span class="auth-btn-label">Continue with GitHub</span>
+        </button>
+
+        <div class="divider">
+          <div class="divider-line"></div>
+          <span class="divider-text">or</span>
+          <div class="divider-line"></div>
+        </div>
+
+        <button class="auth-btn" id="btn-wallet-open">
+          <span class="auth-btn-icon">
+            <svg width="22" height="22" viewBox="0 0 48 48" fill="none"><defs><linearGradient id="wg" x1="0" y1="0" x2="48" y2="48"><stop offset="0%" stop-color="#4f52e8"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient></defs><rect x="2" y="10" width="36" height="30" rx="4" fill="url(#wg)"/><path d="M38 10H8C4.69 10 2 12.69 2 16V10C2 6.69 4.69 4 8 4H34C37.31 4 38 6.69 38 10Z" fill="#818cf8"/><rect x="30" y="22" width="16" height="12" rx="3" fill="#22d3ee"/><circle cx="38" cy="28" r="2.5" fill="#fff"/></svg>
+          </span>
+          <span class="auth-btn-label">Connect Wallet</span>
+        </button>
+      </div>
+
+      <p class="login-footer">
+        By signing in, you agree to our
+        <a href="#">Terms of Service</a> &middot; <a href="#">Privacy Policy</a>
+      </p>
+    </div>
+
+    <!-- Screen 2: Wallet selection (shown inline, no popup) -->
+    <div class="screen hidden" id="screen-wallet">
+      <div class="login-logo"><img src="caLogo.svg" alt="CodeAutrix" /></div>
+
+      <button class="back-btn" id="btn-back-to-main">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+        Back
+      </button>
+
+      <p class="section-title">Connect Wallet</p>
+      <p class="section-sub">Choose your wallet to continue</p>
+
+      <div class="auth-list" id="wallet-list">
+        <!-- Wallet options injected by JS -->
+      </div>
+
+      <p class="login-footer">
+        Don't have a wallet? <a href="https://metamask.io/download/" target="_blank">Install MetaMask</a>
+      </p>
+    </div>
+
+  </div>
+
+  <script>
+    var GOOGLE_CLIENT_ID = window.HEALTH_AI_GOOGLE_CLIENT_ID || "744175699896-h7k636bv5g8bggvgdumdoqt3om6pcpk9.apps.googleusercontent.com";
+    var GITHUB_CLIENT_ID = window.HEALTH_AI_GITHUB_CLIENT_ID || (function() {
+      var h = window.location.hostname;
+      return (h === 'localhost' || h === '127.0.0.1') ? 'Ov23liVdUWv2zE2NaXdK' : 'Ov23liVMPb3d1XqGPFZ7';
+    })();
+
+    function setLoading(btn) { btn.classList.add('loading'); }
+
+    // Google
+    document.getElementById('btn-google').addEventListener('click', function() {
+      setLoading(this);
+      localStorage.setItem('google_oauth_redirect', 'workspace.html');
+      var params = new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        redirect_uri: window.location.origin + '/workspace.html',
+        response_type: 'token', scope: 'email profile', prompt: 'select_account'
+      });
+      window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+    });
+
+    // GitHub
+    document.getElementById('btn-github').addEventListener('click', function() {
+      setLoading(this);
+      localStorage.setItem('github_oauth_redirect', 'workspace.html');
+      var params = new URLSearchParams({
+        client_id: GITHUB_CLIENT_ID,
+        redirect_uri: window.location.origin + '/workspace.html',
+        scope: 'user:email'
+      });
+      window.location.href = 'https://github.com/login/oauth/authorize?' + params.toString();
+    });
+
+    // ── EIP-6963 wallet detection ──
+    var eip6963Providers = [];
+    var eip6963ProviderMap = {};  // rdns → full detail (has .provider)
+    window.addEventListener('eip6963:announceProvider', function(event) {
+      if (!event.detail || !event.detail.info) return;
+      var rdns = event.detail.info.rdns;
+      var already = eip6963Providers.some(function(p) { return p.info.rdns === rdns; });
+      if (!already) eip6963Providers.push(event.detail);
+      eip6963ProviderMap[rdns] = event.detail;
+    });
+    window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+    // Legacy wallet detection fallback
+    var LEGACY_WALLETS = [
+      { rdns: 'io.metamask',          name: 'MetaMask',        get: function(){ var ps = window.ethereum && (window.ethereum.providers || [window.ethereum]); return ps && ps.find(function(p){return p.isMetaMask;}); } },
+      { rdns: 'com.okex.wallet',      name: 'OKX Wallet',      get: function(){ return window.okxwallet; } },
+      { rdns: 'com.coinbase.wallet',  name: 'Coinbase Wallet', get: function(){ return window.coinbaseWalletExtension || (window.ethereum && window.ethereum.isCoinbaseWallet ? window.ethereum : null); } },
+      { rdns: 'app.phantom',          name: 'Phantom',         get: function(){ return window.phantom && window.phantom.ethereum; } },
+      { rdns: 'com.bitget.web3',      name: 'Bitget Wallet',   get: function(){ return window.bitkeep && window.bitkeep.ethereum; } },
+      { rdns: 'com.trustwallet.app',  name: 'Trust Wallet',    get: function(){ return window.trustwallet || (window.ethereum && window.ethereum.isTrust ? window.ethereum : null); } },
+      { rdns: 'io.rabby',             name: 'Rabby Wallet',    get: function(){ return window.rabby; } },
+      { rdns: 'io.zerion.wallet',     name: 'Zerion',          get: function(){ return window.zerion; } },
+      { rdns: 'com.brave.wallet',     name: 'Brave Wallet',    get: function(){ return window.ethereum && window.ethereum.isBraveWallet ? window.ethereum : null; } },
+    ];
+
+    // Fallback SVG icons for wallets without EIP-6963 icons
+    var WALLET_ICONS = {
+      'io.metamask': '<svg width="28" height="28" viewBox="0 0 35 33" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M32.958 1L19.42 10.873l2.498-5.904L32.958 1z" fill="#E17726" stroke="#E17726" stroke-width=".25" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.042 1l13.41 9.959-2.372-5.99L2.042 1z" fill="#E27625" stroke="#E27625" stroke-width=".25" stroke-linecap="round" stroke-linejoin="round"/><path d="M28.226 23.533l-3.6 5.51 7.695 2.12 2.21-7.514-6.305-.116z" fill="#E27625" stroke="#E27625" stroke-width=".25" stroke-linecap="round" stroke-linejoin="round"/><path d="M.48 23.649l2.198 7.514 7.683-2.12-3.589-5.51L.48 23.649z" fill="#E27625" stroke="#E27625" stroke-width=".25" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.97 14.403l-2.144 3.24 7.638.34-.258-8.208-5.236 4.628z" fill="#E27625" stroke="#E27625" stroke-width=".25" stroke-linecap="round" stroke-linejoin="round"/><path d="M25.03 14.403l-5.307-4.714-.174 8.294 7.625-.34-2.144-3.24z" fill="#E27625" stroke="#E27625" stroke-width=".25" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.361 29.043l4.61-2.246-3.978-3.101-.632 5.347z" fill="#E27625" stroke="#E27625" stroke-width=".25" stroke-linecap="round" stroke-linejoin="round"/><path d="M21.03 26.797l4.598 2.246-.62-5.347-3.978 3.101z" fill="#E27625" stroke="#E27625" stroke-width=".25" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      'com.okex.wallet': '<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="28" height="28" rx="6" fill="#000"/><rect x="6" y="6" width="5" height="5" fill="white"/><rect x="11.5" y="6" width="5" height="5" fill="white"/><rect x="17" y="6" width="5" height="5" fill="white"/><rect x="6" y="11.5" width="5" height="5" fill="white"/><rect x="17" y="11.5" width="5" height="5" fill="white"/><rect x="6" y="17" width="5" height="5" fill="white"/><rect x="11.5" y="17" width="5" height="5" fill="white"/><rect x="17" y="17" width="5" height="5" fill="white"/></svg>',
+      'io.rabby': '<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="28" height="28" rx="6" fill="#8697FF"/><path d="M14 5C9.582 5 6 8.582 6 13c0 2.387 1.014 4.534 2.636 6.048C9.39 19.72 10 20.834 10 22h8c0-1.166.61-2.28 1.364-2.952C20.986 17.534 22 15.387 22 13c0-4.418-3.582-8-8-8z" fill="white"/><circle cx="11" cy="13" r="1.5" fill="#8697FF"/><circle cx="17" cy="13" r="1.5" fill="#8697FF"/><path d="M11 17h6" stroke="#8697FF" stroke-width="1.5" stroke-linecap="round"/></svg>',
+      'app.phantom': '<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="28" height="28" rx="6" fill="#AB9FF2"/><path d="M21.5 14c0 4.142-3.358 7.5-7.5 7.5S6.5 18.142 6.5 14 9.858 6.5 14 6.5s7.5 3.358 7.5 7.5z" fill="white"/><path d="M10 13.5c0-.828.672-1.5 1.5-1.5s1.5.672 1.5 1.5-.672 1.5-1.5 1.5S10 14.328 10 13.5z" fill="#AB9FF2"/><path d="M15 13.5c0-.828.672-1.5 1.5-1.5s1.5.672 1.5 1.5-.672 1.5-1.5 1.5S15 14.328 15 13.5z" fill="#AB9FF2"/><path d="M10.5 17c.5.833 1.5 1.5 3.5 1.5s3-.667 3.5-1.5" stroke="#AB9FF2" stroke-width="1.2" stroke-linecap="round"/></svg>',
+      'app.keplr.io': '<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="28" height="28" rx="6" fill="#2E73EA"/><path d="M9 8v12M9 14l8-6M9 14l8 6" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      'com.coinbase.wallet': '<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="28" height="28" rx="6" fill="#1652F0"/><rect x="7" y="7" width="14" height="14" rx="7" fill="white"/><rect x="11" y="11" width="6" height="6" rx="1.5" fill="#1652F0"/></svg>',
+      'com.bitget.web3': '<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="28" height="28" rx="6" fill="#00C6C6"/><text x="14" y="19" font-size="12" font-weight="bold" fill="white" text-anchor="middle" font-family="Arial">B</text></svg>',
+      'com.trustwallet.app': '<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="28" height="28" rx="6" fill="#3375BB"/><path d="M14 6l7 3.5v5c0 4-3.5 7.5-7 8-3.5-.5-7-4-7-8v-5L14 6z" fill="white"/></svg>',
+      'io.zerion.wallet': '<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="28" height="28" rx="6" fill="#2962EF"/><circle cx="14" cy="14" r="6" fill="white"/><circle cx="14" cy="14" r="3" fill="#2962EF"/></svg>',
+      'com.brave.wallet': '<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="28" height="28" rx="6" fill="#FF5500"/><path d="M14 6l5 4-1 7-4 5-4-5-1-7 5-4z" fill="white"/></svg>',
+      'browser': '<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="28" height="28" rx="6" fill="#6366f1"/><circle cx="14" cy="14" r="6" stroke="white" stroke-width="1.5" fill="none"/><path d="M14 8v12M8 14h12M10 10.5C10 10.5 12 12 14 12s4-1.5 4-1.5M10 17.5C10 17.5 12 16 14 16s4 1.5 4 1.5" stroke="white" stroke-width="1.2" stroke-linecap="round"/></svg>',
+    };
+
+    function makeWalletIcon(rdns, eip6963Icon) {
+      if (eip6963Icon) {
+        // EIP-6963 provides a base64 data URL or remote URL
+        return '<img src="' + eip6963Icon + '" width="28" height="28" style="border-radius:6px;object-fit:cover;display:block;" onerror="this.style.display=\'none\'" />';
+      }
+      return WALLET_ICONS[rdns] || WALLET_ICONS['browser'];
+    }
+
+    function getDetectedProviders() {
+      var providers = [];
+      var seenRdns = new Set();
+
+      // EIP-6963 providers first (have real icons)
+      eip6963Providers.forEach(function(detail) {
+        var rdns = detail.info && detail.info.rdns;
+        var key = rdns || detail.info.name;
+        if (seenRdns.has(key)) return;
+        seenRdns.add(key);
+        providers.push({ name: detail.info.name, rdns: rdns, icon: detail.info.icon });
+      });
+
+      // Legacy fallback
+      LEGACY_WALLETS.forEach(function(w) {
+        if (seenRdns.has(w.rdns) || seenRdns.has(w.name)) return;
+        try {
+          var p = w.get();
+          if (p) { seenRdns.add(w.rdns); providers.push({ name: w.name, rdns: w.rdns, icon: null }); }
+        } catch(e) {}
+      });
+
+      // Generic fallback
+      if (providers.length === 0 && window.ethereum) {
+        providers.push({ name: 'Browser Wallet', rdns: 'browser', icon: null });
+      }
+
+      return providers;
+    }
+
+    // ── API base (mirrors main.js logic) ──
+    var API_BASE = (function() {
+      var h = window.location.hostname;
+      if (h === 'localhost' || h === '127.0.0.1') return 'http://localhost:8000';
+      return window.location.origin;
+    })();
+
+    // ── Connect a detected wallet provider directly on this page ──
+    async function connectProvider(providerObj) {
+      try {
+        // 1. Request accounts
+        var accounts = await providerObj.provider.request({ method: 'eth_requestAccounts' });
+        if (!accounts || accounts.length === 0) {
+          alert('Please authorize wallet access.'); return;
+        }
+        var walletAddress = accounts[0];
+
+        // 2. Get nonce / sign message from backend
+        var nonceResp = await fetch(API_BASE + '/api/wallet/nonce?wallet_address=' + walletAddress);
+        if (!nonceResp.ok) throw new Error('Failed to get nonce');
+        var nonceData = await nonceResp.json();
+        var message = nonceData.message;
+
+        // 3. Sign
+        var signature = await providerObj.provider.request({
+          method: 'personal_sign', params: [message, walletAddress]
+        });
+
+        // 4. Verify with backend
+        var verifyResp = await fetch(API_BASE + '/api/wallet/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ walletAddress: walletAddress, signature: signature, message: message })
+        });
+        if (!verifyResp.ok) throw new Error('Verification failed');
+        var verifyData = await verifyResp.json();
+
+        // 5. Store token & redirect
+        localStorage.setItem('wallet_token', verifyData.token);
+        localStorage.setItem('wallet_address', walletAddress);
+        localStorage.setItem('login_type', 'wallet');
+        localStorage.removeItem('login_email');
+        window.location.href = 'workspace.html';
+
+      } catch (err) {
+        console.error('Wallet connect error:', err);
+        alert('Failed to connect wallet: ' + (err.message || err));
+        // Re-enable all wallet buttons
+        var btns = walletList.querySelectorAll('.auth-btn');
+        btns.forEach(function(b) { b.classList.remove('loading'); b.disabled = false; });
+      }
+    }
+
+    function buildWalletList() {
+      walletList.innerHTML = '';
+      var providers = getDetectedProviders();
+
+      if (providers.length === 0) {
+        walletList.innerHTML = '<p style="color:#8896c8;font-size:13px;text-align:center;padding:16px 0;">No wallet detected.<br>Please install a wallet extension first.</p>';
+        return;
+      }
+
+      providers.forEach(function(w) {
+        var btn = document.createElement('button');
+        btn.className = 'auth-btn';
+        btn.innerHTML =
+          '<span class="auth-btn-icon" style="width:28px;height:28px;flex-shrink:0;">' + makeWalletIcon(w.rdns, w.icon) + '</span>' +
+          '<span class="auth-btn-label">' + w.name + '</span>';
+        btn.addEventListener('click', function() {
+          btn.classList.add('loading');
+          btn.disabled = true;
+
+          // Resolve the actual provider object
+          var providerObj = null;
+
+          // 1. Try EIP-6963 map first
+          if (eip6963ProviderMap[w.rdns]) {
+            providerObj = eip6963ProviderMap[w.rdns];  // has .provider
+          }
+
+          // 2. Legacy fallback
+          if (!providerObj) {
+            var legacyDef = LEGACY_WALLETS.find(function(lw) { return lw.rdns === w.rdns; });
+            if (legacyDef) {
+              try {
+                var rawProvider = legacyDef.get();
+                if (rawProvider) providerObj = { provider: rawProvider };
+              } catch(e) {}
+            }
+          }
+
+          // 3. Generic window.ethereum fallback
+          if (!providerObj && window.ethereum) {
+            providerObj = { provider: window.ethereum };
+          }
+
+          if (!providerObj) {
+            alert('Could not find provider for ' + w.name + '. Please reload and try again.');
+            btn.classList.remove('loading');
+            btn.disabled = false;
+            return;
+          }
+
+          connectProvider(providerObj);
+        });
+        walletList.appendChild(btn);
+      });
+    }
+
+    var screenMain   = document.getElementById('screen-main');
+    var screenWallet = document.getElementById('screen-wallet');
+    var walletList   = document.getElementById('wallet-list');
+
+    // Switch to wallet screen
+    document.getElementById('btn-wallet-open').addEventListener('click', function() {
+      screenMain.classList.add('hidden');
+      screenWallet.classList.remove('hidden');
+      screenWallet.classList.add('slide-in');
+      setTimeout(function() { screenWallet.classList.remove('slide-in'); }, 400);
+
+      // Re-dispatch so any late-loading extensions can announce themselves
+      walletList.innerHTML = '<p style="color:#8896c8;font-size:13px;text-align:center;padding:16px 0;">Detecting wallets…</p>';
+      window.dispatchEvent(new Event('eip6963:requestProvider'));
+      setTimeout(function() { buildWalletList(); }, 150);
+    });
+
+    // Back to main screen
+    document.getElementById('btn-back-to-main').addEventListener('click', function() {
+      screenWallet.classList.add('hidden');
+      screenMain.classList.remove('hidden');
+    });
+  </script>
+</body>
+</html>
