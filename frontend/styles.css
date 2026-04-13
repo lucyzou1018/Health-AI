@@ -1244,6 +1244,7 @@ body.landing-only header h1 {
 }
 
 .history-dl-btn {
+  display: none;
   font-size: 11px;
   font-family: inherit;
   font-weight: 500;
