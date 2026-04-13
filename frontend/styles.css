@@ -3486,6 +3486,56 @@ body:not(.landing-only) .ambient-glow {
 
 .vl-cnt { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--text-primary); }
 
+/* ── Recent checks list ──────────────────────── */
+.recent-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.rc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.rc-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.rc-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34,197,94,0.1);
+  border-radius: 20px;
+  padding: 1px 8px;
+}
+.rc-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgba(99,120,255,0.04);
+}
+.rc-icon {
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+}
+.rc-pass .rc-icon { color: #22c55e; }
+.rc-warn .rc-icon { color: #f59e0b; }
+.rc-fail .rc-icon { color: #ef4444; }
+.rc-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 /* ── Scan progress bars ──────────────────────── */
 .scan-bars { display: flex; flex-direction: column; gap: 9px; }
 

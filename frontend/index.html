@@ -113,18 +113,18 @@
           <span class="perf-tag">P95 Latency</span>
         </div>
         <div class="lc-wrap">
-          <svg class="lc-svg" viewBox="0 0 260 68" fill="none" preserveAspectRatio="none">
-            <path class="lc-area" d="M0 52 C25 48 45 38 75 33 C105 28 125 44 155 30 C180 18 200 40 220 26 C238 15 250 20 260 15 L260 68 L0 68 Z" fill="url(#lcAreaGrad)"/>
-            <path class="lc-line" d="M0 52 C25 48 45 38 75 33 C105 28 125 44 155 30 C180 18 200 40 220 26 C238 15 250 20 260 15"/>
-            <circle cx="75"  cy="33" r="2.5" fill="#818cf8"/>
-            <circle cx="155" cy="30" r="2.5" fill="#818cf8"/>
-            <circle cx="260" cy="15" r="2.5" fill="#818cf8"/>
+          <svg id="lc-svg" class="lc-svg" viewBox="0 0 260 68" fill="none" preserveAspectRatio="none">
+            <path id="lc-area" class="lc-area" fill="url(#lcAreaGrad)"/>
+            <path id="lc-line" class="lc-line"/>
+            <circle id="lc-dot0" r="2.5" fill="#818cf8"/>
+            <circle id="lc-dot1" r="2.5" fill="#818cf8"/>
+            <circle id="lc-dot2" r="2.5" fill="#818cf8"/>
           </svg>
         </div>
         <div class="lc-footer">
-          <span>Requests: <b>1K+</b></span>
-          <span>Success: <b>~99%</b></span>
-          <span>Avg: <b>&lt;100ms</b></span>
+          <span>Requests: <b id="lc-req">1K+</b></span>
+          <span>Success: <b id="lc-suc">~99%</b></span>
+          <span>Avg: <b id="lc-avg">&lt;100ms</b></span>
         </div>
       </div>
     </div>
@@ -160,13 +160,13 @@
               <path class="gauge-fill" d="M 12 78 A 68 68 0 0 1 148 78" stroke="url(#gaugeGrad)" stroke-width="10" stroke-linecap="round"/>
             </svg>
             <div class="gauge-overlay">
-              <span class="gauge-num">87</span><span class="gauge-sub">%</span>
+              <span class="gauge-num" id="gauge-num">87</span><span class="gauge-sub">%</span>
             </div>
           </div>
           <div class="gauge-meta">
-            <span class="gauge-grade">Good</span>
+            <span class="gauge-grade" id="gauge-grade">Good</span>
             <span class="gauge-label">Security Score</span>
-            <span class="gauge-change">↑ vs last scan</span>
+            <span class="gauge-change" id="gauge-change">↑ vs last scan</span>
           </div>
         </div>
 
@@ -185,18 +185,29 @@
             </div>
           </div>
           <div class="vuln-legend">
-            <div class="vl-item"><span class="vl-dot" style="background:#ef4444"></span>Critical<span class="vl-cnt">~10%</span></div>
-            <div class="vl-item"><span class="vl-dot" style="background:#f97316"></span>High<span class="vl-cnt">~20%</span></div>
-            <div class="vl-item"><span class="vl-dot" style="background:#f59e0b"></span>Medium<span class="vl-cnt">~40%</span></div>
-            <div class="vl-item"><span class="vl-dot" style="background:#22c55e"></span>Low<span class="vl-cnt">~30%</span></div>
+            <div class="vl-item"><span class="vl-dot" style="background:#ef4444"></span>Critical<span class="vl-cnt" id="vl-critical">~10%</span></div>
+            <div class="vl-item"><span class="vl-dot" style="background:#f97316"></span>High<span class="vl-cnt" id="vl-high">~20%</span></div>
+            <div class="vl-item"><span class="vl-dot" style="background:#f59e0b"></span>Medium<span class="vl-cnt" id="vl-medium">~40%</span></div>
+            <div class="vl-item"><span class="vl-dot" style="background:#22c55e"></span>Low<span class="vl-cnt" id="vl-low">~30%</span></div>
           </div>
+        </div>
+
+        <!-- Recent findings -->
+        <div class="recent-checks">
+          <div class="rc-header">
+            <span class="rc-title">Recent Checks</span>
+            <span class="rc-badge">47 / 50 Passed</span>
+          </div>
+          <div class="rc-item rc-pass"><span class="rc-icon">✓</span><span class="rc-text">No obfuscation detected</span></div>
+          <div class="rc-item rc-warn"><span class="rc-icon">⚠</span><span class="rc-text">Missing version field in manifest</span></div>
+          <div class="rc-item rc-fail"><span class="rc-icon">✗</span><span class="rc-text">Sensitive key pattern in config</span></div>
         </div>
 
         <!-- Scan progress bars -->
         <div class="scan-bars">
-          <div class="sb-row"><span class="sb-lbl">Permissions</span><div class="sb-track"><div class="sb-fill" style="--tc:#22c55e" data-w="92"></div></div><span class="sb-pct">~90%</span></div>
-          <div class="sb-row"><span class="sb-lbl">API Security</span><div class="sb-track"><div class="sb-fill" style="--tc:#f59e0b" data-w="75"></div></div><span class="sb-pct">~75%</span></div>
-          <div class="sb-row"><span class="sb-lbl">Data Safety</span><div class="sb-track"><div class="sb-fill"  style="--tc:#6366f1" data-w="88"></div></div><span class="sb-pct">~88%</span></div>
+          <div class="sb-row"><span class="sb-lbl">Permissions</span><div class="sb-track"><div class="sb-fill" id="sb-fill-perm" style="--tc:#22c55e" data-w="92"></div></div><span class="sb-pct" id="sb-pct-perm">~90%</span></div>
+          <div class="sb-row"><span class="sb-lbl">API Security</span><div class="sb-track"><div class="sb-fill" id="sb-fill-api"  style="--tc:#f59e0b" data-w="75"></div></div><span class="sb-pct" id="sb-pct-api">~75%</span></div>
+          <div class="sb-row"><span class="sb-lbl">Data Safety</span><div class="sb-track"><div class="sb-fill" id="sb-fill-data" style="--tc:#6366f1" data-w="88"></div></div><span class="sb-pct" id="sb-pct-data">~88%</span></div>
         </div>
       </div>
     </div>
@@ -753,6 +764,260 @@
 </script>
 
   <script src="i18n.js?v=20260409c"></script>
+
+  <script>
+  // ── Animated latency line chart ──────────────────────────────────────────
+  (function () {
+    var lineEl = document.getElementById('lc-line');
+    var areaEl = document.getElementById('lc-area');
+    var dots   = [document.getElementById('lc-dot0'), document.getElementById('lc-dot1'), document.getElementById('lc-dot2')];
+    if (!lineEl || !areaEl) return;
+
+    var W = 260, H = 68, BOTTOM = 68;
+    var N = 14; // number of data points across the width
+    // y values: lower = higher latency visually (SVG y=0 is top)
+    // Range: 15..55 (lower y = faster/better)
+    var pts = [];
+    var base = 35;
+    for (var i = 0; i < N; i++) {
+      pts.push(base + (Math.random() - 0.5) * 22);
+    }
+
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+    function buildPath(pts) {
+      var xs = pts.map(function (_, i) { return (i / (N - 1)) * W; });
+      var d = 'M' + xs[0].toFixed(1) + ' ' + pts[0].toFixed(1);
+      for (var i = 1; i < pts.length; i++) {
+        var cpx = (xs[i - 1] + xs[i]) / 2;
+        d += ' C' + cpx.toFixed(1) + ' ' + pts[i - 1].toFixed(1) +
+             ' '  + cpx.toFixed(1) + ' ' + pts[i].toFixed(1) +
+             ' '  + xs[i].toFixed(1) + ' ' + pts[i].toFixed(1);
+      }
+      return { line: d, area: d + ' L' + W + ' ' + BOTTOM + ' L0 ' + BOTTOM + ' Z' };
+    }
+
+    function placeDots(pts) {
+      var indices = [Math.floor(N * 0.28), Math.floor(N * 0.6), N - 1];
+      indices.forEach(function (idx, i) {
+        var x = (idx / (N - 1)) * W;
+        dots[i].setAttribute('cx', x.toFixed(1));
+        dots[i].setAttribute('cy', pts[idx].toFixed(1));
+      });
+    }
+
+    var last = 0;
+    var interval = 500; // ms per tick (shift + new point)
+    var drift = 0;
+
+    function tick(ts) {
+      if (ts - last >= interval) {
+        last = ts;
+        // Remove oldest, add new point with realistic drift
+        drift += (Math.random() - 0.52) * 6;
+        drift = clamp(drift, -12, 12);
+        var next = clamp(base + drift + (Math.random() - 0.5) * 10, 12, 58);
+        pts.shift();
+        pts.push(next);
+        var p = buildPath(pts);
+        lineEl.setAttribute('d', p.line);
+        areaEl.setAttribute('d', p.area);
+        placeDots(pts);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    // draw initial state
+    var p0 = buildPath(pts);
+    lineEl.setAttribute('d', p0.line);
+    areaEl.setAttribute('d', p0.area);
+    placeDots(pts);
+    requestAnimationFrame(tick);
+  })();
+
+  // ── Animated gauge score ─────────────────────────────────────────────────
+  (function () {
+    var gf        = document.querySelector('.gauge-fill');
+    var numEl     = document.getElementById('gauge-num');
+    var gradeEl   = document.getElementById('gauge-grade');
+    var changeEl  = document.getElementById('gauge-change');
+    if (!gf || !numEl) return;
+
+    var GL = Math.PI * 68; // arc length ≈ 213.63
+    var scores = [87, 84, 91, 89, 85, 93, 88, 82, 90, 86];
+    var idx = 0;
+
+    function gradeFor(s) {
+      return s >= 90 ? 'Excellent' : s >= 80 ? 'Good' : s >= 60 ? 'Fair' : 'Risk';
+    }
+    function colorFor(s) {
+      return s >= 90 ? '#22c55e' : s >= 80 ? '#6366f1' : s >= 60 ? '#f59e0b' : '#ef4444';
+    }
+
+    function animateTo(score) {
+      var offset = (GL - (score / 100) * GL).toFixed(2);
+      gf.style.transition      = 'stroke-dashoffset 1.2s cubic-bezier(0.4,0,0.2,1)';
+      gf.style.strokeDashoffset = offset;
+
+      // Count up/down the displayed number
+      var current = parseInt(numEl.textContent);
+      var step = score > current ? 1 : -1;
+      var t = setInterval(function () {
+        current += step;
+        numEl.textContent = current;
+        if (current === score) clearInterval(t);
+      }, 1200 / Math.abs(score - current) || 50);
+
+      var grade = gradeFor(score);
+      gradeEl.textContent = grade;
+      gradeEl.style.color = colorFor(score);
+      var prev = scores[(idx - 1 + scores.length) % scores.length];
+      changeEl.textContent = score >= prev ? '↑ vs last scan' : '↓ vs last scan';
+      changeEl.style.color = score >= prev ? '#22c55e' : '#f97316';
+    }
+
+    // Wait for initial entrance animation to finish, then start cycling
+    setTimeout(function () {
+      setInterval(function () {
+        idx = (idx + 1) % scores.length;
+        animateTo(scores[idx]);
+      }, 2000);
+    }, 2500);
+  })();
+
+  // ── Animated vuln percentages ────────────────────────────────────────────
+  (function () {
+    var els = {
+      critical: document.getElementById('vl-critical'),
+      high:     document.getElementById('vl-high'),
+      medium:   document.getElementById('vl-medium'),
+      low:      document.getElementById('vl-low')
+    };
+    if (!els.critical) return;
+
+    // Each row sums to 100. Realistic variation sets.
+    var sets = [
+      { critical: 10, high: 20, medium: 40, low: 30 },
+      { critical:  8, high: 18, medium: 43, low: 31 },
+      { critical: 12, high: 22, medium: 38, low: 28 },
+      { critical:  9, high: 19, medium: 41, low: 31 },
+      { critical: 11, high: 21, medium: 37, low: 31 },
+      { critical:  7, high: 17, medium: 44, low: 32 },
+    ];
+    var idx = 0;
+
+    var C = 2 * Math.PI * 38; // donut circumference
+
+    function updateDonut(s) {
+      var domSegs = document.querySelectorAll('.donut-seg');
+      // HTML order: seg-low [0], seg-medium [1], seg-high [2], seg-critical [3]
+      var configs = [
+        { da: (s.low     / 100) * C, off: -((s.critical + s.high + s.medium) / 100) * C },
+        { da: (s.medium  / 100) * C, off: -((s.critical + s.high) / 100) * C },
+        { da: (s.high    / 100) * C, off: -((s.critical) / 100) * C },
+        { da: (s.critical/ 100) * C, off: 0 },
+      ];
+      configs.forEach(function (cfg, i) {
+        domSegs[i].style.transition = 'stroke-dasharray 0.8s ease, stroke-dashoffset 0.8s ease';
+        domSegs[i].style.strokeDasharray  = cfg.da + ' ' + C;
+        domSegs[i].style.strokeDashoffset = cfg.off;
+      });
+    }
+
+    function flash(el, val) {
+      el.style.transition = 'opacity 0.25s ease';
+      el.style.opacity = '0';
+      setTimeout(function () {
+        el.textContent = '~' + val + '%';
+        el.style.opacity = '1';
+      }, 250);
+    }
+
+    setInterval(function () {
+      idx = (idx + 1) % sets.length;
+      var s = sets[idx];
+      flash(els.critical, s.critical);
+      setTimeout(function () { flash(els.high,   s.high);   }, 80);
+      setTimeout(function () { flash(els.medium, s.medium); }, 160);
+      setTimeout(function () { flash(els.low,    s.low);    }, 240);
+      updateDonut(s);
+    }, 3500);
+  })();
+
+  // ── Animated scan bars ───────────────────────────────────────────────────
+  (function () {
+    var bars = [
+      { fill: document.getElementById('sb-fill-perm'), pct: document.getElementById('sb-pct-perm') },
+      { fill: document.getElementById('sb-fill-api'),  pct: document.getElementById('sb-pct-api')  },
+      { fill: document.getElementById('sb-fill-data'), pct: document.getElementById('sb-pct-data') },
+    ];
+    if (!bars[0].fill) return;
+
+    // Each set: [permissions, api, data] as integer percents
+    var sets = [
+      [90, 75, 88],
+      [93, 78, 85],
+      [88, 72, 91],
+      [95, 80, 87],
+      [91, 74, 89],
+      [87, 77, 92],
+    ];
+    var idx = 0;
+
+    // Init widths with transition
+    bars.forEach(function (b) {
+      b.fill.style.transition = 'width 0.9s ease';
+    });
+
+    function update() {
+      idx = (idx + 1) % sets.length;
+      var s = sets[idx];
+      bars.forEach(function (b, i) {
+        var v = s[i];
+        b.fill.style.width = v + '%';
+        b.pct.style.transition = 'opacity 0.25s ease';
+        b.pct.style.opacity = '0';
+        setTimeout(function () {
+          b.pct.textContent = '~' + v + '%';
+          b.pct.style.opacity = '1';
+        }, 250);
+      });
+    }
+
+    setInterval(update, 3000);
+  })();
+
+  // ── Animated latency stats ────────────────────────────────────────────────
+  (function () {
+    var reqEl = document.getElementById('lc-req');
+    var sucEl = document.getElementById('lc-suc');
+    var avgEl = document.getElementById('lc-avg');
+    if (!reqEl || !sucEl || !avgEl) return;
+
+    // Tick values: [display string, direction hint]  — cycle through these
+    var reqVals = ['1K+', '1.1K', '1.2K', '1.3K', '1.2K', '1.1K'];
+    var sucVals = ['~99%', '~98%', '~99%', '100%', '~99%', '~98%'];
+    var avgVals = ['<100ms', '<95ms', '<102ms', '<98ms', '<100ms', '<96ms'];
+    var idx = 0;
+
+    function flash(el, val) {
+      el.style.transition = 'opacity 0.2s ease';
+      el.style.opacity = '0';
+      setTimeout(function () {
+        el.textContent = val;
+        el.style.opacity = '1';
+      }, 200);
+    }
+
+    setInterval(function () {
+      idx = (idx + 1) % reqVals.length;
+      flash(reqEl, reqVals[idx]);
+      flash(sucEl, sucVals[idx]);
+      flash(avgEl, avgVals[idx]);
+    }, 2000);
+  })();
+  </script>
+
   <!-- Vercel Web Analytics -->
   <script defer src="/_vercel/insights/script.js"></script>
 </body>
