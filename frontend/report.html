@@ -891,6 +891,26 @@
         document.title = 'Contract Audit Report - CodeAutrix';
         const updatedAt = task.updatedAt ? new Date(task.updatedAt).toLocaleString() : 'Unknown';
 
+        // ── Analysis failed: all files had AI errors — show retry prompt ───────
+        if (/^##\s+⚠️\s+Analysis Failed/m.test(reportText)) {
+          const errMatch = reportText.match(/\*\*Error:\*\*\s*`([^`]*)`/);
+          const errDetail = errMatch ? errMatch[1] : 'AI analysis could not be completed.';
+          let html = '<div class="report-header">';
+          html += getCodeProfileHtml(task.skillType, 0);
+          html += '<h1>📋 Contract Audit Report</h1>';
+          html += '<div class="report-meta">Task ID: ' + task.taskId + ' · Scanned: ' + updatedAt + '</div></div>';
+          html += '<div style="margin:24px 0;padding:24px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:12px;text-align:center;">';
+          html += '<div style="font-size:2rem;margin-bottom:12px;">⚠️</div>';
+          html += '<div style="font-size:18px;font-weight:700;color:#dc2626;margin-bottom:8px;">Analysis Failed</div>';
+          html += '<div style="color:#64748b;margin-bottom:16px;">The AI analysis could not be completed. Scores have not been generated.</div>';
+          html += '<div style="font-size:12px;color:#94a3b8;background:rgba(0,0,0,0.05);border-radius:6px;padding:8px 12px;display:inline-block;margin-bottom:20px;">' + errDetail + '</div>';
+          html += '<br><a href="javascript:history.back()" style="display:inline-block;padding:10px 24px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">← Go Back &amp; Retry</a>';
+          html += '</div>';
+          html += '<div class="issues-section"><div class="issues-header">📄 Full Report</div><div style="padding:16px 20px;"><div class="raw-report">' + markdownToHtml(reportText) + '</div></div></div>';
+          container.innerHTML = html;
+          return;
+        }
+
         // ── New format: dimension score table (per CONTRACT_AUDIT_GUIDE.md) ───
         if (/\|\s*[^\|]*Access Control/.test(reportText)) {
           const scoreMap = {};

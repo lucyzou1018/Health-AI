@@ -3207,32 +3207,8 @@ body:not(.landing-only) .ambient-glow {
   flex-shrink: 0;
 }
 
-/* History item name tooltip — 挂在 li 上避免被 overflow:hidden 裁掉 */
-.history-item.has-tooltip {
-  position: relative;
-}
-.history-item.has-tooltip::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: 14px;
-  top: calc(100% + 4px);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 400;
-  white-space: nowrap;
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border-default);
-  box-shadow: var(--shadow-lg);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease;
-  z-index: 200;
-}
-.history-item.has-tooltip:hover::after {
-  opacity: 1;
-}
+/* History item name tooltip is implemented in JS (position:fixed on body)
+   to avoid being clipped by .history-panel { overflow: hidden }. */
 
 /* ══════════════════════════════════════════════════
    VISUAL OVERHAUL — 2-col Hero + Charts + Animations
@@ -5113,3 +5089,217 @@ button#run-task:hover:not(:disabled) {
 .dash-card {
   border-radius: 24px !important;
 }
+
+/* ──────────────────────────────────────────────────────────────────── */
+/*  16. Contract Audit input-mode sub-tabs (file upload / address)      */
+/* ──────────────────────────────────────────────────────────────────── */
+.input-mode-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  margin: 0 0 14px;
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.12);
+  border-radius: 12px;
+  width: 100%;
+}
+.input-mode-tabs.hidden { display: none; }
+.input-mode-tabs .imt-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #5b6c96;
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+.input-mode-tabs .imt-btn:hover {
+  color: #3d4a78;
+  background: rgba(99, 102, 241, 0.06);
+}
+.input-mode-tabs .imt-btn.active {
+  color: #4f52e8;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(79, 82, 232, 0.12),
+              0 1px 1px rgba(79, 82, 232, 0.06);
+}
+
+/* ── Address input zone ── */
+.address-input-zone {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 18px 20px;
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.035) 0%, rgba(99, 102, 241, 0.01) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.14);
+  border-radius: 14px;
+}
+.address-input-zone.hidden { display: none; }
+
+.aiz-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5b6c96;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.aiz-select {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1e2547;
+  background: #fff;
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  border-radius: 9px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.aiz-select:focus {
+  border-color: rgba(99, 102, 241, 0.55);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+.aiz-addr-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.aiz-input {
+  width: 100%;
+  padding: 10px 34px 10px 12px;
+  font-size: 13px;
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  color: #1e2547;
+  background: #fff;
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  border-radius: 9px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.aiz-input:focus {
+  border-color: rgba(99, 102, 241, 0.55);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+.aiz-input.valid {
+  border-color: rgba(34, 197, 94, 0.45);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.08);
+}
+.aiz-input.invalid {
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.08);
+}
+
+.aiz-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #8896c8;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.aiz-clear:hover { background: rgba(99, 102, 241, 0.08); color: #4f52e8; }
+.aiz-clear svg { width: 10px; height: 10px; }
+.aiz-clear.hidden { display: none; }
+
+.aiz-hint {
+  font-size: 12px;
+  color: #7a87b4;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.aiz-hint--error { color: #dc2626; }
+
+#param-fields.hidden { display: none; }
+
+/* The project uses per-element ".X.hidden" rules instead of a global .hidden.
+   Add one for the upload zone so it collapses cleanly in address mode. */
+.upload-zone.hidden { display: none !important; }
+
+/* ── User Menu Dropdown ─────────────────────────────────────────────────── */
+.user-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Hide caret when not connected (sign-in button has no dropdown) */
+.user-menu-caret {
+  display: none;
+  margin-left: 2px;
+  transition: transform 150ms ease;
+  flex-shrink: 0;
+}
+.wallet-btn.connected .user-menu-caret {
+  display: inline-block;
+}
+.user-menu-wrap.is-open .user-menu-caret {
+  transform: rotate(180deg);
+}
+
+.user-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 148px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 4px;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+.user-menu-wrap.is-open .user-menu-dropdown {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text, #1e293b);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 120ms ease;
+  white-space: nowrap;
+  text-align: left;
+}
+.user-menu-item:hover {
+  background: var(--surface-hover, #f1f5f9);
+}
+.user-menu-item--danger {
+  color: #ef4444;
+}
+.user-menu-item--danger:hover {
+  background: #fef2f2;
+}
+

@@ -60,7 +60,7 @@ const PARAM_SCHEMA = {
     // Upload skill zip file instead of path/URL
   ],
   "multichain-contract-vuln": [
-    { id: "chain", label: "Chain Type", type: "select", options: ["evm", "solana"], placeholder: "evm" }
+    { id: "chain", label: "Chain Type", type: "select", options: ["evm"], placeholder: "evm" }
   ],
   "skill-stress-lab": [
     // command template and workdir use default values, not shown in UI
@@ -205,9 +205,8 @@ let loginEmail = localStorage.getItem("login_email");
 const GOOGLE_CLIENT_ID = window.HEALTH_AI_GOOGLE_CLIENT_ID || "744175699896-h7k636bv5g8bggvgdumdoqt3om6pcpk9.apps.googleusercontent.com";
 const GITHUB_CLIENT_ID = window.HEALTH_AI_GITHUB_CLIENT_ID || (function() {
   var h = window.location.hostname;
-  if (h === "codeautrix.agentese.ai") return "Ov23liE0GA6KVy3Qs4vc";
-  if (h === "health-ai-alpha-six.vercel.app") return "Ov23livecFSIM0UymN3w";
-  return "Ov23lidd5lnCSTryITS5"; // localhost dev
+  if (h === "www.codeautrix.com" || h === "codeautrix.com") return "Ov23lia1DNtFes1ZAM3e"; // production
+  return "Ov23liGOlSlH9lK0zkah"; // localhost dev
 })();
 const SKILL_LABELS = {
   "skill-security-audit": "Skill Security Audit",
@@ -243,6 +242,166 @@ const pageInfoEl = document.getElementById("page-info");
 const recordedHistory = new Set();
 let previewTaskId = null;
 let currentFile = null;
+
+// ── Contract Audit input-mode sub-tabs (file upload vs on-chain address) ──
+const inputModeTabs  = document.getElementById("input-mode-tabs");
+const inputModeBtns  = inputModeTabs ? inputModeTabs.querySelectorAll(".imt-btn") : [];
+const addressZone    = document.getElementById("address-input-zone");
+const chainSelect    = document.getElementById("chain-select");
+const addressInput   = document.getElementById("contract-address");
+const addressClear   = document.getElementById("aiz-clear");
+const addressHint    = document.getElementById("aiz-hint");
+const paramFieldsBox = document.getElementById("param-fields");
+let inputMode = "file"; // "file" | "address"
+
+// Address format validators — kept in sync with backend explorer_client.py.
+const EVM_ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
+
+function isValidAddress(chain, address) {
+  if (!chain || !address) return false;
+  return EVM_ADDR_RE.test(address);
+}
+
+/** Show/hide sub-tabs + toggle upload vs address input.  Called on both
+ *  top-tab changes (selectTab) and sub-tab clicks. */
+function applyInputMode(mode) {
+  inputMode = mode === "address" ? "address" : "file";
+
+  if (inputModeBtns && inputModeBtns.length) {
+    inputModeBtns.forEach(btn => {
+      const on = btn.dataset.mode === inputMode;
+      btn.classList.toggle("active", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    });
+  }
+
+  if (inputMode === "address") {
+    uploadZone?.classList.add("hidden");
+    addressZone?.classList.remove("hidden");
+    // The generic PARAM_SCHEMA chain dropdown is redundant in address mode
+    // — the specific network is picked via #chain-select.
+    paramFieldsBox?.classList.add("hidden");
+  } else {
+    uploadZone?.classList.remove("hidden");
+    addressZone?.classList.add("hidden");
+    paramFieldsBox?.classList.remove("hidden");
+  }
+  updateRunButtonState();
+}
+
+/** Shown only for the Contract Audit top tab; hidden otherwise. */
+function updateInputModeVisibility(tab) {
+  if (!inputModeTabs) return;
+  if (tab === "multichain-contract-vuln") {
+    inputModeTabs.classList.remove("hidden");
+  } else {
+    inputModeTabs.classList.add("hidden");
+    // Reset to file mode when leaving contract audit so other tabs keep
+    // their original upload behaviour.
+    applyInputMode("file");
+  }
+}
+
+// Sub-tab click handlers — registered once, safe on non-contract tabs since
+// the buttons are hidden anyway.
+if (inputModeBtns && inputModeBtns.length) {
+  inputModeBtns.forEach(btn => {
+    btn.addEventListener("click", () => applyInputMode(btn.dataset.mode));
+  });
+}
+
+if (addressInput) {
+  addressInput.addEventListener("input", () => {
+    const val = addressInput.value.trim();
+    if (addressClear) addressClear.classList.toggle("hidden", !val);
+    const chain = chainSelect ? chainSelect.value : "ethereum";
+    if (!val) {
+      addressInput.classList.remove("invalid", "valid");
+      if (addressHint) {
+        addressHint.textContent = "We will fetch the verified source from the block explorer and run the same audit pipeline.";
+        addressHint.classList.remove("aiz-hint--error");
+      }
+    } else if (isValidAddress(chain, val)) {
+      addressInput.classList.remove("invalid");
+      addressInput.classList.add("valid");
+      if (addressHint) {
+        addressHint.textContent = "Address looks valid. Click Start Analysis to fetch and audit.";
+        addressHint.classList.remove("aiz-hint--error");
+      }
+    } else {
+      addressInput.classList.add("invalid");
+      addressInput.classList.remove("valid");
+      if (addressHint) {
+        addressHint.textContent = "Expected a 0x-prefixed 40-hex-character EVM address.";
+        addressHint.classList.add("aiz-hint--error");
+      }
+    }
+    updateRunButtonState();
+  });
+}
+
+if (chainSelect) {
+  chainSelect.addEventListener("change", () => {
+    // Re-run the validator with the new chain so hint/state stays accurate.
+    addressInput?.dispatchEvent(new Event("input"));
+  });
+}
+
+// Hide testnet options when not running on localhost
+(function hideTestnetInProduction() {
+  const h = window.location.hostname;
+  const isLocal = h === "localhost" || h === "127.0.0.1" || h.startsWith("192.168.") || h === "";
+  if (!isLocal) {
+    // Remove from the hidden <select>
+    const opt = chainSelect && chainSelect.querySelector('option[value="bsc-testnet"]');
+    if (opt) opt.remove();
+    // Remove from the visible custom dropdown
+    const csOpt = document.querySelector('.cs-option[data-value="bsc-testnet"]');
+    if (csOpt) csOpt.remove();
+  }
+})();
+
+// Initialize custom dropdown for network select in On-chain Address tab
+const networkCustomSelect = document.getElementById("network-custom-select");
+if (networkCustomSelect && chainSelect) {
+  const trigger  = networkCustomSelect.querySelector(".cs-trigger");
+  const valueEl  = networkCustomSelect.querySelector(".cs-value");
+
+  trigger.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpen = networkCustomSelect.classList.toggle("cs-open");
+    if (isOpen) {
+      document.querySelectorAll(".custom-select.cs-open").forEach(el => {
+        if (el !== networkCustomSelect) el.classList.remove("cs-open");
+      });
+    }
+  });
+
+  networkCustomSelect.querySelectorAll(".cs-option").forEach(optEl => {
+    optEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const val   = optEl.dataset.value;
+      const label = optEl.textContent.trim();
+      valueEl.textContent = label;
+      chainSelect.value = val;
+      networkCustomSelect.querySelectorAll(".cs-option").forEach(o => o.classList.remove("cs-option--selected"));
+      optEl.classList.add("cs-option--selected");
+      networkCustomSelect.classList.remove("cs-open");
+      chainSelect.dispatchEvent(new Event("change"));
+    });
+  });
+
+  document.addEventListener("click", () => networkCustomSelect.classList.remove("cs-open"));
+}
+
+if (addressClear) {
+  addressClear.addEventListener("click", () => {
+    if (!addressInput) return;
+    addressInput.value = "";
+    addressInput.dispatchEvent(new Event("input"));
+    addressInput.focus();
+  });
+}
 
 function getCurrentUILang() {
   try {
@@ -479,10 +638,17 @@ function clearResults() {
 
 function updateRunButtonState() {
   if (!runBtn) return;
-  
+
   const hasFile = currentFile !== null || (fileInput && fileInput.files && fileInput.files[0]);
   const isRunning = !!runningTabs[activeTab];
   const hasWallet = currentWallet !== null;
+
+  // Contract Audit address mode: enabled only when both chain + valid address are set.
+  const isContractAddressMode = activeTab === "multichain-contract-vuln" && inputMode === "address";
+  const hasValidAddress = isContractAddressMode
+    && chainSelect
+    && addressInput
+    && isValidAddress(chainSelect.value, addressInput.value.trim());
   
   // Check Skill Stress Lab params
   let hasValidParams = true;
@@ -506,7 +672,10 @@ function updateRunButtonState() {
   if (!hasWallet) {
     runBtn.disabled = true;
     runBtn.textContent = workspaceI18n("signInFirst");
-  } else if (!hasFile) {
+  } else if (isContractAddressMode && !hasValidAddress) {
+    runBtn.disabled = true;
+    runBtn.textContent = workspaceI18n("startAnalysis");
+  } else if (!isContractAddressMode && !hasFile) {
     runBtn.disabled = true;
     runBtn.textContent = workspaceI18n("startAnalysis");
   } else if (activeTab === "skill-stress-lab" && !hasValidParams) {
@@ -546,6 +715,8 @@ function selectTab(tab, opts = {}) {
   updateContextBanner();
   // 清除上传的文件
   clearCurrentFile();
+  // Toggle Contract Audit sub-tabs (file / on-chain address) based on active tab.
+  updateInputModeVisibility(tab);
   // Restore this tab's last task state, or show empty defaults if no task yet
   const lastTask = lastTaskPerTab[tab];
   if (lastTask) {
@@ -558,8 +729,12 @@ function selectTab(tab, opts = {}) {
           if (!fresh) return;
           lastTaskPerTab[tab] = fresh;
           if (activeTab === tab) {
-            const v = fresh.status === "failed" ? "error" : fresh.status === "completed" ? "success" : "running";
-            const label = { completed:workspaceI18n("scanComplete"), failed:workspaceI18n("scanFailed"), running:workspaceI18n("analyzingEllipsis"), pending:workspaceI18n("queued") }[fresh.status] || fresh.status;
+            const _freshFailed = fresh.status === "completed" &&
+              fresh.message && fresh.message.toLowerCase().startsWith("analysis failed");
+            const v = (fresh.status === "failed" || _freshFailed) ? "error"
+                    : fresh.status === "completed" ? "success" : "running";
+            const label = _freshFailed ? workspaceI18n("scanFailed")
+              : ({ completed:workspaceI18n("scanComplete"), failed:workspaceI18n("scanFailed"), running:workspaceI18n("analyzingEllipsis"), pending:workspaceI18n("queued") }[fresh.status] || fresh.status);
             setStatus(label, v);
             setSummary(describeTask(fresh));
             renderArtifacts(fresh);
@@ -572,15 +747,17 @@ function selectTab(tab, opts = {}) {
       setSummary(workspaceI18n("refreshing"));
       return;
     }
-    const variant = lastTask.status === "failed" ? "error"
+    const _lastFailed = lastTask.status === "completed" &&
+      lastTask.message && lastTask.message.toLowerCase().startsWith("analysis failed");
+    const variant = (lastTask.status === "failed" || _lastFailed) ? "error"
                   : lastTask.status === "completed" ? "success"
                   : "running";
-    const statusLabel = {
+    const statusLabel = _lastFailed ? workspaceI18n("scanFailed") : ({
       completed: workspaceI18n("scanComplete"),
       failed:    workspaceI18n("scanFailed"),
       running:   workspaceI18n("analyzingEllipsis"),
       pending:   workspaceI18n("queued"),
-    }[lastTask.status] || lastTask.status;
+    }[lastTask.status] || lastTask.status);
     setStatus(statusLabel, variant);
     const msg = (!FINAL_STATUSES.has(lastTask.status) && pollingMsgPerTab[tab])
       ? pollingMsgPerTab[tab]
@@ -824,8 +1001,42 @@ async function runTask() {
     setStatus("Analyzing...", "running");
     setSummary("Uploading package and preparing scan…");
     artifactBox?.classList.add("hidden");
-    const uploadId = await uploadFileIfNeeded();
-    const params = collectParams();
+
+    const isContractAddressMode =
+      activeTab === "multichain-contract-vuln" && inputMode === "address";
+
+    let uploadId = null;
+    let effectiveFileName = currentFile ? currentFile.name : null;
+    let params = collectParams();
+
+    if (isContractAddressMode) {
+      // ── On-chain contract flow: fetch verified source from the explorer,
+      //    which returns an uploadId that the regular task pipeline consumes. ──
+      const chain = chainSelect ? chainSelect.value : "ethereum";
+      const address = addressInput ? addressInput.value.trim() : "";
+      if (!isValidAddress(chain, address)) {
+        throw new Error("Please enter a valid on-chain contract address.");
+      }
+      setSummary(`Fetching verified source for ${address} on ${chain}…`);
+      const fcResp = await fetch(`${API_BASE}/api/contracts/from-chain`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chain, address }),
+      });
+      if (!fcResp.ok) {
+        let detail;
+        try { detail = (await fcResp.json()).detail; } catch (_) { detail = await fcResp.text(); }
+        throw new Error(detail || `Failed to fetch contract source (HTTP ${fcResp.status}).`);
+      }
+      const fcData = await fcResp.json();
+      uploadId = fcData.uploadId;
+      effectiveFileName = fcData.filename || `${chain}_${address.slice(0, 10)}.zip`;
+      // On-chain address mode always uses EVM chains.
+      params.chain = "evm";
+    } else {
+      uploadId = await uploadFileIfNeeded();
+    }
+
     const codePathValue = codePathInput?.value?.trim();
     if (!codePathValue && !uploadId) {
       throw new Error("Please upload a Skill/Agent archive first.");
@@ -838,7 +1049,7 @@ async function runTask() {
       uploadId: uploadId,
       params,
       walletAddress: currentWallet,
-      fileName: currentFile ? currentFile.name : null,
+      fileName: effectiveFileName,
       deviceId: deviceId,
     };
     const headers = { "Content-Type": "application/json" };
@@ -969,6 +1180,11 @@ function describeTask(task) {
   }
 
   if (task.status === "completed") {
+    // Backend sets message="Analysis failed." when the AI call inside the report fails.
+    if (task.message && task.message.toLowerCase().startsWith("analysis failed")) {
+      return workspaceI18n("analysisFailedSummary") ||
+        "AI analysis failed — the audit could not be completed. Please retry.";
+    }
     const msgs = {
       "skill-security-audit":    workspaceI18n("completedSecurity"),
       "multichain-contract-vuln": workspaceI18n("completedContract"),
@@ -1141,7 +1357,10 @@ async function pollTask(taskId, taskTab) {
         : "Security pre-check passed, running stress test…";
       progressMsg = `${phase} (${elapsed}s elapsed)`;
     } else {
-      progressMsg = `Analyzing… (${elapsed}s elapsed — large packages may take several minutes)`;
+      const sizeHint = inputMode === "address"
+        ? "large contracts may take several minutes"
+        : "large packages may take several minutes";
+      progressMsg = `Analyzing… (${elapsed}s elapsed — ${sizeHint})`;
     }
     pollingMsgPerTab[taskTab] = progressMsg;
     // Only update the visible panel if this task's tab is currently active
@@ -1174,13 +1393,16 @@ function renderTask(task) {
   appendHistoryEntry(task);
   // Only update the visible panel if this task belongs to the currently active tab
   if (task.skillType !== activeTab) return;
-  const variant = task.status === "failed" ? "error" : task.status === "completed" ? "success" : "running";
-  const statusLabel = {
+  const _analysisActuallyFailed = task.status === "completed" &&
+    task.message && task.message.toLowerCase().startsWith("analysis failed");
+  const variant = (task.status === "failed" || _analysisActuallyFailed) ? "error"
+                : task.status === "completed" ? "success" : "running";
+  const statusLabel = _analysisActuallyFailed ? workspaceI18n("scanFailed") : ({
     completed: workspaceI18n("scanComplete"),
     failed:    workspaceI18n("scanFailed"),
     running:   workspaceI18n("analyzingEllipsis"),
     pending:   workspaceI18n("queued")
-  }[task.status] || task.status;
+  }[task.status] || task.status);
   setStatus(statusLabel, variant);
   setSummary(describeTask(task));
   renderArtifacts(task);
@@ -2651,8 +2873,10 @@ function createHistoryItem(task) {
   var li = document.createElement("li");
   li.className = "history-item";
   
-  var isCompleted = task.status === "completed";
-  var isFailed = task.status === "failed";
+  var _histAnalysisFailed = task.status === "completed" &&
+    task.message && task.message.toLowerCase().startsWith("analysis failed");
+  var isCompleted = task.status === "completed" && !_histAnalysisFailed;
+  var isFailed = task.status === "failed" || _histAnalysisFailed;
   var isProcessing = !isCompleted && !isFailed;
   var statusText = isCompleted ? historyI18n("done") : isFailed ? historyI18n("failed") : historyI18n("processing");
   var statusClass = isCompleted ? "success" : isFailed ? "error" : "processing";
@@ -2740,15 +2964,62 @@ function showDisconnectModal() {
 }
 
 // 登录按钮事件
-if (walletBtn) {
-  walletBtn.addEventListener("click", async function() {
+// ── User Menu Dropdown ──────────────────────────────────────────────────────
+(function() {
+  var wrap    = document.getElementById("user-menu-wrap");
+  var btn     = document.getElementById("wallet-connect");
+  var dropdown = document.getElementById("user-menu-dropdown");
+  var profileLink = document.getElementById("user-menu-profile");
+  var logoutBtn   = document.getElementById("user-menu-logout");
+
+  if (!wrap || !btn || !dropdown) return;
+
+  function openMenu() {
+    wrap.classList.add("is-open");
+    dropdown.setAttribute("aria-hidden", "false");
+  }
+  function closeMenu() {
+    wrap.classList.remove("is-open");
+    dropdown.setAttribute("aria-hidden", "true");
+  }
+  function toggleMenu() {
+    if (wrap.classList.contains("is-open")) closeMenu(); else openMenu();
+  }
+
+  btn.addEventListener("click", function() {
     if (currentWallet) {
-      showDisconnectModal();
+      toggleMenu();
     } else {
       window.location.href = "login.html";
     }
   });
-}
+
+  // Close when clicking outside
+  document.addEventListener("click", function(e) {
+    if (!wrap.contains(e.target)) closeMenu();
+  });
+
+  // Close on Esc
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") closeMenu();
+  });
+
+  // Log Out
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", function() {
+      closeMenu();
+      showDisconnectModal();
+    });
+  }
+
+  // Profile link — only accessible when logged in
+  if (profileLink) {
+    profileLink.addEventListener("click", function(e) {
+      if (!currentWallet) { e.preventDefault(); return; }
+      closeMenu();
+    });
+  }
+})();
 
 // 历史记录筛选按钮
 historyFilters.forEach(function(btn) {
@@ -2844,6 +3115,87 @@ function initWallet() {
     loadWalletHistory();
   }
 }
+
+// ── History item tooltip ─────────────────────────────────────────────────────
+// CSS ::after tooltips are clipped by .history-panel { overflow: hidden }.
+// Instead, we append a single fixed-position div to document.body so it's
+// never clipped by any ancestor's overflow.
+(function initHistoryTooltip() {
+  var tip = null;
+  function getTip() {
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.style.cssText = [
+        'position:fixed',
+        'z-index:9999',
+        'pointer-events:none',
+        'opacity:0',
+        'transition:opacity 0.12s ease',
+        'background:var(--bg-secondary,#1e2130)',
+        'color:var(--text-primary,#e2e8f0)',
+        'font-size:12px',
+        'font-weight:400',
+        'white-space:nowrap',
+        'padding:5px 10px',
+        'border-radius:6px',
+        'border:1px solid var(--border-default,#334155)',
+        'box-shadow:0 4px 16px rgba(0,0,0,0.4)',
+        'max-width:360px',
+        'word-break:break-all',
+      ].join(';');
+      document.body.appendChild(tip);
+    }
+    return tip;
+  }
+  document.addEventListener('mouseover', function(e) {
+    var item = e.target.closest && e.target.closest('.history-item[data-tooltip]');
+    if (item) {
+      var t = getTip();
+      t.textContent = item.getAttribute('data-tooltip');
+
+      // Cap width to the history panel so the tooltip never spills into the
+      // status/report columns (or beyond the viewport).
+      var panelEl = document.getElementById('history-panel');
+      var maxW    = panelEl
+        ? Math.min(panelEl.getBoundingClientRect().width - 16, 400)
+        : 360;
+      t.style.maxWidth  = maxW + 'px';
+      t.style.whiteSpace = 'normal';   // allow wrapping instead of one long line
+
+      // Render off-screen first so we can measure actual dimensions.
+      t.style.left    = '0px';
+      t.style.top     = '-9999px';
+      t.style.opacity = '0';
+
+      requestAnimationFrame(function() {
+        var itemRect = item.getBoundingClientRect();
+        var th = t.offsetHeight;
+        var tw = t.offsetWidth;
+        var vw = window.innerWidth || document.documentElement.clientWidth;
+
+        // Horizontal: align to the item's left edge, clamped to viewport.
+        var left = Math.max(8, Math.min(itemRect.left, vw - tw - 8));
+
+        // Vertical: show BELOW the row.
+        // Fall back to above only if it would overflow the bottom of the viewport.
+        var vh  = window.innerHeight || document.documentElement.clientHeight;
+        var top = (itemRect.bottom + 4 + th <= vh - 8)
+          ? itemRect.bottom + 4
+          : itemRect.top - th - 6;
+
+        t.style.left    = left + 'px';
+        t.style.top     = top  + 'px';
+        t.style.opacity = '1';
+      });
+    }
+  });
+  document.addEventListener('mouseout', function(e) {
+    var item = e.target.closest && e.target.closest('.history-item[data-tooltip]');
+    if (item && !item.contains(e.relatedTarget)) {
+      if (tip) tip.style.opacity = '0';
+    }
+  });
+})();
 
 // 页面加载时初始化：先处理 OAuth 回调，再恢复 localStorage
 (async function initAuth() {

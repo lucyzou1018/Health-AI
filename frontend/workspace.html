@@ -62,10 +62,23 @@
           <button class="lang-switch__option" type="button" role="menuitem" data-lang-option="zh-CN">简体中文</button>
         </div>
       </div>
-      <button id="wallet-connect" class="wallet-btn">
-        <span class="wallet-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-        <span id="wallet-text">Sign In</span>
-      </button>
+      <div class="user-menu-wrap" id="user-menu-wrap">
+        <button id="wallet-connect" class="wallet-btn">
+          <span class="wallet-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+          <span id="wallet-text">Sign In</span>
+          <svg class="user-menu-caret" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,3 5,7 8,3"/></svg>
+        </button>
+        <div class="user-menu-dropdown" id="user-menu-dropdown" role="menu" aria-hidden="true">
+          <a class="user-menu-item" id="user-menu-profile" href="profile.html" role="menuitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Profile
+          </a>
+          <button class="user-menu-item user-menu-item--danger" id="user-menu-logout" role="menuitem" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Log Out
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -226,6 +239,59 @@
           <span class="panel-badge" id="panel-size-badge">ZIP · 10 MB</span>
         </div>
         <p class="panel-desc" id="upload-panel-desc">Upload your Skill or Agent zip package to run a full permission, API exposure and configuration security scan.</p>
+
+        <!-- ── Input-mode sub-tabs (only visible for Contract Audit) ── -->
+        <div class="input-mode-tabs hidden" id="input-mode-tabs" role="tablist">
+          <button type="button" class="imt-btn active" data-mode="file" role="tab" aria-selected="true">Upload File</button>
+          <button type="button" class="imt-btn" data-mode="address" role="tab" aria-selected="false">On-chain Address</button>
+        </div>
+
+        <!-- ── On-chain address input (shown only when sub-tab = address) ── -->
+        <div class="address-input-zone hidden" id="address-input-zone">
+          <label class="aiz-label">Network</label>
+          <select id="chain-select" hidden>
+            <option value="ethereum">Ethereum Mainnet</option>
+            <option value="bsc">BNB Smart Chain</option>
+            <option value="bsc-testnet">BNB Smart Chain Testnet</option>
+            <option value="polygon">Polygon</option>
+            <option value="arbitrum">Arbitrum One</option>
+            <option value="optimism">Optimism</option>
+            <option value="base">Base</option>
+          </select>
+          <div class="custom-select" id="network-custom-select" tabindex="0">
+            <div class="cs-trigger">
+              <span class="cs-value">Ethereum Mainnet</span>
+              <svg class="cs-chevron" viewBox="0 0 16 16" fill="none">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+            <div class="cs-dropdown">
+              <div class="cs-option cs-option--selected" data-value="ethereum">Ethereum Mainnet</div>
+              <div class="cs-option" data-value="bsc">BNB Smart Chain</div>
+              <div class="cs-option" data-value="bsc-testnet">BNB Smart Chain Testnet</div>
+              <div class="cs-option" data-value="polygon">Polygon</div>
+              <div class="cs-option" data-value="arbitrum">Arbitrum One</div>
+              <div class="cs-option" data-value="optimism">Optimism</div>
+              <div class="cs-option" data-value="base">Base</div>
+            </div>
+          </div>
+
+          <label class="aiz-label" for="contract-address" style="margin-top:12px;">Contract Address</label>
+          <div class="aiz-addr-wrap">
+            <input type="text"
+                   class="aiz-input"
+                   id="contract-address"
+                   spellcheck="false"
+                   autocomplete="off"
+                   placeholder="0x… EVM contract address" />
+            <button type="button" class="aiz-clear hidden" id="aiz-clear" title="Clear">
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                <path d="M2 2l8 8M10 2L2 10"/>
+              </svg>
+            </button>
+          </div>
+          <p class="aiz-hint" id="aiz-hint">We will fetch the verified source from the block explorer and run the same audit pipeline.</p>
+        </div>
 
         <div class="upload-zone" id="upload-zone">
           <!-- Scan animation background -->

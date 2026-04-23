@@ -88,6 +88,30 @@ Skill Security Audit 包含**强制 AI 代码审查**，启动前需配置以下
 > - `SKILL_AUDIT_AI_MODEL` 未设置时默认使用 `gpt-4o-mini`（OpenAI）或 `grok-3-mini`（xAI）。
 > - `SKILL_AUDIT_AI_DETAIL=true` 时，报告中会额外展示各维度风险分和 LLM 输出的具体风险项（findings）；默认关闭，仅显示"⚠️ Risk Detected"。
 
+### 项目图表指标接口（可选）
+
+| 变量名 | 说明 | 示例 |
+|--------|------|------|
+| `CHARTS_ACCESS_TOKEN` | 指标接口鉴权 Token | 见下方生成方式 |
+
+> **说明：**
+> - 用于保护 `GET /api/metrics/snapshot` 接口，未设置或 Token 不匹配时服务端**不返回任何响应**（直接关闭 TCP 连接，不发送任何 HTTP 字节）。
+> - Token 值建议用 `openssl rand -hex 32` 生成，固定后不要更换（看板侧 URL 会写死该值）。
+> - 接口供外部看板（如 Notion 图表）每小时拉取累计指标快照，返回总用户数、总审计次数等维度数据。
+> - 不配置此变量则所有对该接口的请求均被静默丢弃，其它功能不受影响。
+
+生成 Token：
+
+```bash
+openssl rand -hex 32
+```
+
+配置后的接口地址（贴到看板「图表 API」列）：
+
+```
+https://<你的域名>/api/metrics/snapshot?access_token=<token>
+```
+
 ### 配置方式
 
 **方式一：导出环境变量（推荐）**
@@ -129,6 +153,7 @@ WorkingDirectory=/home/ec2-user/Health-AI/backend
 ExecStart=/home/ec2-user/Health-AI/backend/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000
 Environment=OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
 Environment=SKILL_AUDIT_AI_MODEL=gpt-4o-mini
+Environment=CHARTS_ACCESS_TOKEN=<openssl rand -hex 32 生成的值>
 Restart=always
 
 [Install]
@@ -212,6 +237,7 @@ services:
     environment:
       - OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
       - SKILL_AUDIT_AI_MODEL=gpt-4o-mini
+      - CHARTS_ACCESS_TOKEN=<openssl rand -hex 32 生成的值>
     volumes:
       - ./backend/storage:/app/backend/storage
 ```

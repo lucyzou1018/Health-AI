@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Profile — CodeAutrix</title>
+  <link rel="icon" type="image/svg+xml" href="caLogo.svg" />
+  <link rel="shortcut icon" href="caLogo.svg" />
+  <link rel="stylesheet" href="styles.css?v=20260423" />
+  <style>
+    /* ── Profile Page Layout ───────────────────────────────────────────── */
+    .profile-page {
+      min-height: calc(100vh - 64px);
+      padding: 48px 24px 80px;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .profile-container {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* ── Card ──────────────────────────────────────────────────────────── */
+    .profile-card {
+      background: var(--surface, #fff);
+      border: 1px solid var(--border, #e2e8f0);
+      border-radius: 16px;
+      padding: 28px 32px;
+    }
+
+    .profile-card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted, #64748b);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 20px;
+    }
+
+    /* ── Avatar + identity ────────────────────────────────────────────── */
+    .profile-identity {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .profile-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .profile-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .profile-identity-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .profile-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text, #1e293b);
+      margin-bottom: 4px;
+      word-break: break-all;
+    }
+    .profile-login-type {
+      font-size: 12px;
+      color: var(--text-muted, #64748b);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .profile-login-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--accent-subtle, #ede9fe);
+      color: var(--accent, #6366f1);
+    }
+
+    /* ── Info rows ─────────────────────────────────────────────────────── */
+    .profile-info-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .profile-info-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--border, #f1f5f9);
+    }
+    .profile-info-row:last-child { border-bottom: none; }
+    .profile-info-label {
+      font-size: 13px;
+      color: var(--text-muted, #64748b);
+      width: 120px;
+      flex-shrink: 0;
+    }
+    .profile-info-value {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text, #1e293b);
+      word-break: break-all;
+      flex: 1;
+    }
+    .profile-info-value.mono {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 12px;
+    }
+
+    /* ── Stats ─────────────────────────────────────────────────────────── */
+    .profile-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+    .profile-stat-card {
+      background: var(--surface-2, #f8fafc);
+      border: 1px solid var(--border, #e2e8f0);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+    }
+    .profile-stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent, #6366f1);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .profile-stat-label {
+      font-size: 12px;
+      color: var(--text-muted, #64748b);
+    }
+
+    /* ── Actions ───────────────────────────────────────────────────────── */
+    .profile-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .profile-action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      border-radius: 9px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 140ms ease;
+      border: 1px solid transparent;
+      text-decoration: none;
+    }
+    .profile-action-btn--primary {
+      background: var(--accent, #6366f1);
+      color: #fff;
+      border-color: var(--accent, #6366f1);
+    }
+    .profile-action-btn--primary:hover {
+      opacity: 0.88;
+    }
+    .profile-action-btn--ghost {
+      background: transparent;
+      color: var(--text, #1e293b);
+      border-color: var(--border, #e2e8f0);
+    }
+    .profile-action-btn--ghost:hover {
+      background: var(--surface-hover, #f1f5f9);
+    }
+    .profile-action-btn--danger {
+      background: transparent;
+      color: #ef4444;
+      border-color: #fecaca;
+    }
+    .profile-action-btn--danger:hover {
+      background: #fef2f2;
+    }
+
+    /* ── Not logged in state ───────────────────────────────────────────── */
+    .profile-not-logged-in {
+      text-align: center;
+      padding: 60px 24px;
+    }
+    .profile-not-logged-in svg {
+      opacity: 0.3;
+      margin-bottom: 16px;
+    }
+    .profile-not-logged-in p {
+      color: var(--text-muted, #64748b);
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+  <div class="grid-overlay"></div>
+
+  <!-- Nav -->
+  <header class="brand-nav workspace-header">
+    <div class="lp-nav-left">
+      <a class="brand-stack brand-stack--link" href="index.html" aria-label="CodeAutrix home">
+        <span class="brand-logo">
+          <span class="logo-pulse"></span>
+          <img class="brand-logo__img" src="caLogo.svg" alt="CodeAutrix logo" />
+        </span>
+        <h1 class="brand-name">CodeAutrix</h1>
+      </a>
+      <nav class="lp-nav-links">
+        <a href="index.html#features" class="lp-nav-item">Features</a>
+        <a href="index.html#how-it-works" class="lp-nav-item">How It Works</a>
+        <a href="index.html#faq" class="lp-nav-item">FAQ</a>
+        <a href="pricing.html" class="lp-nav-item">Pricing</a>
+        <a href="workspace.html" class="lp-nav-item">Dashboard</a>
+      </nav>
+    </div>
+    <div class="lp-nav-right">
+      <div class="help-switch" data-help-switch>
+        <button class="help-switch__trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Community Help">
+          <span class="help-switch__icon" aria-hidden="true">?</span>
+        </button>
+        <div class="help-switch__menu" role="menu" aria-hidden="true">
+          <div class="help-switch__title">Community</div>
+          <a class="help-switch__link" href="https://t.me/+4lSNlbSEZEtlOGVl" target="_blank" rel="noopener noreferrer" role="menuitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            Telegram @CodeAutrix Official
+          </a>
+        </div>
+      </div>
+      <div class="lang-switch" data-lang-switch>
+        <button class="lang-switch__trigger lang-switch__trigger--icon" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Language">
+          <span class="lang-switch__icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="10" cy="10" r="7"></circle>
+              <path d="M3 10h14"></path>
+              <path d="M10 3c2.1 2.1 3.2 4.4 3.2 7S12.1 14.9 10 17c-2.1-2.1-3.2-4.4-3.2-7S7.9 5.1 10 3z"></path>
+            </svg>
+          </span>
+        </button>
+        <div class="lang-switch__menu" role="menu" aria-hidden="true">
+          <div class="lang-switch__title">Language</div>
+          <button class="lang-switch__option is-active" type="button" role="menuitem" data-lang-option="en">English</button>
+          <button class="lang-switch__option" type="button" role="menuitem" data-lang-option="zh-CN">简体中文</button>
+        </div>
+      </div>
+      <div class="user-menu-wrap" id="user-menu-wrap">
+        <button id="wallet-connect" class="wallet-btn">
+          <span class="wallet-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+          <span id="wallet-text">Sign In</span>
+          <svg class="user-menu-caret" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2,3 5,7 8,3"/></svg>
+        </button>
+        <div class="user-menu-dropdown" id="user-menu-dropdown" role="menu" aria-hidden="true">
+          <a class="user-menu-item" id="user-menu-profile" href="profile.html" role="menuitem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Profile
+          </a>
+          <button class="user-menu-item user-menu-item--danger" id="user-menu-logout" role="menuitem" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Log Out
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Profile Content -->
+  <main class="profile-page">
+    <div class="profile-container" id="profile-container">
+      <!-- Rendered by JS -->
+    </div>
+  </main>
+
+  <!-- Logout Modal (same as workspace) -->
+  <div class="modal-overlay" id="disconnect-modal" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-icon-wrap">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="8" width="24" height="18" rx="3" stroke="currentColor" stroke-width="1.8"/>
+          <path d="M4 13h24" stroke="currentColor" stroke-width="1.8"/>
+          <circle cx="22" cy="20" r="2" fill="currentColor"/>
+          <path d="M28 8V7a3 3 0 00-3-3H7a3 3 0 00-3 3v1" stroke="currentColor" stroke-width="1.8"/>
+        </svg>
+      </div>
+      <h3 class="modal-title" id="modal-title">Logout</h3>
+      <div class="modal-addr-pill" id="modal-addr">—</div>
+      <p class="modal-desc">You'll be signed out and will need to login again to access scan history.</p>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn--cancel" id="modal-cancel">Cancel</button>
+        <button class="modal-btn modal-btn--danger" id="modal-confirm">
+          <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <path d="M5 7h6M8.5 5L11 7l-2.5 2"/>
+            <path d="M3 10V4" opacity="0.5"/>
+          </svg>
+          Logout
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Read auth state from localStorage ──────────────────────────────────
+    var walletAddress = localStorage.getItem("wallet_address") || "";
+    var loginType     = localStorage.getItem("login_type") || "";
+    var loginEmail    = localStorage.getItem("login_email") || "";
+    var githubLogin   = localStorage.getItem("github_login") || "";
+    var walletToken   = localStorage.getItem("wallet_token") || "";
+
+    var container = document.getElementById("profile-container");
+
+    function formatAddress(addr) {
+      if (!addr || addr.length < 10) return addr;
+      return addr.slice(0, 6) + "…" + addr.slice(-4);
+    }
+
+    function getDisplayName() {
+      if (loginType === "github" && githubLogin) return githubLogin;
+      if (loginType === "google" && loginEmail)  return loginEmail.split("@")[0];
+      if (walletAddress) return formatAddress(walletAddress);
+      return "Anonymous";
+    }
+
+    function getInitial() {
+      var n = getDisplayName();
+      return n ? n[0].toUpperCase() : "?";
+    }
+
+    function getLoginBadge() {
+      var map = { github: "GitHub", google: "Google", wallet: "Wallet" };
+      return map[loginType] || "Web3 Wallet";
+    }
+
+    function renderNotLoggedIn() {
+      container.innerHTML = [
+        '<div class="profile-card">',
+        '  <div class="profile-not-logged-in">',
+        '    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+        '    <p>You are not signed in. Please sign in to view your profile.</p>',
+        '    <a href="login.html" class="profile-action-btn profile-action-btn--primary">Sign In</a>',
+        '  </div>',
+        '</div>'
+      ].join("\n");
+    }
+
+    function renderProfile() {
+      var displayName = getDisplayName();
+      var initial     = getInitial();
+      var badge       = getLoginBadge();
+
+      // Stats — load from API if available, otherwise show dashes
+      container.innerHTML = [
+        '<!-- Identity card -->',
+        '<div class="profile-card">',
+        '  <div class="profile-card-title">Account</div>',
+        '  <div class="profile-identity">',
+        '    <div class="profile-avatar" id="profile-avatar">' + initial + '</div>',
+        '    <div class="profile-identity-info">',
+        '      <div class="profile-name">' + escHtml(displayName) + '</div>',
+        '      <div class="profile-login-type">',
+        '        Signed in via&nbsp;<span class="profile-login-badge">' + escHtml(badge) + '</span>',
+        '      </div>',
+        '    </div>',
+        '  </div>',
+        '</div>',
+
+        '<!-- Details card -->',
+        '<div class="profile-card">',
+        '  <div class="profile-card-title">Details</div>',
+        '  <div class="profile-info-list">',
+        loginEmail ? '<div class="profile-info-row"><span class="profile-info-label">Email</span><span class="profile-info-value">' + escHtml(loginEmail) + '</span></div>' : '',
+        githubLogin ? '<div class="profile-info-row"><span class="profile-info-label">GitHub</span><span class="profile-info-value">@' + escHtml(githubLogin) + '</span></div>' : '',
+        (loginType === "wallet" && walletAddress) ? '<div class="profile-info-row"><span class="profile-info-label">Wallet</span><span class="profile-info-value mono">' + escHtml(walletAddress) + '</span></div>' : '',
+        '    <div class="profile-info-row"><span class="profile-info-label">Plan</span><span class="profile-info-value" id="plan-label">Free</span></div>',
+        '  </div>',
+        '</div>',
+
+        '<!-- Stats card -->',
+        '<div class="profile-card">',
+        '  <div class="profile-card-title">Usage</div>',
+        '  <div class="profile-stats">',
+        '    <div class="profile-stat-card"><div class="profile-stat-value" id="stat-total">—</div><div class="profile-stat-label">Total Audits</div></div>',
+        '    <div class="profile-stat-card"><div class="profile-stat-value" id="stat-contract">—</div><div class="profile-stat-label">Contract Audits</div></div>',
+        '    <div class="profile-stat-card"><div class="profile-stat-value" id="stat-skill">—</div><div class="profile-stat-label">Skill Audits</div></div>',
+        '    <div class="profile-stat-card"><div class="profile-stat-value" id="stat-stress">—</div><div class="profile-stat-label">Stress Tests</div></div>',
+        '  </div>',
+        '</div>',
+
+        '<!-- Actions card -->',
+        '<div class="profile-card">',
+        '  <div class="profile-card-title">Actions</div>',
+        '  <div class="profile-actions">',
+        '    <a href="workspace.html" class="profile-action-btn profile-action-btn--ghost">',
+        '      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>',
+        '      Dashboard',
+        '    </a>',
+        '    <button class="profile-action-btn profile-action-btn--danger" id="profile-logout-btn">',
+        '      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+        '      Log Out',
+        '    </button>',
+        '  </div>',
+        '</div>',
+      ].join("\n");
+
+      // Bind logout
+      var logoutBtn = document.getElementById("profile-logout-btn");
+      if (logoutBtn) {
+        logoutBtn.addEventListener("click", function() {
+          showDisconnectModal();
+        });
+      }
+
+      // Load stats from API
+      loadStats();
+    }
+
+    function doLogout() {
+      localStorage.removeItem("wallet_token");
+      localStorage.removeItem("wallet_address");
+      localStorage.removeItem("login_type");
+      localStorage.removeItem("login_email");
+      localStorage.removeItem("github_login");
+      localStorage.removeItem("github_oauth_redirect");
+      window.location.href = "login.html";
+    }
+
+    function showDisconnectModal() {
+      var overlay    = document.getElementById("disconnect-modal");
+      var addrEl     = document.getElementById("modal-addr");
+      var cancelBtn  = document.getElementById("modal-cancel");
+      var confirmBtn = document.getElementById("modal-confirm");
+      if (!overlay) { if (confirm("Logout?")) doLogout(); return; }
+
+      // 填充用户标识
+      if (addrEl) {
+        if (loginEmail) {
+          addrEl.textContent = loginEmail;
+        } else if (githubLogin) {
+          addrEl.textContent = "@" + githubLogin;
+        } else if (walletAddress) {
+          addrEl.textContent = walletAddress.slice(0, 6) + "..." + walletAddress.slice(-4);
+        }
+      }
+
+      overlay.classList.add("is-open");
+      overlay.setAttribute("aria-hidden", "false");
+
+      function close() {
+        overlay.classList.remove("is-open");
+        overlay.setAttribute("aria-hidden", "true");
+        cancelBtn.removeEventListener("click", onCancel);
+        confirmBtn.removeEventListener("click", onConfirm);
+        overlay.removeEventListener("click", onBackdrop);
+        document.removeEventListener("keydown", onEsc);
+      }
+      function onCancel()  { close(); }
+      function onConfirm() { close(); doLogout(); }
+      function onBackdrop(e) { if (e.target === overlay) close(); }
+      function onEsc(e)    { if (e.key === "Escape") close(); }
+
+      cancelBtn.addEventListener("click", onCancel);
+      confirmBtn.addEventListener("click", onConfirm);
+      overlay.addEventListener("click", onBackdrop);
+      document.addEventListener("keydown", onEsc);
+    }
+
+    function loadStats() {
+      if (!walletToken) return;
+      var API_BASE = window.HEALTH_AI_API_BASE || "http://localhost:8000";
+      fetch(API_BASE + "/api/wallet/history?limit=200", {
+        headers: { "X-Wallet-Token": walletToken }
+      }).then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          // API 直接返回数组，不是 { tasks: [...] }
+          if (!Array.isArray(data)) return;
+          var tasks    = data;
+          var total    = tasks.length;
+          var contract = tasks.filter(function(t) { return t.skillType === "multichain-contract-vuln"; }).length;
+          var skill    = tasks.filter(function(t) { return t.skillType === "skill-security-audit"; }).length;
+          var stress   = tasks.filter(function(t) { return t.skillType === "skill-stress-lab"; }).length;
+          setText("stat-total",    total);
+          setText("stat-contract", contract);
+          setText("stat-skill",    skill);
+          setText("stat-stress",   stress);
+        }).catch(function() {});
+    }
+
+    function setText(id, val) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = val;
+    }
+
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    // ── Nav wallet button ──────────────────────────────────────────────────
+    (function() {
+      var wrap     = document.getElementById("user-menu-wrap");
+      var btn      = document.getElementById("wallet-connect");
+      var wText    = document.getElementById("wallet-text");
+      var dropdown = document.getElementById("user-menu-dropdown");
+      var logoutItem = document.getElementById("user-menu-logout");
+
+      if (btn && wText) {
+        if (walletAddress || githubLogin || loginEmail) {
+          btn.classList.add("connected");
+          if (loginType === "github") {
+            var ghLogin = githubLogin || loginEmail || "";
+            wText.textContent = ghLogin.length > 14 ? ghLogin.slice(0, 12) + ".." : (ghLogin || formatAddress(walletAddress));
+          } else if (loginType === "google" && loginEmail) {
+            var email = loginEmail;
+            if (email.length > 14) {
+              var parts = email.split(".");
+              var last  = parts[parts.length - 1];
+              var front = email.slice(0, 4);
+              wText.textContent = front + "..." + last;
+            } else {
+              wText.textContent = email;
+            }
+          } else {
+            wText.textContent = formatAddress(walletAddress);
+          }
+        } else {
+          btn.classList.remove("connected");
+          wText.textContent = "Sign In";
+        }
+      }
+
+      function closeMenu() { wrap && wrap.classList.remove("is-open"); }
+      function toggleMenu() { wrap && wrap.classList.toggle("is-open"); }
+
+      if (btn) {
+        btn.addEventListener("click", function() {
+          if (walletAddress) { toggleMenu(); } else { window.location.href = "login.html"; }
+        });
+      }
+      document.addEventListener("click", function(e) {
+        if (wrap && !wrap.contains(e.target)) closeMenu();
+      });
+      document.addEventListener("keydown", function(e) { if (e.key === "Escape") closeMenu(); });
+
+      if (logoutItem) {
+        logoutItem.addEventListener("click", function() {
+          closeMenu();
+          showDisconnectModal();
+        });
+      }
+    })();
+
+    // ── Boot ───────────────────────────────────────────────────────────────
+    // 任意一种登录标识存在即视为已登录
+    var isLoggedIn = !!(walletAddress || githubLogin || loginEmail);
+    if (isLoggedIn) {
+      renderProfile();
+    } else {
+      renderNotLoggedIn();
+    }
+  </script>
+</body>
+</html>

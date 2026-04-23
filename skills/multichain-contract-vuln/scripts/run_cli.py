@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import io
 import json
 import os
 import re
@@ -175,6 +176,224 @@ def download_onchain_sources(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
     return dest_dir, f"On-chain source downloaded: {normalized}"
+
+
+# ── Solana on-chain source fetching via OtterSec Verify + GitHub ─────────────
+
+_OSEC_VERIFY_URL = "https://verify.osec.io/status/{program_id}"
+_GITHUB_ARCHIVE_URL = "https://github.com/{slug}/archive/{ref}.zip"
+_GITHUB_SEARCH_URL  = (
+    "https://api.github.com/search/code"
+    "?q=declare_id+%22{program_id}%22+language%3ARust&per_page=5"
+)
+_SOLANA_ADDR_RE = re.compile(r"^[1-9A-HJ-NP-Za-km-z]{32,44}$")
+_SOLANA_MAX_FILES = 10
+import ssl as _ssl
+import zipfile as _zipfile
+from urllib.parse import quote as _url_quote
+
+
+def _http_get_json_solana(url: str) -> dict:
+    """Fetch JSON from *url* using stdlib only (no requests)."""
+    req = urlrequest.Request(url, headers={"User-Agent": "CodeAutrix/1.0"})
+    ctx = _ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = _ssl.CERT_NONE
+    try:
+        with urlrequest.urlopen(req, timeout=20, context=ctx) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        raise RuntimeError(f"HTTP GET failed for {url}: {exc}") from exc
+
+
+def _http_get_bytes_solana(url: str, timeout: int = 45) -> bytes:
+    """Download raw bytes from *url* following redirects."""
+    req = urlrequest.Request(url, headers={"User-Agent": "CodeAutrix/1.0"})
+    ctx = _ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = _ssl.CERT_NONE
+    try:
+        with urlrequest.urlopen(req, timeout=timeout, context=ctx) as resp:
+            return resp.read()
+    except Exception as exc:
+        raise RuntimeError(f"HTTP GET failed for {url}: {exc}") from exc
+
+
+def _github_slug(repo_url: str) -> Optional[str]:
+    m = re.match(r"https?://github\.com/([A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+?)(?:\.git)?(?:[/?#].*)?$", repo_url)
+    return m.group(1) if m else None
+
+
+def _extract_rs_from_zip(zip_bytes: bytes) -> Dict[str, str]:
+    """Extract .rs files from a GitHub archive, stripping the top-level dir prefix."""
+    files: Dict[str, str] = {}
+    try:
+        with _zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+            names = zf.namelist()
+            prefix = (names[0].split("/")[0] + "/") if names else ""
+
+            def _priority(n: str) -> int:
+                ln = n.lower()
+                if "/tests/" in ln or ln.split("/")[-1].startswith("test_"):
+                    return 2
+                if "/target/" in ln or "/node_modules/" in ln:
+                    return 3
+                return 1
+
+            rs = sorted(
+                [n for n in names if n.endswith(".rs") and not n.endswith("/")
+                 and "/__MACOSX/" not in n and "/." not in n.split("/")[-1]],
+                key=_priority,
+            )[:_SOLANA_MAX_FILES]
+
+            for entry in rs:
+                rel = entry[len(prefix):] if entry.startswith(prefix) else entry
+                if not rel:
+                    continue
+                # Strip path traversal
+                parts = [p for p in rel.replace("\\", "/").split("/") if p and p not in (".", "..")]
+                rel = "/".join(parts) or entry.split("/")[-1]
+                try:
+                    files[rel] = zf.read(entry).decode("utf-8", errors="ignore")
+                except Exception:
+                    pass
+    except _zipfile.BadZipFile:
+        pass
+    return files
+
+
+def _osec_query_soft(program_id: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """Query OtterSec Verify. Returns (repo_url, commit, error_msg) — never raises."""
+    osec_url = _OSEC_VERIFY_URL.format(program_id=program_id)
+    print(f"[Solana] Stage 1 — OtterSec Verify: {osec_url}", file=sys.stderr)
+    try:
+        data = _http_get_json_solana(osec_url)
+    except RuntimeError as exc:
+        return None, None, f"OtterSec API error: {exc}"
+    if not data.get("is_verified"):
+        return None, None, f"Program {program_id[:8]}… is not verified on OtterSec"
+    repo_url = (data.get("repo_url") or data.get("github") or "").strip().rstrip("/")
+    commit   = (data.get("commit") or "").strip()
+    if not repo_url:
+        return None, None, f"OtterSec returned no GitHub URL for {program_id[:8]}…"
+    return repo_url, commit, None
+
+
+def _github_search_soft(program_id: str) -> Tuple[Optional[str], Optional[str]]:
+    """Search GitHub for declare_id!("{program_id}") in Rust files.
+
+    Returns (repo_url, error_msg). Supports GITHUB_TOKEN env var.
+    """
+    search_url = _GITHUB_SEARCH_URL.format(program_id=_url_quote(program_id))
+    print(f"[Solana] Stage 2 — GitHub Code Search: {search_url}", file=sys.stderr)
+    headers = {
+        "User-Agent": "CodeAutrix/1.0",
+        "Accept":     "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    token = os.getenv("GITHUB_TOKEN", "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urlrequest.Request(search_url, headers=headers)
+    ctx = _ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = _ssl.CERT_NONE
+    try:
+        with urlrequest.urlopen(req, timeout=20, context=ctx) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as exc:
+        return None, f"GitHub Search API failed: {exc}"
+    for item in (data.get("items") or []):
+        repo = item.get("repository") or {}
+        url  = (repo.get("html_url") or "").strip().rstrip("/")
+        if url and "github.com" in url:
+            print(f"[Solana] GitHub matched: {url} (file: {item.get('path', '?')})", file=sys.stderr)
+            return url, None
+    return None, (
+        f"No public repo found for declare_id!(\"{program_id[:8]}…\"). "
+        "The program may not be open-source or the repository is private."
+    )
+
+
+def download_onchain_sources_solana(
+    program_id: str,
+) -> Tuple[Optional[Path], Optional[str]]:
+    """Fetch Solana program source via two-stage lookup: OtterSec → GitHub Search.
+
+    Stage 1 (OtterSec): pinned commit, strongest source ↔ bytecode correspondence.
+    Stage 2 (GitHub):   any open-source repo declaring the same program ID.
+
+    Returns (directory_with_rs_files, status_note) or (None, None) on failure.
+    """
+    program_id = program_id.strip()
+    if not _SOLANA_ADDR_RE.match(program_id):
+        print(f"[Solana] Invalid program ID (expected base58, 32–44 chars): {program_id}", file=sys.stderr)
+        return None, None
+
+    # ── Stage 1: OtterSec ────────────────────────────────────────────────────
+    repo_url, commit, osec_err = _osec_query_soft(program_id)
+    source_tag = "OtterSec-verified"
+
+    if repo_url is None:
+        print(f"[Solana] OtterSec: {osec_err} — falling back to GitHub search…", file=sys.stderr)
+
+        # ── Stage 2: GitHub Code Search ───────────────────────────────────────
+        repo_url, search_err = _github_search_soft(program_id)
+        commit     = ""
+        source_tag = "GitHub (unverified)"
+
+        if repo_url is None:
+            print(
+                f"[Solana] Could not locate source for {program_id[:8]}…\n"
+                f"  OtterSec: {osec_err}\n"
+                f"  GitHub:   {search_err}",
+                file=sys.stderr,
+            )
+            return None, None
+
+    slug = _github_slug(repo_url)
+    if not slug:
+        print(f"[Solana] Cannot parse GitHub URL: {repo_url}", file=sys.stderr)
+        return None, None
+
+    # ── Download archive ──────────────────────────────────────────────────────
+    refs = list(dict.fromkeys(filter(None, [commit, "main", "master"])))
+    zip_bytes: Optional[bytes] = None
+    used_ref = ""
+    for ref in refs:
+        archive_url = _GITHUB_ARCHIVE_URL.format(slug=slug, ref=ref)
+        print(f"[Solana] Downloading archive: {archive_url}", file=sys.stderr)
+        try:
+            zip_bytes = _http_get_bytes_solana(archive_url)
+            used_ref = ref
+            break
+        except RuntimeError as exc:
+            print(f"[Solana] Archive download failed ({ref}): {exc}", file=sys.stderr)
+
+    if not zip_bytes:
+        print(f"[Solana] Could not download source archive from {repo_url}", file=sys.stderr)
+        return None, None
+
+    # ── Extract .rs files ─────────────────────────────────────────────────────
+    rs_files = _extract_rs_from_zip(zip_bytes)
+    if not rs_files:
+        print(f"[Solana] No .rs files found in {repo_url}@{used_ref}", file=sys.stderr)
+        return None, None
+
+    # ── Write to temp directory ───────────────────────────────────────────────
+    tmp_root = Path(tempfile.mkdtemp(prefix="multichain-solana-"))
+    dest_dir = tmp_root / program_id[:10]
+    for rel, content in rs_files.items():
+        out = dest_dir / _sanitize_relative_path(rel)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(content, encoding="utf-8")
+
+    note = (
+        f"Solana source fetched ({source_tag}): {program_id[:8]}… | "
+        f"repo={repo_url} | ref={used_ref} | files={len(rs_files)}"
+    )
+    print(f"[Solana] {note}", file=sys.stderr)
+    return dest_dir, note
 
 
 def _collect_source_files(target: Path) -> List[Path]:
@@ -438,21 +657,44 @@ def _analyze_file_with_llm(filename: str, code: str, model: str, chain: str) -> 
         }
 
     def _call_responses_api() -> Optional[str]:
-        """Responses API — SDK v2 endpoint for gpt-4.1 / o-series models."""
+        """Responses API — SDK v2 endpoint for gpt-4.1 / o-series models.
+        Tries temperature=0 first for determinism; falls back without it for
+        models that do not accept the temperature parameter (e.g. codex variants).
+        """
+        def _extract(resp) -> Optional[str]:
+            if hasattr(resp, "output_text"):
+                return (resp.output_text or "").strip() or None
+            if hasattr(resp, "output") and resp.output:
+                item = resp.output[0]
+                if hasattr(item, "content") and item.content:
+                    return (item.content[0].text or "").strip() or None
+            return None
+
+        # First attempt: with temperature=0 for deterministic output
+        try:
+            resp = client.responses.create(
+                model=model,
+                instructions=system_prompt,
+                input=user_prompt,
+                temperature=0,
+            )
+            result = _extract(resp)
+            if result is not None:
+                return result
+        except Exception:
+            pass
+
+        # Second attempt: without temperature (some models reject the parameter)
         try:
             resp = client.responses.create(
                 model=model,
                 instructions=system_prompt,
                 input=user_prompt,
             )
-            if hasattr(resp, "output_text"):
-                return (resp.output_text or "").strip()
-            if hasattr(resp, "output") and resp.output:
-                item = resp.output[0]
-                if hasattr(item, "content") and item.content:
-                    return (item.content[0].text or "").strip()
+            return _extract(resp)
         except Exception:
             pass
+
         return None
 
     # ── Path 1: Chat Completions ──────────────────────────────────────────────
@@ -515,11 +757,27 @@ def _aggregate_llm_results(file_results: List[Dict]) -> Dict:
     - Take minimum dimension score across all files (worst case wins)
     - overall = average of min dimension scores
     - Collect all criticalFindings with file attribution
+    - If ALL files failed (no ok results), return analysis_failed=True so
+      the caller can surface a proper error instead of fake 100/100 scores.
     """
     min_scores: Dict[str, int] = {k: 100 for k in _DIM_KEYS}
     all_critical: List[str] = []
 
     ok_results = [r for r in file_results if r.get("status") == "ok"]
+
+    # ── All files failed — surface as analysis failure, not perfect scores ──
+    if not ok_results:
+        error_reasons = [
+            r.get("reason", "unknown error")
+            for r in file_results if r.get("status") != "ok"
+        ]
+        return {
+            "analysis_failed": True,
+            "error_reason":    error_reasons[0] if error_reasons else "AI analysis failed",
+            "scores":          {score_key: 0 for score_key in _DIM_SCORE_KEYS.values()} | {"overall": 0},
+            "criticalFindings": [],
+            "verdict":          "ERROR",
+        }
 
     for result in ok_results:
         for k in _DIM_KEYS:
@@ -533,10 +791,11 @@ def _aggregate_llm_results(file_results: List[Dict]) -> Dict:
     scores: Dict[str, int] = {}
     for dim_key, score_key in _DIM_SCORE_KEYS.items():
         scores[score_key] = min_scores[dim_key]
-    scores["overall"] = sum(min_scores.values()) // len(_DIM_KEYS) if min_scores else 100
+    scores["overall"] = sum(min_scores.values()) // len(_DIM_KEYS) if min_scores else 0
 
     verdict = _verdict_from_aggregate(all_critical, scores["overall"])
     return {
+        "analysis_failed":  False,
         "scores":           scores,
         "criticalFindings": all_critical,
         "verdict":          verdict,
@@ -545,11 +804,29 @@ def _aggregate_llm_results(file_results: List[Dict]) -> Dict:
 
 # ── Report generation ─────────────────────────────────────────────────────────
 
-def _build_per_file_section(file_results: List[Dict]) -> List[str]:
+def _display_fname(fname: str, onchain_meta: Optional[Dict]) -> str:
+    """Return display name for a contract file.
+
+    For on-chain audits where Etherscan defaulted the filename to 'Contract.sol',
+    replace it with the actual on-chain address so the report is more meaningful.
+    Real filenames (e.g. 'TetherToken.sol') are always kept as-is.
+    """
+    if (
+        onchain_meta
+        and onchain_meta.get("source") == "explorer"
+        and fname == "Contract.sol"
+    ):
+        addr = onchain_meta.get("address", "").strip()
+        if addr:
+            return addr
+    return fname
+
+
+def _build_per_file_section(file_results: List[Dict], onchain_meta: Optional[Dict] = None) -> List[str]:
     """Build per-file analysis sections per CONTRACT_AUDIT_GUIDE.md format."""
     lines: List[str] = []
     for result in file_results:
-        fname = result.get("filename", "unknown")
+        fname = _display_fname(result.get("filename", "unknown"), onchain_meta)
         lines.append(f"\n### 📄 {fname}")
 
         if result.get("status") != "ok":
@@ -610,6 +887,7 @@ def build_report(
     llm_file_results: List[Dict],
     extra_notes: List[str],
     model: str = "",
+    onchain_meta: Optional[Dict] = None,
 ) -> Path:
     report_path.parent.mkdir(parents=True, exist_ok=True)
     timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y/%m/%d %H:%M:%S UTC")
@@ -618,15 +896,56 @@ def build_report(
     scores          = aggregated["scores"]
     verdict         = aggregated["verdict"]
     critical_list   = aggregated["criticalFindings"]
+    analysis_failed = aggregated.get("analysis_failed", False)
+
+    ok_count = sum(1 for r in llm_file_results if r.get("status") == "ok")
+
+    # ── All files failed: write an error report instead of fake scores ────────
+    if analysis_failed:
+        error_reason = aggregated.get("error_reason", "AI analysis failed")
+        error_lines: List[str] = [
+            f"# {scope} Contract Audit Report",
+            "",
+            f"**Scanned:** {timestamp}  ",
+            f"**Chain:** {chain.upper()}  ",
+            f"**Files Analyzed:** {ok_count}/{len(llm_file_results)}  ",
+            "**Analysis Method:** AI Semantic Analysis  ",
+            f"**Model:** {model or 'N/A'}",
+            "",
+            "## ⚠️ Analysis Failed",
+            "",
+            "> The AI analysis could not be completed. Scores have not been generated.",
+            "> Please try again. If the problem persists, check your API key and network connection.",
+            "",
+            f"**Error:** `{error_reason}`",
+            "",
+            "---",
+            "",
+            "## 📄 Per-File Details",
+            "",
+        ]
+        error_lines += _build_per_file_section(llm_file_results, onchain_meta)
+        report_path.write_text("\n".join(error_lines), encoding="utf-8")
+        return report_path
+
+    # On-chain audits: replace the generic "Contract.sol" placeholder in the
+    # critical findings list (built by _aggregate_llm_results) with the actual
+    # on-chain address, so the report is unambiguous about what was audited.
+    is_onchain = bool(onchain_meta and onchain_meta.get("source") == "explorer")
+    if is_onchain:
+        _addr = (onchain_meta or {}).get("address", "").strip()
+        if _addr:
+            critical_list = [
+                cf.replace("**Contract.sol**", f"**{_addr}**")
+                for cf in critical_list
+            ]
 
     if verdict == "SAFE":
-        v_icon, v_label = "✅", "SAFE TO DEPLOY"
+        v_icon, v_label = "✅", "SAFE TO USE" if is_onchain else "SAFE TO DEPLOY"
     elif verdict == "CAUTION":
         v_icon, v_label = "⚠️", "CAUTION — REVIEW REQUIRED"
     else:
         v_icon, v_label = "❌", "REJECT — HIGH RISK DETECTED"
-
-    ok_count = sum(1 for r in llm_file_results if r.get("status") == "ok")
 
     lines: List[str] = [
         f"# {scope} Contract Audit Report",
@@ -676,7 +995,7 @@ def build_report(
         "",
     ]
 
-    lines += _build_per_file_section(llm_file_results)
+    lines += _build_per_file_section(llm_file_results, onchain_meta)
 
     # Audit summary table
     lines += [
@@ -689,7 +1008,7 @@ def build_report(
         "| --- | :---: | --- | :---: |",
     ]
     for result in llm_file_results:
-        fname = result.get("filename", "unknown")
+        fname = _display_fname(result.get("filename", "unknown"), onchain_meta)
         if result.get("status") != "ok":
             lines.append(f"| {fname} | — | ⚠️ Analysis Error | — |")
             continue
@@ -745,6 +1064,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="multichain-contract-vuln AI audit CLI")
     parser.add_argument("--input",             help="Contract file or directory to analyze")
     parser.add_argument("--evm-address",       help="On-chain EVM contract address (auto-download source)")
+    parser.add_argument("--solana-address",    help="On-chain Solana program ID (auto-download source via OtterSec + GitHub)")
     parser.add_argument("--network",           default="mainnet",
                         help="EVM network: mainnet/goerli/sepolia (default: mainnet)")
     parser.add_argument("--etherscan-api-key", help="Etherscan API Key (or set ETHERSCAN_API_KEY)")
@@ -771,10 +1091,22 @@ def main() -> int:
         target = fetched_dir
         if fetch_note:
             notes.append(fetch_note)
+    elif args.solana_address:
+        fetched_dir, fetch_note = download_onchain_sources_solana(args.solana_address)
+        if not fetched_dir:
+            print(
+                f"[Error] Could not fetch Solana program source for {args.solana_address}. "
+                "Make sure the program is verified on OtterSec (https://verify.osec.io).",
+                file=sys.stderr,
+            )
+            return 1
+        target = fetched_dir
+        if fetch_note:
+            notes.append(fetch_note)
     else:
         return 1
 
-    chain_hint = args.chain or ("evm" if args.evm_address else None)
+    chain_hint = args.chain or ("solana" if args.solana_address else "evm" if args.evm_address else None)
     chain  = detect_chain(target, chain_hint)
     target, _ = _resolve_project_path(target)
 
@@ -821,8 +1153,23 @@ def main() -> int:
             ordered[futures[fut]] = fut.result()
     llm_file_results: List[Dict] = [ordered[i] for i in range(len(source_files))]
 
+    # ── Read on-chain metadata sidecar (present when source came from /api/contracts/from-chain) ──
+    onchain_meta: Optional[Dict] = None
+    meta_candidates = [
+        target / "codeautrix_fetch_metadata.json",          # file-mode: metadata next to sources
+        target.parent / "codeautrix_fetch_metadata.json",   # one level up (edge cases)
+    ]
+    for meta_path in meta_candidates:
+        if meta_path.exists():
+            try:
+                onchain_meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+            break
+
     # ── Generate report ───────────────────────────────────────────────────────
-    build_report(scope, chain, target, report_path, llm_file_results, notes, model)
+    build_report(scope, chain, target, report_path, llm_file_results, notes, model,
+                 onchain_meta=onchain_meta)
     return 0
 
 

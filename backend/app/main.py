@@ -5,8 +5,10 @@ import json
 import logging
 import os
 import secrets
+import sqlite3
 import threading
 import time
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 from pathlib import Path
@@ -23,6 +25,7 @@ from pydantic import BaseModel, Field
 
 from .task_manager import TaskManager
 from . import rate_limiter
+from . import explorer_client
 
 # Try to import eth-account for signature verification
 try:
@@ -124,6 +127,25 @@ class UploadResponse(BaseModel):
     filename: str
 
 
+class FromChainRequest(BaseModel):
+    chain: str = Field(description="Chain slug, e.g. ethereum, bsc, polygon, arbitrum, optimism, base, solana")
+    address: str = Field(description="On-chain contract/program address")
+
+    class Config:
+        validate_by_name = True
+
+
+class FromChainResponse(BaseModel):
+    upload_id: str = Field(alias="uploadId")
+    filename: str
+    chain: str
+    address: str
+    contract_name: str = Field(alias="contractName")
+
+    class Config:
+        validate_by_name = True
+
+
 class TaskRequest(BaseModel):
     skill_type: Literal["skill-security-audit", "multichain-contract-vuln", "skill-stress-lab"] = Field(alias="skillType")
     code_path: Optional[str] = Field(default=None, alias="codePath")
@@ -134,7 +156,7 @@ class TaskRequest(BaseModel):
     device_id: Optional[str] = Field(default=None, alias="deviceId")
 
     class Config:
-        allow_population_by_field_name = True
+        validate_by_name = True
 
 
 class TaskResponse(BaseModel):
@@ -151,7 +173,7 @@ class TaskResponse(BaseModel):
     file_name: Optional[str] = Field(default=None, alias="fileName")
 
     class Config:
-        allow_population_by_field_name = True
+        validate_by_name = True
 
 
 class WalletAuthRequest(BaseModel):
@@ -160,7 +182,7 @@ class WalletAuthRequest(BaseModel):
     message: str = Field(description="The message that was signed")
 
     class Config:
-        allow_population_by_field_name = True
+        validate_by_name = True
 
 
 class WalletAuthResponse(BaseModel):
@@ -176,7 +198,7 @@ class GoogleAuthRequest(BaseModel):
     access_token: str = Field(alias="accessToken")
 
     class Config:
-        allow_population_by_field_name = True
+        validate_by_name = True
 
 
 class GitHubAuthRequest(BaseModel):
@@ -184,7 +206,7 @@ class GitHubAuthRequest(BaseModel):
     client_id: str = Field(default="", alias="clientId", description="GitHub OAuth client ID used by frontend")
 
     class Config:
-        allow_population_by_field_name = True
+        validate_by_name = True
 
 
 class HistoryQueryParams(BaseModel):
@@ -218,6 +240,49 @@ def upload_file(file: UploadFile = File(...)) -> UploadResponse:
         )
     upload_id = task_manager.save_upload(file.filename, content)
     return UploadResponse(uploadId=upload_id, filename=file.filename)
+
+
+@app.post("/api/contracts/from-chain", response_model=FromChainResponse)
+def fetch_contract_from_chain(payload: FromChainRequest) -> FromChainResponse:
+    """Fetch verified source for an on-chain contract and stage it as an upload.
+
+    The returned ``uploadId`` can be passed directly to ``POST /api/tasks`` —
+    the task pipeline then runs exactly the same audit it would for a
+    user-uploaded archive.
+    """
+    chain = (payload.chain or "").strip().lower()
+    address = (payload.address or "").strip()
+
+    try:
+        fetched = explorer_client.fetch_verified_contract(chain, address)
+    except explorer_client.UnsupportedChainError as exc:
+        # 422: request is well-formed but not actionable (wrong chain).
+        raise HTTPException(status_code=422, detail=str(exc))
+    except explorer_client.ContractNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except explorer_client.ContractNotVerifiedError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except explorer_client.ExplorerConfigError as exc:
+        # 503: server-side misconfiguration, surfaced clearly to the caller.
+        raise HTTPException(status_code=503, detail=str(exc))
+    except explorer_client.ExplorerError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    # Reuse the same upload-size guard to avoid pathological contracts.
+    if len(fetched.zip_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Fetched source exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit.",
+        )
+
+    upload_id = task_manager.save_upload(fetched.zip_filename, fetched.zip_bytes)
+    return FromChainResponse(
+        uploadId=upload_id,
+        filename=fetched.zip_filename,
+        chain=fetched.chain,
+        address=fetched.address,
+        contractName=fetched.contract_name,
+    )
 
 
 @app.post("/api/tasks", response_model=TaskResponse)
@@ -500,7 +565,12 @@ def _load_github_oauth_configs() -> Dict[str, str]:
     sec = os.getenv("GITHUB_CLIENT_SECRET", "")
     if cid and sec:
         configs[cid] = sec
-    # Numbered extras (_2, _3, ...)
+    # Secondary without underscore: GITHUB_CLIENT_ID2 / GITHUB_CLIENT_SECRET2
+    cid = os.getenv("GITHUB_CLIENT_ID2", "")
+    sec = os.getenv("GITHUB_CLIENT_SECRET2", "")
+    if cid and sec:
+        configs[cid] = sec
+    # Numbered extras with underscore (_2, _3, ...)
     for i in range(2, 10):
         cid = os.getenv(f"GITHUB_CLIENT_ID_{i}", "")
         sec = os.getenv(f"GITHUB_CLIENT_SECRET_{i}", "")
@@ -665,7 +735,145 @@ def get_wallet_info(wallet_address: str = Depends(verify_wallet_token)):
     return {"wallet_address": wallet_address}
 
 
-# Serve frontend static files — must be mounted last so API routes take precedence
+# ── Metrics snapshot endpoint ────────────────────────────────────────────────
+
+@app.get("/api/metrics/snapshot")
+def metrics_snapshot(
+    access_token: str = "",
+    end_timestamp: Optional[int] = None,
+):
+    """
+    Project-chart metrics endpoint.
+    GET /api/metrics/snapshot?access_token=<token>[&end_timestamp=<unix_sec>]
+
+    Returns cumulative counters up to `end_timestamp` (or now if omitted).
+    Identical end_timestamp always returns identical data (idempotent).
+    """
+    # ── Auth (fallback — primary guard is the ASGI wrapper) ──────────────────
+    # The ASGI wrapper drops the connection before any HTTP bytes are sent.
+    # This check is a safety net only and should never be reached.
+    expected = os.environ.get("CHARTS_ACCESS_TOKEN", "")
+    if not expected or access_token != expected:
+        return None
+
+    # ── Time bound ───────────────────────────────────────────────────────────
+    # created_at is stored as ISO-8601 UTC string "2026-03-23T07:15:32.463888Z"
+    # Converting unix ts → same format lets us do a plain string comparison.
+    if end_timestamp is not None:
+        cutoff_dt  = datetime.fromtimestamp(end_timestamp, tz=timezone.utc)
+        cutoff_iso = cutoff_dt.strftime("%Y-%m-%dT%H:%M:%S")   # prefix match is enough
+        ts_out = end_timestamp
+    else:
+        cutoff_iso = None
+        ts_out = int(datetime.utcnow().timestamp())
+
+    # ── Query SQLite ──────────────────────────────────────────────────────────
+    db_path = BASE_DIR / "tasks.db"
+    try:
+        conn = sqlite3.connect(str(db_path), check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+
+        if cutoff_iso:
+            where = "WHERE created_at <= ?"
+            args  = (cutoff_iso,)
+        else:
+            where = ""
+            args  = ()
+
+        def q(sql: str, params: tuple = ()) -> int:
+            return conn.execute(sql, params).fetchone()[0]
+
+        total_users = q(
+            f"SELECT COUNT(DISTINCT lower(wallet_address)) FROM tasks {where}",
+            args,
+        )
+        total_audits = q(
+            f"SELECT COUNT(*) FROM tasks {where}",
+            args,
+        )
+        total_contract_audits = q(
+            f"SELECT COUNT(*) FROM tasks {where} {'AND' if where else 'WHERE'} skill_type='multichain-contract-vuln'",
+            args,
+        )
+        total_skill_audits = q(
+            f"SELECT COUNT(*) FROM tasks {where} {'AND' if where else 'WHERE'} skill_type='skill-security-audit'",
+            args,
+        )
+        total_skill_stress = q(
+            f"SELECT COUNT(*) FROM tasks {where} {'AND' if where else 'WHERE'} skill_type='skill-stress-lab'",
+            args,
+        )
+        conn.close()
+    except Exception as exc:
+        logger.exception("metrics_snapshot db error")
+        raise HTTPException(status_code=500, detail={"error": str(exc)})
+
+    return {
+        "data": {
+            "total_users":           total_users,
+            "total_audits":          total_audits,
+            "total_contract_audits": total_contract_audits,
+            "total_skill_audits":    total_skill_audits,
+            "total_skill_stress":    total_skill_stress,
+        },
+        "extra": {
+            "timestamp": ts_out,
+            "display": {
+                "total_users":           "总用户数",
+                "total_audits":          "总审计次数",
+                "total_contract_audits": "总合约审计数",
+                "total_skill_audits":    "总Skill审计数",
+                "total_skill_stress":    "总压力测试数",
+            },
+            "order": [
+                "total_users",
+                "total_audits",
+                "total_contract_audits",
+                "total_skill_audits",
+                "total_skill_stress",
+            ],
+        },
+    }
+
+
+# Serve frontend static files — must be mounted last so API routes take precedence.
+# JS/HTML files get no-cache headers so browsers always fetch the latest version.
 _FRONTEND_DIR = REPO_ROOT / "frontend"
-if _FRONTEND_DIR.exists():
-    app.mount("/", StaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")
+
+@app.get("/{full_path:path}", include_in_schema=False)
+async def serve_frontend(full_path: str, request: Request):
+    """Serve static files with no-cache for JS/HTML to prevent stale client_id issues."""
+    from fastapi.responses import Response
+    target = _FRONTEND_DIR / full_path
+    # Default to index / workspace.html for bare paths
+    if not target.exists() or target.is_dir():
+        target = _FRONTEND_DIR / "workspace.html"
+    if not target.exists():
+        raise HTTPException(status_code=404)
+    suffix = target.suffix.lower()
+    no_cache_types = {".js", ".html", ".htm"}
+    headers = {"Cache-Control": "no-store, no-cache, must-revalidate"} if suffix in no_cache_types else {}
+    import mimetypes
+    mime, _ = mimetypes.guess_type(str(target))
+    return FileResponse(str(target), headers=headers, media_type=mime or "application/octet-stream")
+
+
+# ── Raw ASGI guard: drop connection silently on bad metrics token ─────────────
+# Wraps the entire FastAPI app so the check runs before Starlette's
+# ServerErrorMiddleware — no HTTP response is sent at all when auth fails.
+
+from urllib.parse import parse_qs as _parse_qs
+
+_inner_app = app   # keep a reference before reassignment
+
+async def _metrics_drop_guard(scope, receive, send):
+    if scope["type"] == "http" and scope.get("path") == "/api/metrics/snapshot":
+        qs      = _parse_qs(scope.get("query_string", b"").decode())
+        token   = qs.get("access_token", [""])[0]
+        expected = os.environ.get("CHARTS_ACCESS_TOKEN", "")
+        if not expected or token != expected:
+            return  # close TCP without sending any HTTP bytes
+    await _inner_app(scope, receive, send)
+
+# uvicorn entry-point: app.main:asgi_app
+asgi_app = _metrics_drop_guard

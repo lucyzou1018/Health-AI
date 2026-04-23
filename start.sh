@@ -21,9 +21,9 @@ if [[ "$1" == "--dev" ]]; then
   echo "⚠️  Starting in DEV mode (--reload enabled)."
   echo "   File changes will restart the server and may interrupt active scan tasks."
   source .venv/bin/activate
-  uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+  uvicorn app.main:asgi_app --reload --host 0.0.0.0 --port 8000
 else
   echo "🚀 Starting CodeAutrix backend (stable mode, no auto-reload)..."
   source .venv/bin/activate
-  uvicorn app.main:app --host 0.0.0.0 --port 8000
+  uvicorn app.main:asgi_app --host 0.0.0.0 --port 8000
 fi

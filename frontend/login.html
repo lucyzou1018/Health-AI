@@ -253,7 +253,8 @@
     var GOOGLE_CLIENT_ID = window.HEALTH_AI_GOOGLE_CLIENT_ID || "744175699896-h7k636bv5g8bggvgdumdoqt3om6pcpk9.apps.googleusercontent.com";
     var GITHUB_CLIENT_ID = window.HEALTH_AI_GITHUB_CLIENT_ID || (function() {
       var h = window.location.hostname;
-      return (h === 'localhost' || h === '127.0.0.1') ? 'Ov23liVdUWv2zE2NaXdK' : 'Ov23liVMPb3d1XqGPFZ7';
+      if (h === 'www.codeautrix.com' || h === 'codeautrix.com') return 'Ov23lia1DNtFes1ZAM3e'; // production
+      return 'Ov23liGOlSlH9lK0zkah'; // localhost dev
     })();
 
     function setLoading(btn) { btn.classList.add('loading'); }
@@ -490,6 +491,33 @@
     document.getElementById('btn-back-to-main').addEventListener('click', function() {
       screenWallet.classList.add('hidden');
       screenMain.classList.remove('hidden');
+    });
+
+    // ── Reset loading state when the page is shown (e.g. bfcache restore after
+    //    returning from Google/GitHub OAuth page via the browser back button) ──
+    function clearAllAuthLoading() {
+      var buttons = document.querySelectorAll('.auth-btn');
+      buttons.forEach(function(b) {
+        b.classList.remove('loading');
+        b.disabled = false;
+      });
+    }
+
+    // Fires on initial load AND on bfcache restore; event.persisted === true
+    // specifically indicates a bfcache restore where JS state was frozen.
+    window.addEventListener('pageshow', function(event) {
+      if (event.persisted) {
+        clearAllAuthLoading();
+      }
+    });
+
+    // Also clear when the tab becomes visible again (covers the rare case of
+    // a browser that doesn't fire pageshow with persisted=true but still
+    // preserves DOM state).
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible') {
+        clearAllAuthLoading();
+      }
     });
   </script>
 </body>
