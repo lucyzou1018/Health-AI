@@ -1011,6 +1011,20 @@
     loadReport();
   </script>
 
+  <!-- Analytics helper -->
+  <script src="analytics.js"></script>
   <!-- Vercel Web Analytics -->
   <script defer src="/_vercel/insights/script.js"></script>
+  <script>
+    // Track report view (fires when the report page opens)
+    (function () {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        var taskId = params.get('task') || '';
+        if (window.trackEvent) {
+          window.trackEvent('report_viewed', { taskId: taskId });
+        }
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
 </body>

@@ -261,6 +261,7 @@
 
     // Google
     document.getElementById('btn-google').addEventListener('click', function() {
+      if (window.trackEvent) window.trackEvent('login_click_email', { method: 'google' });
       setLoading(this);
       localStorage.setItem('google_oauth_redirect', 'workspace.html');
       var params = new URLSearchParams({
@@ -273,6 +274,7 @@
 
     // GitHub
     document.getElementById('btn-github').addEventListener('click', function() {
+      if (window.trackEvent) window.trackEvent('login_click_github', { method: 'github' });
       setLoading(this);
       localStorage.setItem('github_oauth_redirect', 'workspace.html');
       var params = new URLSearchParams({
@@ -403,6 +405,7 @@
         localStorage.setItem('wallet_address', walletAddress);
         localStorage.setItem('login_type', 'wallet');
         localStorage.removeItem('login_email');
+        if (window.trackEvent) window.trackEvent('login_success', { method: 'wallet' });
         window.location.href = 'workspace.html';
 
       } catch (err) {
@@ -476,6 +479,7 @@
 
     // Switch to wallet screen
     document.getElementById('btn-wallet-open').addEventListener('click', function() {
+      if (window.trackEvent) window.trackEvent('login_click_wallet', { method: 'wallet', step: 'open_selector' });
       screenMain.classList.add('hidden');
       screenWallet.classList.remove('hidden');
       screenWallet.classList.add('slide-in');
@@ -520,5 +524,10 @@
       }
     });
   </script>
+
+  <!-- Analytics helper -->
+  <script src="analytics.js"></script>
+  <!-- Vercel Web Analytics -->
+  <script defer src="/_vercel/insights/script.js"></script>
 </body>
 </html>

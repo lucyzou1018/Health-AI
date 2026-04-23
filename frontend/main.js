@@ -794,6 +794,13 @@ async function uploadFileIfNeeded() {
   }
   // Don't clear file input here - we want to keep showing the selected file
   const data = await resp.json();
+  if (window.trackEvent) {
+    window.trackEvent("file_uploaded", {
+      skillType: activeTab,
+      fileName: file.name,
+      fileSize: file.size,
+    });
+  }
   return data.uploadId;
 }
 
@@ -982,6 +989,12 @@ function renderParamFields() {
 }
 
 async function runTask() {
+  if (window.trackEvent) {
+    window.trackEvent("analyze_clicked", {
+      skillType: activeTab,
+      loginType: loginType || "none",
+    });
+  }
   // 检查是否已连接钱包
   if (!currentWallet) {
     alert("Please connect your wallet before running analysis.");
@@ -1873,6 +1886,9 @@ function showShareModal(shareText) {
   // Share on X
   overlay.querySelector(".share-modal-twitter-btn").addEventListener("click", () => {
     const text = textarea.value;
+    if (window.trackEvent) {
+      window.trackEvent("share_twitter_clicked", { charCount: xCharCount(text) });
+    }
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   });
@@ -2409,6 +2425,8 @@ async function handleGithubCallback() {
     localStorage.setItem("login_email", data.email || data.login);
     localStorage.setItem("github_login", data.login || "");
 
+    if (window.trackEvent) window.trackEvent("login_success", { method: "github" });
+
     updateWalletUI();
     updateRunButtonState();
     loadWalletHistory();
@@ -2502,6 +2520,7 @@ async function handleGoogleCallback() {
     }
 
     console.log("[GoogleAuth] Login complete:", userInfo.email);
+    if (window.trackEvent) window.trackEvent("login_success", { method: "google" });
     loadWalletHistory();
     return true;
   } catch (err) {
@@ -2544,6 +2563,7 @@ async function doConnectProvider(selectedProvider) {
     localStorage.setItem("login_type", "wallet");
     localStorage.removeItem("login_email");
     walletToken = token; currentWallet = walletAddress; loginType = "wallet"; loginEmail = null;
+    if (window.trackEvent) window.trackEvent("login_success", { method: "wallet" });
     updateWalletUI(); updateRunButtonState(); loadWalletHistory();
   } catch (err) {
     console.error("Wallet connection failed:", err);
@@ -2743,7 +2763,7 @@ async function connectWallet() {
     }
     
     const { token } = await verifyResp.json();
-    
+
     // 保存 token 和钱包地址
     localStorage.setItem("wallet_token", token);
     localStorage.setItem("wallet_address", walletAddress);
@@ -2754,10 +2774,12 @@ async function connectWallet() {
     loginType = "wallet";
     loginEmail = null;
 
+    if (window.trackEvent) window.trackEvent("login_success", { method: "wallet" });
+
     updateWalletUI();
     updateRunButtonState();
     loadWalletHistory();
-    
+
   } catch (err) {
     console.error("Wallet connection failed:", err);
     alert("Failed to connect wallet: " + err.message);
