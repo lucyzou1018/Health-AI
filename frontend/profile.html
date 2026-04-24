@@ -486,7 +486,11 @@
 
     function loadStats() {
       if (!walletToken) return;
-      var API_BASE = window.HEALTH_AI_API_BASE || "http://localhost:8000";
+      var API_BASE = window.HEALTH_AI_API || (
+        (window.location.hostname === 'localhost' && ['3000','8091'].includes(window.location.port))
+          ? 'http://localhost:8000'
+          : window.location.origin
+      );
       fetch(API_BASE + "/api/wallet/history?limit=200", {
         headers: { "X-Wallet-Token": walletToken }
       }).then(function(r) { return r.ok ? r.json() : null; })
