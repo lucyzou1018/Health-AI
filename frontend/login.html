@@ -253,7 +253,8 @@
     var GOOGLE_CLIENT_ID = window.HEALTH_AI_GOOGLE_CLIENT_ID || "744175699896-h7k636bv5g8bggvgdumdoqt3om6pcpk9.apps.googleusercontent.com";
     var GITHUB_CLIENT_ID = window.HEALTH_AI_GITHUB_CLIENT_ID || (function() {
       var h = window.location.hostname;
-      if (h === 'www.codeautrix.com' || h === 'codeautrix.com') return 'Ov23lia1DNtFes1ZAM3e'; // production
+      if (h === 'www.codeautrix.com' || h === 'codeautrix.com') return 'Ov23lia1DNtFes1ZAM3e'; // codeautrix.com production
+      if (h === 'codeautrix.agentese.ai')                        return 'Ov23liP8rMZs6eXHkulK'; // agentese.ai production
       return 'Ov23liGOlSlH9lK0zkah'; // localhost dev
     })();
 

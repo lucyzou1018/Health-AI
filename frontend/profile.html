@@ -921,24 +921,93 @@
       }
     }
 
-    async function connectPaymentWallet() {
-      var p = window.ethereum;
-      if (!p) { alert("No wallet found. Please install MetaMask or Rabby."); return; }
-      try {
-        // wallet_requestPermissions 会触发钱包重新弹出账户选择界面
-        await p.request({
-          method: "wallet_requestPermissions",
-          params: [{ eth_accounts: {} }],
+    // ── 轻量 EIP-6963 provider 检测（profile.html 不加载 main.js，需内联）─────
+    var _profileEip6963 = [];
+    (function() {
+      window.addEventListener("eip6963:announceProvider", function(e) {
+        if (e.detail && e.detail.provider) _profileEip6963.push(e.detail);
+      });
+      window.dispatchEvent(new Event("eip6963:requestProvider"));
+    })();
+
+    function _detectProfileProviders() {
+      var seen = {};
+      var list = [];
+      _profileEip6963.forEach(function(d) {
+        var rdns = d.info && d.info.rdns ? d.info.rdns : "";
+        // 按 rdns 去重，rdns 为空时按 provider 引用去重
+        var key = rdns || ("_" + list.length);
+        if (rdns && seen[rdns]) return;
+        seen[rdns || key] = true;
+        list.push({ rdns: rdns, name: d.info.name, icon: d.info.icon, provider: d.provider });
+      });
+      // legacy fallback（仅当 EIP-6963 没有检测到任何钱包时）
+      if (list.length === 0 && window.ethereum) {
+        list.push({ rdns: "", name: "Browser Wallet", icon: null, provider: window.ethereum });
+      }
+      return list;
+    }
+
+    // ── 简易钱包选择弹窗（profile 页独立，不依赖 main.js）────────────────────
+    function _profileShowWalletPicker(providers) {
+      return new Promise(function(resolve) {
+        var modal = document.createElement("div");
+        modal.style.cssText = "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5)";
+        var card = document.createElement("div");
+        card.style.cssText = "background:#fff;border-radius:16px;padding:24px 20px;min-width:280px;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.2)";
+        card.innerHTML = '<h3 style="margin:0 0 16px;font-size:16px;font-weight:700;text-align:center">Choose Wallet</h3>';
+        providers.forEach(function(p, i) {
+          var btn = document.createElement("button");
+          btn.style.cssText = "display:flex;align-items:center;gap:12px;width:100%;padding:12px 16px;margin-bottom:8px;border:1px solid #e2e8f0;border-radius:10px;background:#fff;cursor:pointer;font-size:14px;font-weight:500;transition:background 120ms";
+          btn.onmouseover = function() { btn.style.background = "#f8fafc"; };
+          btn.onmouseout  = function() { btn.style.background = "#fff"; };
+          if (p.icon) {
+            var img = document.createElement("img");
+            img.src = p.icon; img.width = 24; img.height = 24;
+            img.style.borderRadius = "6px";
+            btn.appendChild(img);
+          }
+          btn.appendChild(document.createTextNode(p.name || "Wallet"));
+          btn.onclick = function() { document.body.removeChild(modal); resolve(p); };
+          card.appendChild(btn);
         });
-        var accounts = await p.request({ method: "eth_accounts" });
+        var cancel = document.createElement("button");
+        cancel.textContent = "Cancel";
+        cancel.style.cssText = "width:100%;padding:10px;border:none;background:none;color:#64748b;cursor:pointer;font-size:13px;margin-top:4px";
+        cancel.onclick = function() { document.body.removeChild(modal); resolve(null); };
+        card.appendChild(cancel);
+        modal.appendChild(card);
+        modal.onclick = function(e) { if (e.target === modal) { document.body.removeChild(modal); resolve(null); } };
+        document.body.appendChild(modal);
+      });
+    }
+
+    async function connectPaymentWallet() {
+      var allProviders = _detectProfileProviders();
+      if (allProviders.length === 0) {
+        alert("No wallet found. Please install MetaMask or Rabby.");
+        return;
+      }
+
+      // 始终弹出选择器
+      var chosen = await _profileShowWalletPicker(allProviders);
+      if (!chosen) return;
+
+      try {
+        var accounts = await chosen.provider.request({ method: "eth_requestAccounts" });
         if (!accounts || accounts.length === 0) return;
         paymentWalletAddress  = accounts[0];
-        paymentWalletProvider = p;
-        window._paymentWalletProvider = p;
+        paymentWalletProvider = chosen.provider;
+        window._paymentWalletProvider = chosen.provider;
         localStorage.setItem("payment_wallet_address", paymentWalletAddress);
-        localStorage.setItem("payment_wallet_rdns", "");
+        localStorage.setItem("payment_wallet_rdns",   chosen.rdns || "");
         _updatePaymentWalletUI();
-      } catch(e) { if (e.code !== 4001) console.error("Payment wallet connect failed:", e); }
+      } catch(e) {
+        var _em = e && e.message ? e.message : String(e);
+        var _rejected = (e && e.code === 4001) ||
+          _em.includes("User rejected") || _em.includes("user rejected");
+        if (!_rejected) console.error("Payment wallet connect failed:", e);
+      }
     }
 
     function disconnectPaymentWallet() {

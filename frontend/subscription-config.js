@@ -11,8 +11,8 @@
       chainId:              97,
       chainName:            "BSC Testnet",
       rpcUrl:               "https://data-seed-prebsc-1-s1.binance.org:8545",
-      subscriptionAddress:  "0x5C0B9ae96eBc735d18570084C4Dd75eE268D5a06",
-      usdtAddress:          "0x5a526E46449021B5d666C4579fE043344905bC78",
+      subscriptionAddress:  "0x0d1885369bb00B6b5B954716bd177c13f6f57563",
+      usdtAddress:          "0x18340375a93099ef53B0a3c868b1b972E62C687E",
       usdtDecimals:         6,
       explorerUrl:          "https://testnet.bscscan.com",
     },
@@ -20,7 +20,7 @@
       chainId:              56,
       chainName:            "BSC Mainnet",
       rpcUrl:               "https://bsc-dataseed.binance.org",
-      subscriptionAddress:  "0xB9d76024723D4A25061B7336EBbBe1dA5243eCAF",
+      subscriptionAddress:  "0x2151eDA62f438f17Df35e242b32155C923D7F19f",
       usdtAddress:          "0x55d398326f99059fF775485246999027B3197955",
       usdtDecimals:         18,
       explorerUrl:          "https://bscscan.com",
@@ -209,8 +209,40 @@
   };
 
   // ── 获取当前 wallet provider（兼容 Rabby / OKX / MetaMask 等）───────────
-  function getProvider() {
-    // 优先用登录时记录的 provider，fallback 到 window.ethereum
+  /**
+   * 找到持有登录钱包地址的 provider（最可靠方案）。
+   * 优先级：
+   *   1. 地址匹配：遍历所有 EIP-6963 provider，找 eth_accounts 包含登录地址的那个
+   *   2. RDNS 精确匹配
+   *   3. 回退 window._walletProvider / window.ethereum
+   */
+  async function getProvider() {
+    var walletAddr   = localStorage.getItem("wallet_address") || "";
+    var savedRdns    = localStorage.getItem("wallet_provider_rdns") || "";
+    var allProviders = window._detectWalletProviders ? window._detectWalletProviders() : [];
+
+    // 1. 地址匹配（最准确，不依赖 RDNS 或 isMetaMask flag）
+    if (walletAddr) {
+      for (var i = 0; i < allProviders.length; i++) {
+        try {
+          var accs = await allProviders[i].provider.request({ method: "eth_accounts" });
+          if (Array.isArray(accs) && accs.some(function(a) {
+            return a.toLowerCase() === walletAddr.toLowerCase();
+          })) {
+            return allProviders[i].provider;
+          }
+        } catch(e) { /* 该 provider 未连接到本站，跳过 */ }
+      }
+    }
+
+    // 2. RDNS 精确匹配（地址匹配失败时的 fallback）
+    if (savedRdns) {
+      for (var j = 0; j < allProviders.length; j++) {
+        if (allProviders[j].rdns === savedRdns) return allProviders[j].provider;
+      }
+    }
+
+    // 3. 最终回退
     var p = window._walletProvider || window.ethereum;
     if (!p) throw new Error("No wallet provider found. Please connect your wallet.");
     return p;
@@ -218,7 +250,7 @@
 
   // ── 发送交易（eth_sendTransaction）───────────────────────────────────────
   async function sendTx(from, to, data) {
-    var txHash = await getProvider().request({
+    var txHash = await (await getProvider()).request({
       method: "eth_sendTransaction",
       params: [{ from: from, to: to, data: data }],
     });
@@ -269,7 +301,7 @@
 
     // ── Step 0: 确保账户已授权 ────────────────────────────────────────────
     onStatus && onStatus("Connecting wallet…");
-    var provider = getProvider();
+    var provider = await getProvider();
     var accounts;
     try {
       accounts = await provider.request({ method: "eth_requestAccounts" });
@@ -281,7 +313,7 @@
       }
     }
     if (!accounts || accounts.length === 0) throw new Error("No wallet accounts found. Please reconnect your wallet.");
-    // 始终用 provider 返回的当前账户作为 from，避免与传入的 walletAddr 不一致
+    // 始终用 provider 返回的当前账户作为 from
     var fromAddr = accounts[0];
 
     // ── Step 1: 切换到正确链 ──────────────────────────────────────────────

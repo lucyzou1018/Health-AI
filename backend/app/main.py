@@ -824,46 +824,59 @@ def metrics_snapshot(
             f"SELECT COUNT(*) FROM tasks {where}",
             args,
         )
-        total_contract_audits = q(
-            f"SELECT COUNT(*) FROM tasks {where} {'AND' if where else 'WHERE'} skill_type='multichain-contract-vuln'",
-            args,
-        )
-        total_skill_audits = q(
-            f"SELECT COUNT(*) FROM tasks {where} {'AND' if where else 'WHERE'} skill_type='skill-security-audit'",
-            args,
-        )
-        total_skill_stress = q(
-            f"SELECT COUNT(*) FROM tasks {where} {'AND' if where else 'WHERE'} skill_type='skill-stress-lab'",
-            args,
-        )
         conn.close()
     except Exception as exc:
         logger.exception("metrics_snapshot db error")
         raise HTTPException(status_code=500, detail={"error": str(exc)})
 
+    # ── 从链上读取 totalRevenue ───────────────────────────────────────────────
+    # selector: keccak256("totalRevenue()") = 0xbf2d9e0b
+    # USDT decimals: testnet=6, mainnet=18
+    total_revenue_usdt: float = 0.0
+    try:
+        is_testnet   = os.environ.get("SUBSCRIPTION_ENV", "mainnet").lower() == "testnet"
+        contract_addr = os.environ.get(
+            "SUBSCRIPTION_CONTRACT_TESTNET" if is_testnet else "SUBSCRIPTION_CONTRACT_MAINNET", ""
+        )
+        rpc_url = (
+            "https://data-seed-prebsc-1-s1.binance.org:8545" if is_testnet
+            else "https://bsc-dataseed.binance.org"
+        )
+        decimals = 6 if is_testnet else 18
+        if contract_addr:
+            import urllib.request as _ur
+            import json as _json
+            _payload = _json.dumps({
+                "jsonrpc": "2.0", "method": "eth_call",
+                "params": [{"to": contract_addr, "data": "0xbf2d9e0b"}, "latest"], "id": 1,
+            }).encode()
+            _req = _ur.Request(rpc_url, data=_payload,
+                               headers={"Content-Type": "application/json"}, method="POST")
+            with _ur.urlopen(_req, timeout=5) as _resp:
+                _result = _json.loads(_resp.read().decode()).get("result", "")
+            if _result and _result != "0x":
+                _raw = int(_result, 16)
+                total_revenue_usdt = round(_raw / (10 ** decimals), 2)
+    except Exception:
+        pass  # 链上查询失败时保留 0
+
     return {
         "data": {
-            "total_users":           total_users,
-            "total_audits":          total_audits,
-            "total_contract_audits": total_contract_audits,
-            "total_skill_audits":    total_skill_audits,
-            "total_skill_stress":    total_skill_stress,
+            "total_users":        total_users,
+            "total_audits":       total_audits,
+            "total_revenue_usdt": total_revenue_usdt,
         },
         "extra": {
             "timestamp": ts_out,
             "display": {
-                "total_users":           "总用户数",
-                "total_audits":          "总审计次数",
-                "total_contract_audits": "总合约审计数",
-                "total_skill_audits":    "总Skill审计数",
-                "total_skill_stress":    "总压力测试数",
+                "total_users":        "总用户数",
+                "total_audits":       "总审计次数",
+                "total_revenue_usdt": "总订阅收入(USDT)",
             },
             "order": [
                 "total_users",
                 "total_audits",
-                "total_contract_audits",
-                "total_skill_audits",
-                "total_skill_stress",
+                "total_revenue_usdt",
             ],
         },
     }

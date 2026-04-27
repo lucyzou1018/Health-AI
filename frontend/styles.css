@@ -5561,3 +5561,8 @@ button#run-task:hover:not(:disabled) {
   color: #fff;
   border-color: transparent;
 }
+
+/* ── Pro-only feature visibility ────────────────────────────────────────── */
+/* PDF download button hidden by default; shown only for Pro users */
+.history-dl-btn.pro-only { display: none; }
+body.is-pro-user .history-dl-btn.pro-only { display: inline-block; }

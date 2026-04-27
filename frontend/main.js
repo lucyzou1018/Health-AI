@@ -2009,7 +2009,7 @@ function setUpgradeBtnVisible(visible) {
   if (btn) btn.style.display = visible ? "inline-flex" : "none";
 }
 
-/** 从 localStorage 缓存读取 plan，更新升级按钮文案和显示 */
+/** 从 localStorage 缓存读取 plan，更新升级按钮文案和 PDF 按钮可见性 */
 function refreshUpgradeBtnFromCache() {
   if (!currentWallet) { setUpgradeBtnVisible(false); return; }
   var cached = window.getCachedPlan ? window.getCachedPlan() : { isPro: false };
@@ -2018,8 +2018,10 @@ function refreshUpgradeBtnFromCache() {
   btn.style.display = "inline-flex";
   if (cached.isPro) {
     btn.innerHTML = "🔥 Extend Pro Plan";
+    document.body.classList.add("is-pro-user");
   } else {
     btn.innerHTML = "⚡ Upgrade to Pro";
+    document.body.classList.remove("is-pro-user");
   }
 }
 
@@ -2627,8 +2629,13 @@ async function doConnectProvider(selectedProvider) {
     // 保存实际使用的 provider，供支付模块使用（兼容 Rabby / OKX / MetaMask 等）
     window._walletProvider = selectedProvider.provider;
     // 持久化 rdns，页面刷新后能精确恢复同一个 provider
-    if (selectedProvider.rdns) {
-      localStorage.setItem("wallet_provider_rdns", selectedProvider.rdns);
+    // 保存 rdns；遗留检测（rdns 为空）时按 isMetaMask 写入合成值
+    var _prov = selectedProvider.provider;
+    var _rdnsToSave = selectedProvider.rdns ||
+      (_prov && _prov.isMetaMask && !_prov.isPhantom && !_prov.isRabby
+        && !_prov.isBraveWallet && !_prov.isBackpack ? "io.metamask" : "");
+    if (_rdnsToSave) {
+      localStorage.setItem("wallet_provider_rdns", _rdnsToSave);
     }
     if (window.trackEvent) window.trackEvent("login_success", { method: "wallet" });
     updateWalletUI(); updateRunButtonState(); loadWalletHistory();
@@ -3015,7 +3022,7 @@ function createHistoryItem(task) {
           '<a href="report.html?task=' + task.taskId + '" target="_blank" class="history-link">' + historyI18n("viewReport") + '</a>' +
           '<button class="history-share-btn" data-task-id="' + task.taskId + '" data-skill-type="' + (task.skillType || '') + '">' + historyI18n("shareToX") + ' <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-1px"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg></button>' +
         '</div>' +
-        '<button class="history-dl-btn" data-task-id="' + task.taskId + '" data-skill="' + (task.skillType || 'audit') + '">' + historyI18n("pdfButton") + '</button>' :
+        '<button class="history-dl-btn pro-only" data-task-id="' + task.taskId + '" data-skill="' + (task.skillType || 'audit') + '">' + historyI18n("pdfButton") + '</button>' :
         '<span class="history-no-report">-</span>') +
     '</div>';
   
@@ -3283,6 +3290,9 @@ function _showPaymentStatusModal() {
 
 // 挂到 window，使 onclick="showUpgradeModal()" 在 module 作用域外可调用
 window.showUpgradeModal = showUpgradeModal;
+// 让 subscription-config.js 能实时查询 EIP-6963 providers
+window._detectWalletProviders = detectWalletProviders;
+window._showWalletSelector    = showWalletSelector;
 
 // ── Payment Wallet (Gmail/GitHub users) ──────────────────────────────────────
 
@@ -3431,7 +3441,10 @@ function showDisconnectModal() {
 
   // Show user identifier based on login type
   if (addrEl) {
-    if (loginType === "google" && loginEmail) {
+    if (loginType === "github") {
+      var ghLogin = localStorage.getItem("github_login") || loginEmail || "";
+      addrEl.textContent = ghLogin ? "@" + ghLogin : (currentWallet ? currentWallet.slice(0, 6) + "..." + currentWallet.slice(-4) : "");
+    } else if (loginType === "google" && loginEmail) {
       addrEl.textContent = loginEmail;
     } else if (currentWallet) {
       addrEl.textContent = currentWallet.slice(0, 6) + "..." + currentWallet.slice(-4);
