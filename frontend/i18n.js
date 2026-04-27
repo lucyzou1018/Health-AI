@@ -203,21 +203,21 @@
         highlightMetric: '3 Free Scans / Day',
         highlightText: 'The free quota is shared across Skill health checks, contract audits, and stress tests. It resets daily and is intended for evaluation and light usage.',
         miniStatKeys: ['Skill Audit', 'Contract Scan', 'Stress Test', 'Billing'],
-        miniStatValues: ['Included', 'Included', 'Included', 'Coming soon'],
+        miniStatValues: ['Included', 'Included', 'Included', 'Included'],
         sectionEyebrows: ['Plans', 'Comparison', 'FAQ'],
         sectionTitles: ['Choose the scale you need', 'What changes when billing arrives', 'Short answers before payment launches'],
         sectionDescs: ['All paid tiers below are preview-only at this stage. The direction is clear: free for exploration, paid for unlimited production usage.'],
         planBadge: 'Recommended',
         planNames: ['Free', 'Pro', 'Enterprise'],
         planDescs: ['Best for trying the platform and validating workflows.', 'For builders who need unlimited scans and faster iteration.', 'For teams that want scale, governance, and private delivery.'],
-        planPriceSubs: ['available now', '/ month, coming soon', 'contact plan, coming soon'],
+        planPriceSubs: ['available now', '/ month', 'contact plan, coming soon'],
         planMetas: ['Current live plan', 'Future paid tier', 'Designed for organization rollout'],
         planFeatures: [
           ['3 scans per day total', 'Code health checks for uploaded repos or files', 'Smart contract security scans', 'Basic stress testing for uploaded code', 'Browser-based reports'],
           ['Unlimited code health checks', 'Unlimited contract scans', 'Unlimited stress test runs', 'Priority queue and faster processing', 'Expanded export and report history'],
           ['Unlimited organization-wide usage', 'Team access and shared reporting', 'Private deployment and custom limits', 'Dedicated support and onboarding', 'Custom integration pathways']
         ],
-        planCtas: ['Start Free', 'Coming Soon', 'Talk to Us'],
+        planCtas: ['Start Free', 'Start Pro', 'Talk to Us'],
         compareHeads: ['Capability', 'Free', 'Pro', 'Enterprise'],
         compareRows: [
           ['Daily task limit', '3 total', 'Unlimited', 'Unlimited'],
@@ -225,6 +225,7 @@
           ['Contract vulnerability scans', 'Included', 'Unlimited', 'Unlimited'],
           ['Stress test execution', 'Included', 'Unlimited', 'Unlimited'],
           ['Report retention', 'Basic', 'Extended', 'Custom policy'],
+          ['PDF report download', '—', '✓ Included', '✓ Included'],
           ['Team collaboration', 'Not included', 'Lightweight', 'Advanced'],
           ['Support level', 'Community style', 'Priority', 'Dedicated']
         ],
@@ -332,14 +333,14 @@
         planBadge: '推荐',
         planNames: ['免费版', '专业版', '企业版'],
         planDescs: ['适合快速体验平台与验证工作流。', '适合需要无限扫描与更快迭代的开发者。', '适合需要规模化治理、私有化与团队协作的组织。'],
-        planPriceSubs: ['当前可用', '/ 月，即将上线', '联系定制，即将上线'],
+        planPriceSubs: ['当前可用', '/ 月', '联系定制，即将上线'],
         planMetas: ['当前已开放方案', '未来付费方案', '面向组织级落地'],
         planFeatures: [
           ['每天总共 3 次扫描', '支持上传代码健康检查', '支持智能合约安全扫描', '支持基础压力测试', '浏览器内查看报告'],
           ['代码健康检查无限量', '合约扫描无限量', '压力测试无限量', '优先队列与更快处理速度', '更长的报告历史与导出能力'],
           ['组织级无限量使用', '团队共享报告与协作能力', '私有化部署与自定义限制', '专属支持与上线协助', '可定制集成方案']
         ],
-        planCtas: ['免费开始', '即将上线', '联系我们'],
+        planCtas: ['免费开始', '立即升级 Pro', '联系我们'],
         compareHeads: ['能力项', '免费版', '专业版', '企业版'],
         compareRows: [
           ['每日任务上限', '3 次', '无限量', '无限量'],
