@@ -10,7 +10,8 @@
   <meta name="twitter:image" content="caLogo.svg" />
   <meta name="author" content="Agentese Labs" />
   <meta property="og:site_name" content="Agentese" />
-  <link rel="stylesheet" href="styles.css?v=20260409f" />
+  <link rel="stylesheet" href="styles.css?v=20260424" />
+  <script src="subscription-config.js"></script>
 </head>
 <body>
   <div class="ambient-glow"></div>
@@ -60,6 +61,22 @@
           <div class="lang-switch__title">Language</div>
           <button class="lang-switch__option is-active" type="button" role="menuitem" data-lang-option="en">English</button>
           <button class="lang-switch__option" type="button" role="menuitem" data-lang-option="zh-CN">简体中文</button>
+        </div>
+      </div>
+      <button id="upgrade-btn" class="upgrade-pro-btn" style="display:none;" onclick="showUpgradeModal()">
+        ⚡ Upgrade to Pro
+      </button>
+      <!-- Payment wallet connect/disconnect (Gmail/GitHub users only) -->
+      <div id="payment-wallet-wrap" class="payment-wallet-wrap" style="display:none;">
+        <button id="payment-wallet-btn" class="payment-wallet-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M16 3H8L2 7h20L16 3z"/><circle cx="17" cy="15" r="1" fill="currentColor"/></svg>
+          <span id="payment-wallet-text">Connect Wallet</span>
+        </button>
+        <div id="payment-wallet-dropdown" class="payment-wallet-dropdown" role="menu" aria-hidden="true">
+          <button class="payment-wallet-disconnect" id="payment-wallet-disconnect">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Disconnect Wallet
+          </button>
         </div>
       </div>
       <div class="user-menu-wrap" id="user-menu-wrap">
@@ -405,6 +422,57 @@
     </div><!-- /.app-right -->
 
   </section>
+
+  <!-- Upgrade to Pro Modal -->
+  <div class="modal-overlay" id="upgrade-modal" aria-hidden="true">
+    <div class="upgrade-modal-card" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
+      <button class="upgrade-modal-close" id="upgrade-modal-close" aria-label="Close">✕</button>
+      <div class="upgrade-modal-header">
+        <div class="upgrade-modal-icon">⚡</div>
+        <h3 class="upgrade-modal-title" id="upgrade-modal-title">Upgrade to Pro</h3>
+        <p class="upgrade-modal-sub">Choose your subscription duration</p>
+      </div>
+      <div class="upgrade-plan-options">
+        <label class="upgrade-plan-option">
+          <input type="radio" name="upgrade-months" value="1" />
+          <span class="upgrade-plan-card">
+            <span class="upgrade-plan-label">1 Month</span>
+            <span class="upgrade-plan-price">$19.9 <span class="upgrade-plan-unit">USDT</span></span>
+          </span>
+        </label>
+        <label class="upgrade-plan-option">
+          <input type="radio" name="upgrade-months" value="3" />
+          <span class="upgrade-plan-card">
+            <span class="upgrade-plan-badge">1 Quarter</span>
+            <span class="upgrade-plan-discount" id="disc-badge-3">5% OFF</span>
+            <span class="upgrade-plan-label">3 Months</span>
+            <span class="upgrade-plan-price">$56.71 <span class="upgrade-plan-unit">USDT</span></span>
+          </span>
+        </label>
+        <label class="upgrade-plan-option">
+          <input type="radio" name="upgrade-months" value="6" />
+          <span class="upgrade-plan-card">
+            <span class="upgrade-plan-badge">2 Quarters</span>
+            <span class="upgrade-plan-discount" id="disc-badge-6">10% OFF</span>
+            <span class="upgrade-plan-label">6 Months</span>
+            <span class="upgrade-plan-price">$107.46 <span class="upgrade-plan-unit">USDT</span></span>
+          </span>
+        </label>
+        <label class="upgrade-plan-option">
+          <input type="radio" name="upgrade-months" value="12" />
+          <span class="upgrade-plan-card">
+            <span class="upgrade-plan-badge upgrade-plan-badge--best">Best Value</span>
+            <span class="upgrade-plan-discount upgrade-plan-discount--best" id="disc-badge-12">15% OFF</span>
+            <span class="upgrade-plan-label">12 Months</span>
+            <span class="upgrade-plan-price">$202.98 <span class="upgrade-plan-unit">USDT</span></span>
+          </span>
+        </label>
+      </div>
+      <button class="upgrade-modal-cta" id="upgrade-modal-cta" disabled>
+        Continue with Payment
+      </button>
+    </div>
+  </div>
 
   <!-- Custom Logout Modal -->
   <div class="modal-overlay" id="disconnect-modal" aria-hidden="true">

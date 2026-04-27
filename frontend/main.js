@@ -201,6 +201,11 @@ let walletToken = localStorage.getItem("wallet_token");
 let loginType = localStorage.getItem("login_type"); // "wallet" or "google"
 let loginEmail = localStorage.getItem("login_email");
 
+// Payment Wallet State (Gmail/GitHub users only)
+// Separate from login state — connect/disconnect doesn't affect login
+let paymentWalletAddress  = localStorage.getItem("payment_wallet_address") || null;
+let paymentWalletProvider = null;  // restored from EIP-6963 on page load
+
 // Google OAuth Client ID
 const GOOGLE_CLIENT_ID = window.HEALTH_AI_GOOGLE_CLIENT_ID || "744175699896-h7k636bv5g8bggvgdumdoqt3om6pcpk9.apps.googleusercontent.com";
 const GITHUB_CLIENT_ID = window.HEALTH_AI_GITHUB_CLIENT_ID || (function() {
@@ -1970,11 +1975,55 @@ function updateWalletUI() {
     } else {
       walletText.textContent = formatWalletAddress(currentWallet);
     }
+    // 先用缓存立即渲染按钮
+    refreshUpgradeBtnFromCache();
+    if (loginType === "wallet" && currentWallet && window.fetchPlanFromChain) {
+      // wallet 用户：查 walletStatus(address)
+      window.fetchPlanFromChain(currentWallet).then(function() {
+        refreshUpgradeBtnFromCache();
+      });
+    } else if (window.fetchPlanFromChainIdentity) {
+      // Google / GitHub 用户：查 identityStatus(keccak256(provider:id))
+      var _provider = loginType === "github" ? "github" : "google";
+      var _id       = loginType === "github"
+        ? (localStorage.getItem("github_login") || loginEmail || "")
+        : (loginEmail || "");
+      if (_id) {
+        window.fetchPlanFromChainIdentity(_provider, _id).then(function() {
+          refreshUpgradeBtnFromCache();
+        });
+      }
+    }
   } else if (walletBtn && walletText) {
     walletBtn.classList.remove("connected");
     walletText.textContent = "Sign In";
+    setUpgradeBtnVisible(false);
+  }
+  // 每次 UI 更新后同步 payment wallet 按钮
+  updatePaymentWalletUI();
+}
+
+function setUpgradeBtnVisible(visible) {
+  var btn = document.getElementById("upgrade-btn");
+  if (btn) btn.style.display = visible ? "inline-flex" : "none";
+}
+
+/** 从 localStorage 缓存读取 plan，更新升级按钮文案和显示 */
+function refreshUpgradeBtnFromCache() {
+  if (!currentWallet) { setUpgradeBtnVisible(false); return; }
+  var cached = window.getCachedPlan ? window.getCachedPlan() : { isPro: false };
+  var btn = document.getElementById("upgrade-btn");
+  if (!btn) return;
+  btn.style.display = "inline-flex";
+  if (cached.isPro) {
+    btn.innerHTML = "🔥 Extend Pro Plan";
+  } else {
+    btn.innerHTML = "⚡ Upgrade to Pro";
   }
 }
+
+// 保持向后兼容（profile.html 也在用）
+function refreshUpgradeBtn() { refreshUpgradeBtnFromCache(); }
 
 // ── EIP-6963 钱包发现 + 传统注入检测 ──
 // 收集通过 EIP-6963 协议注册的钱包
@@ -2461,6 +2510,17 @@ async function handleGoogleCallback() {
   history.replaceState(null, "", window.location.pathname + window.location.search);
   localStorage.removeItem("google_oauth_redirect");
 
+  // 立即用 localStorage 缓存渲染导航栏（避免异步 API 期间显示 Sign In）
+  var _cachedEmail   = localStorage.getItem("login_email");
+  var _cachedAddr    = localStorage.getItem("wallet_address");
+  var _cachedType    = localStorage.getItem("login_type");
+  if (_cachedEmail && _cachedAddr && _cachedType === "google") {
+    loginType     = "google";
+    loginEmail    = _cachedEmail;
+    currentWallet = _cachedAddr;
+    updateWalletUI();
+  }
+
   try {
     // Step 1: Get user info from Google
     console.log("[GoogleAuth] Fetching user info from Google...");
@@ -2563,11 +2623,24 @@ async function doConnectProvider(selectedProvider) {
     localStorage.setItem("login_type", "wallet");
     localStorage.removeItem("login_email");
     walletToken = token; currentWallet = walletAddress; loginType = "wallet"; loginEmail = null;
+    // 保存实际使用的 provider，供支付模块使用（兼容 Rabby / OKX / MetaMask 等）
+    window._walletProvider = selectedProvider.provider;
+    // 持久化 rdns，页面刷新后能精确恢复同一个 provider
+    if (selectedProvider.rdns) {
+      localStorage.setItem("wallet_provider_rdns", selectedProvider.rdns);
+    }
     if (window.trackEvent) window.trackEvent("login_success", { method: "wallet" });
     updateWalletUI(); updateRunButtonState(); loadWalletHistory();
   } catch (err) {
-    console.error("Wallet connection failed:", err);
-    alert("Failed to connect wallet: " + err.message);
+    var _code = err && err.code;
+    var _msg  = err && err.message ? err.message : String(err);
+    var _userRejected = _code === 4001 ||
+      _msg.includes("User rejected") || _msg.includes("user rejected") ||
+      _msg.includes("rejected the request");
+    if (!_userRejected) {
+      console.error("Wallet connection failed:", err);
+      alert("Failed to connect wallet: " + _msg);
+    }
   }
 }
 
@@ -2781,8 +2854,15 @@ async function connectWallet() {
     loadWalletHistory();
 
   } catch (err) {
-    console.error("Wallet connection failed:", err);
-    alert("Failed to connect wallet: " + err.message);
+    var _code = err && err.code;
+    var _msg  = err && err.message ? err.message : String(err);
+    var _userRejected = _code === 4001 ||
+      _msg.includes("User rejected") || _msg.includes("user rejected") ||
+      _msg.includes("rejected the request");
+    if (!_userRejected) {
+      console.error("Wallet connection failed:", err);
+      alert("Failed to connect wallet: " + _msg);
+    }
   }
 }
 
@@ -2793,6 +2873,15 @@ function disconnectWallet() {
   localStorage.removeItem("login_email");
   localStorage.removeItem("github_login");
   localStorage.removeItem("github_oauth_redirect");
+  localStorage.removeItem("wallet_provider_rdns");
+  // 登出时同时断开 payment wallet（如有）
+  localStorage.removeItem("payment_wallet_address");
+  localStorage.removeItem("payment_wallet_rdns");
+  paymentWalletAddress  = null;
+  paymentWalletProvider = null;
+  window._paymentWalletProvider = null;
+  window._walletProvider = null;
+  if (window.clearPlanCache) window.clearPlanCache();
   walletToken = null;
   currentWallet = null;
   loginType = null;
@@ -2945,6 +3034,391 @@ function goToPage(page) {
   currentPage = page;
   renderHistoryPage();
 }
+
+// ── Upgrade / Extend Pro Modal ───────────────────────────────────────────────
+function showUpgradeModal() {
+  var overlay  = document.getElementById("upgrade-modal");
+  var closeBtn = document.getElementById("upgrade-modal-close");
+  var ctaBtn   = document.getElementById("upgrade-modal-cta");
+  if (!overlay) return;
+
+  // 根据当前 plan 更新弹窗标题
+  var cached  = window.getCachedPlan ? window.getCachedPlan() : { isPro: false };
+  var titleEl = overlay.querySelector(".upgrade-modal-title");
+  var subEl   = overlay.querySelector(".upgrade-modal-sub");
+  var iconEl  = overlay.querySelector(".upgrade-modal-icon");
+  if (cached.isPro) {
+    if (titleEl) titleEl.textContent = "Extend Pro Plan";
+    if (subEl)   subEl.textContent   = "Stack more time on your current Pro subscription";
+    if (iconEl)  iconEl.textContent  = "🔥";
+  } else {
+    if (titleEl) titleEl.textContent = "Upgrade to Pro";
+    if (subEl)   subEl.textContent   = "Choose your subscription duration";
+    if (iconEl)  iconEl.textContent  = "⚡";
+  }
+
+  // Reset state
+  overlay.querySelectorAll("input[name='upgrade-months']").forEach(function(r) { r.checked = false; });
+
+  // Gmail/GitHub 用户未连接 wallet → CTA 变为 "Connect Wallet First"（始终启用）
+  var isIdentityUser   = loginType === "google" || loginType === "github";
+  var needsWalletFirst = isIdentityUser && !paymentWalletAddress;
+  if (ctaBtn) {
+    ctaBtn.disabled    = needsWalletFirst ? false : true;
+    ctaBtn.textContent = needsWalletFirst ? "Connect Wallet First" : "Continue with Payment";
+  }
+
+  function open() {
+    overlay.classList.add("is-open");
+    overlay.setAttribute("aria-hidden", "false");
+  }
+  function close() {
+    overlay.classList.remove("is-open");
+    overlay.setAttribute("aria-hidden", "true");
+    overlay.querySelectorAll("input[name='upgrade-months']").forEach(function(r) {
+      r.removeEventListener("change", onSelect);
+    });
+    if (closeBtn) closeBtn.removeEventListener("click", close);
+    if (ctaBtn)   ctaBtn.removeEventListener("click", onCta);
+    overlay.removeEventListener("click", onBackdrop);
+    document.removeEventListener("keydown", onEsc);
+  }
+  function onSelect() {
+    if (!ctaBtn) return;
+    var _needsWallet = (loginType === "google" || loginType === "github") && !paymentWalletAddress;
+    ctaBtn.disabled    = _needsWallet ? false : false; // always enable once option selected
+    ctaBtn.textContent = _needsWallet ? "Connect Wallet First" : "Continue with Payment";
+  }
+  function onBackdrop(e) { if (e.target === overlay) close(); }
+  function onEsc(e)      { if (e.key === "Escape") close(); }
+  function onCta() {
+    var _needsWallet = (loginType === "google" || loginType === "github") && !paymentWalletAddress;
+    if (_needsWallet) {
+      // 先连接 wallet，连接后刷新按钮状态
+      connectPaymentWallet().then(function() {
+        if (paymentWalletAddress && ctaBtn) {
+          ctaBtn.textContent = "Continue with Payment";
+          ctaBtn.disabled    = !overlay.querySelector("input[name='upgrade-months']:checked");
+        }
+      });
+      return;
+    }
+    var sel = overlay.querySelector("input[name='upgrade-months']:checked");
+    if (!sel) return;
+    close();
+    handleUpgradePayment(parseInt(sel.value, 10));
+  }
+
+  if (closeBtn) closeBtn.addEventListener("click", close);
+  if (ctaBtn)   ctaBtn.addEventListener("click", onCta);
+  overlay.addEventListener("click", onBackdrop);
+  document.addEventListener("keydown", onEsc);
+  overlay.querySelectorAll("input[name='upgrade-months']").forEach(function(r) {
+    r.addEventListener("change", onSelect);
+  });
+
+  open();
+
+  // 动态从合约读取 monthlyPrice，更新价格卡片
+  _loadUpgradeModalPrices(overlay);
+}
+
+function _loadUpgradeModalPrices(overlay) {
+  if (typeof window.fetchSubscriptionMonthlyPrice !== "function") return;
+
+  // 先读缓存立即渲染（零延迟，零闪烁）
+  var cached = window.getCachedMonthlyPrice && window.getCachedMonthlyPrice();
+  if (cached) {
+    _applyUpgradeModalPrices(overlay, cached);
+  }
+
+  // 后台查链更新（静默更新，不显示 Loading，价格有变化时才重绘）
+  window.fetchSubscriptionMonthlyPrice().then(function(result) {
+    if (result) _applyUpgradeModalPrices(overlay, result);
+  }).catch(function() {});
+}
+
+function _applyUpgradeModalPrices(overlay, priceInfo) {
+  var p = priceInfo.usdt;
+  var labels = [
+    "$" + p.toFixed(2),
+    "$" + window.calcSubscriptionPrice(p, 3),
+    "$" + window.calcSubscriptionPrice(p, 6),
+    "$" + window.calcSubscriptionPrice(p, 12),
+  ];
+  overlay.querySelectorAll(".upgrade-plan-option").forEach(function(opt, i) {
+    var priceEl = opt.querySelector(".upgrade-plan-price");
+    if (priceEl && labels[i] !== undefined) {
+      priceEl.innerHTML = labels[i] + ' <span class="upgrade-plan-unit">USDT</span>';
+    }
+  });
+
+  // 同步更新折扣标签（从 localStorage 缓存读取）
+  function _discPct(bps) { return (100 - bps / 100).toFixed(0) + "% OFF"; }
+  var d = { d3m: 9500, d6m: 9000, d12m: 8500 };
+  if (typeof localStorage !== "undefined") {
+    d.d3m  = parseInt(localStorage.getItem("sub_disc_3m")  || "9500", 10);
+    d.d6m  = parseInt(localStorage.getItem("sub_disc_6m")  || "9000", 10);
+    d.d12m = parseInt(localStorage.getItem("sub_disc_12m") || "8500", 10);
+  }
+  var discEl3  = overlay.querySelector("#disc-badge-3");
+  var discEl6  = overlay.querySelector("#disc-badge-6");
+  var discEl12 = overlay.querySelector("#disc-badge-12");
+  if (discEl3)  discEl3.textContent  = _discPct(d.d3m);
+  if (discEl6)  discEl6.textContent  = _discPct(d.d6m);
+  if (discEl12) discEl12.textContent = _discPct(d.d12m);
+}
+
+async function handleUpgradePayment(months) {
+  var statusModal = _showPaymentStatusModal();
+  // 记录支付前的 plan 状态，用于决定成功文案
+  var _wasProBefore = window.getCachedPlan ? window.getCachedPlan().isPro : false;
+
+  try {
+    if (!window.executeSubscription || !window.executeSubscriptionForIdentity) {
+      statusModal.setError("Subscription module not loaded. Please refresh and try again.");
+      return;
+    }
+
+    statusModal.setStatus("Loading price…");
+    var priceInfo = (window.getCachedMonthlyPrice && window.getCachedMonthlyPrice())
+                 || await window.fetchSubscriptionMonthlyPrice();
+    if (!priceInfo) {
+      statusModal.setError("Failed to fetch price from contract. Check your network and try again.");
+      return;
+    }
+    var totalRaw = priceInfo.raw * BigInt(months);
+
+    if (loginType === "wallet" && currentWallet) {
+      // ── Wallet 登录：subscribe(months) — Pro 绑定到钱包地址 ───────────
+      await window.executeSubscription(
+        currentWallet, months, totalRaw,
+        function(msg) { statusModal.setStatus(msg); }
+      );
+      statusModal.setStatus("Updating your account…");
+      if (window.fetchPlanFromChain) await window.fetchPlanFromChain(currentWallet);
+
+    } else if (loginType === "google" || loginType === "github") {
+      // ── Google/GitHub 登录：subscribeForIdentity — Pro 绑定到身份哈希 ──
+      // 付款钱包只用来转 USDT，Pro 归属与钱包无关
+      var _provider = loginType === "github" ? "github" : "google";
+      var _id = loginType === "github"
+        ? (localStorage.getItem("github_login") || loginEmail || "")
+        : (loginEmail || "");
+      if (!_id) {
+        statusModal.setError("Cannot determine your identity. Please re-login.");
+        return;
+      }
+      await window.executeSubscriptionForIdentity(
+        _provider, _id, months, totalRaw,
+        function(msg) { statusModal.setStatus(msg); }
+      );
+      statusModal.setStatus("Updating your account…");
+      if (window.fetchPlanFromChainIdentity)
+        await window.fetchPlanFromChainIdentity(_provider, _id);
+
+    } else {
+      statusModal.setError("Please sign in before subscribing.");
+      return;
+    }
+
+    var _successMsg = _wasProBefore
+      ? "🎉 You have extended your Pro Plan!"
+      : "🎉 You are now a Pro member!";
+    statusModal.setDone(_successMsg);
+    refreshUpgradeBtnFromCache();
+
+  } catch (err) {
+    var code = err && err.code;
+    var msg  = err && err.message ? err.message : String(err);
+    if (code === 4001 ||
+        msg.includes("User rejected") || msg.includes("user rejected") ||
+        msg.includes("rejected the request")) {
+      // 用户主动取消 → 静默关闭
+      statusModal.close();
+    } else {
+      statusModal.setError(msg);
+    }
+  }
+}
+
+function _showPaymentStatusModal() {
+  var el = document.createElement("div");
+  el.style.cssText = [
+    "position:fixed;inset:0;z-index:99999;",
+    "display:flex;align-items:center;justify-content:center;",
+    "background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);"
+  ].join("");
+  el.innerHTML = [
+    '<div style="background:#fff;border-radius:18px;padding:36px 32px;',
+    'max-width:380px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2);">',
+    '<div id="_ps_icon" style="font-size:32px;margin-bottom:12px;">⏳</div>',
+    '<div id="_ps_msg" style="font-size:14px;color:#475569;line-height:1.6;min-height:40px;"></div>',
+    '<button id="_ps_close" style="display:none;margin-top:20px;padding:10px 24px;',
+    'border-radius:9px;border:none;background:#6366f1;color:#fff;font-weight:600;',
+    'cursor:pointer;font-size:14px;">OK</button>',
+    '</div>'
+  ].join("");
+  document.body.appendChild(el);
+  var msgEl   = el.querySelector("#_ps_msg");
+  var iconEl  = el.querySelector("#_ps_icon");
+  var closeEl = el.querySelector("#_ps_close");
+  closeEl.onclick = function() { document.body.removeChild(el); };
+  return {
+    setStatus: function(msg) { msgEl.textContent = msg; },
+    setDone:   function(msg) {
+      iconEl.textContent = "✅";
+      msgEl.innerHTML = '<strong>' + msg + '</strong>';
+      closeEl.style.display = "inline-block";
+    },
+    setError:  function(msg) {
+      iconEl.textContent = "❌";
+      msgEl.textContent = msg;
+      closeEl.style.display = "inline-block";
+    },
+    close: function() { document.body.removeChild(el); },
+  };
+}
+
+// 挂到 window，使 onclick="showUpgradeModal()" 在 module 作用域外可调用
+window.showUpgradeModal = showUpgradeModal;
+
+// ── Payment Wallet (Gmail/GitHub users) ──────────────────────────────────────
+
+/** 更新 payment wallet 按钮 UI */
+function updatePaymentWalletUI() {
+  var wrap    = document.getElementById("payment-wallet-wrap");
+  var btn     = document.getElementById("payment-wallet-btn");
+  var txtEl   = document.getElementById("payment-wallet-text");
+  var isIdentityUser = (loginType === "google" || loginType === "github");
+
+  if (!wrap) return;
+  wrap.style.display = (isIdentityUser && currentWallet) ? "inline-flex" : "none";
+
+  if (!btn || !txtEl) return;
+  if (paymentWalletAddress) {
+    btn.classList.add("connected");
+    txtEl.textContent = paymentWalletAddress.slice(0, 6) + "…" + paymentWalletAddress.slice(-4);
+  } else {
+    btn.classList.remove("connected");
+    txtEl.textContent = "Connect Wallet";
+  }
+}
+
+/** 连接 payment wallet（弹出选择器）*/
+async function connectPaymentWallet() {
+  var providers = detectWalletProviders();
+  if (providers.length === 0) {
+    alert("No wallet found. Please install MetaMask, Rabby, or another EVM wallet.");
+    return;
+  }
+
+  // 始终显示选择器，让用户每次主动选择钱包
+  var chosen = await showWalletSelector(providers);
+  if (!chosen) return;
+
+  try {
+    var accounts = await chosen.provider.request({ method: "eth_requestAccounts" });
+    if (!accounts || accounts.length === 0) return;
+    paymentWalletAddress  = accounts[0];
+    paymentWalletProvider = chosen.provider;
+    window._paymentWalletProvider = chosen.provider;
+    localStorage.setItem("payment_wallet_address",   paymentWalletAddress);
+    localStorage.setItem("payment_wallet_rdns",      chosen.rdns || "");
+    updatePaymentWalletUI();
+    _updateUpgradeModalCta();
+  } catch (e) {
+    if (e.code !== 4001) console.error("Payment wallet connect failed:", e);
+  }
+}
+
+/** 断开 payment wallet（不影响登录状态）*/
+function disconnectPaymentWallet() {
+  paymentWalletAddress  = null;
+  paymentWalletProvider = null;
+  window._paymentWalletProvider = null;
+  localStorage.removeItem("payment_wallet_address");
+  localStorage.removeItem("payment_wallet_rdns");
+  updatePaymentWalletUI();
+  _updateUpgradeModalCta();
+}
+
+/** 页面刷新时恢复 payment wallet provider */
+function restorePaymentWalletProvider() {
+  var savedAddr = localStorage.getItem("payment_wallet_address");
+  var savedRdns = localStorage.getItem("payment_wallet_rdns");
+  if (!savedAddr) return;
+  paymentWalletAddress = savedAddr;
+  var allProviders = detectWalletProviders();
+  var match = allProviders.find(function(p) { return p.rdns === savedRdns; })
+           || (allProviders.length > 0 ? allProviders[0] : null);
+  if (match) {
+    paymentWalletProvider = match.provider;
+    window._paymentWalletProvider = match.provider;
+  }
+}
+
+/** 升级弹窗 CTA 按钮文字联动 */
+function _updateUpgradeModalCta() {
+  var cta = document.getElementById("upgrade-modal-cta");
+  if (!cta) return;
+  var isIdentityUser = loginType === "google" || loginType === "github";
+  var needsWallet    = isIdentityUser && !paymentWalletAddress;
+  if (needsWallet) {
+    cta.textContent = "Connect Wallet First";
+    cta.disabled    = false;
+  } else {
+    // 恢复原始文字，disabled 由选项状态决定
+    var hasSelection = !!document.querySelector("input[name='upgrade-months']:checked");
+    cta.textContent = "Continue with Payment";
+    cta.disabled    = !hasSelection;
+  }
+}
+
+// 绑定 payment wallet 按钮点击 + 下拉菜单
+(function() {
+  function openPWDrop()  {
+    var wrap = document.getElementById("payment-wallet-wrap");
+    var drop = document.getElementById("payment-wallet-dropdown");
+    if (wrap) wrap.classList.add("is-open");
+    if (drop) drop.setAttribute("aria-hidden", "false");
+  }
+  function closePWDrop() {
+    var wrap = document.getElementById("payment-wallet-wrap");
+    var drop = document.getElementById("payment-wallet-dropdown");
+    if (wrap) wrap.classList.remove("is-open");
+    if (drop) drop.setAttribute("aria-hidden", "true");
+  }
+
+  document.addEventListener("click", function(e) {
+    // 主按钮点击
+    if (e.target.closest("#payment-wallet-btn")) {
+      if (paymentWalletAddress) {
+        // 已连接 → 切换下拉
+        var wrap = document.getElementById("payment-wallet-wrap");
+        if (wrap && wrap.classList.contains("is-open")) closePWDrop();
+        else openPWDrop();
+      } else {
+        connectPaymentWallet();
+      }
+      return;
+    }
+    // Disconnect 按钮
+    if (e.target.closest("#payment-wallet-disconnect")) {
+      closePWDrop();
+      disconnectPaymentWallet();
+      return;
+    }
+    // 点击外部关闭
+    if (!e.target.closest("#payment-wallet-wrap")) {
+      closePWDrop();
+    }
+  });
+
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "Escape") closePWDrop();
+  });
+})();
 
 // 自定义登出 Modal
 function showDisconnectModal() {
@@ -3118,6 +3592,8 @@ window.addEventListener("codeautrix:langchange", function() {
 
 // 检查本地存储的登录状态
 function initWallet() {
+  // 恢复 payment wallet（Gmail/GitHub 用户的付款钱包）
+  restorePaymentWalletProvider();
   const savedAddress = localStorage.getItem("wallet_address");
   const savedToken = localStorage.getItem("wallet_token");
   const savedLoginType = localStorage.getItem("login_type");
@@ -3135,6 +3611,46 @@ function initWallet() {
     updateWalletUI();
     updateRunButtonState();
     loadWalletHistory();
+
+    // 页面刷新后按 rdns 精确恢复 wallet provider
+    if (isWalletLogin && !window._walletProvider) {
+      try {
+        var savedRdns    = localStorage.getItem("wallet_provider_rdns");
+        var allProviders = detectWalletProviders();
+        var restored     = null;
+        if (savedRdns) {
+          // 按 rdns 精确匹配（Rabby = io.rabby, MetaMask = io.metamask 等）
+          for (var _pi = 0; _pi < allProviders.length; _pi++) {
+            if (allProviders[_pi].rdns === savedRdns) {
+              restored = allProviders[_pi].provider;
+              break;
+            }
+          }
+        }
+        // fallback：第一个 EIP-6963 provider 或 window.ethereum
+        if (!restored) {
+          restored = allProviders.length > 0 ? allProviders[0].provider : window.ethereum;
+        }
+        window._walletProvider = restored;
+      } catch(e) {}
+    }
+
+    // 页面刷新时后台查链更新 plan 缓存
+    if (isWalletLogin && window.fetchPlanFromChain) {
+      window.fetchPlanFromChain(savedAddress).then(function() {
+        refreshUpgradeBtnFromCache();
+      });
+    } else if ((isGoogleLogin || isGithubLogin) && window.fetchPlanFromChainIdentity) {
+      var _prov = savedLoginType === "github" ? "github" : "google";
+      var _uid  = savedLoginType === "github"
+        ? (localStorage.getItem("github_login") || savedEmail || "")
+        : (savedEmail || "");
+      if (_uid) {
+        window.fetchPlanFromChainIdentity(_prov, _uid).then(function() {
+          refreshUpgradeBtnFromCache();
+        });
+      }
+    }
   }
 }
 

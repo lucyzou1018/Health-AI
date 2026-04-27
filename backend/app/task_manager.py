@@ -77,7 +77,6 @@ _CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_status       ON tasks(status);",
 ]
 
-
 def _row_to_record(row: sqlite3.Row) -> TaskRecord:
     d = dict(row)
     d["params"] = json.loads(d.get("params") or "{}")

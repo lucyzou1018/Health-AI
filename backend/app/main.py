@@ -102,10 +102,25 @@ def verify_wallet_token(token: str = Header(None, alias="X-Wallet-Token")) -> Op
         if not session:
             return None
         if session.get("expires_at", 0) < int(time.time()):
-            wallet_sessions.pop(token, None)  # pop avoids KeyError if evicted concurrently
+            wallet_sessions.pop(token, None)
             _persist_wallet_sessions()
             return None
         return session.get("wallet_address")
+
+
+def verify_wallet_session(token: str = Header(None, alias="X-Wallet-Token")) -> Optional[dict]:
+    """Return the full session dict (wallet_address + login_type + login_id), or None."""
+    if not token:
+        return None
+    with _sessions_lock:
+        session = wallet_sessions.get(token)
+        if not session:
+            return None
+        if session.get("expires_at", 0) < int(time.time()):
+            wallet_sessions.pop(token, None)
+            _persist_wallet_sessions()
+            return None
+        return dict(session)
 
 app = FastAPI(title="CodeAutrix", version="0.2.0")
 app.add_middleware(
@@ -289,14 +304,23 @@ def fetch_contract_from_chain(payload: FromChainRequest) -> FromChainResponse:
 def create_task(
     request: Request,
     payload: TaskRequest,
-    wallet_address: Optional[str] = Depends(verify_wallet_token)
+    wallet_address: Optional[str] = Depends(verify_wallet_token),
+    _session: Optional[dict]      = Depends(verify_wallet_session),
 ) -> TaskResponse:
     effective_wallet = payload.wallet_address or wallet_address
+    login_type = (_session or {}).get("login_type", "wallet")
+    login_id   = (_session or {}).get("login_id", "")
 
     # Check quota first (non-consuming) — quota is consumed only after successful task creation
     # to avoid wasting the user's daily allowance on validation errors.
+    # Pro users verified on-chain (wallet or identity) are exempt from the daily limit.
     client_ip = request.client.host if request.client else ""
-    quota = rate_limiter.get_status(client_ip)
+    quota = rate_limiter.get_status(
+        client_ip,
+        wallet_address=effective_wallet,
+        login_type=login_type,
+        login_id=login_id,
+    )
     if not quota["allowed"]:
         raise HTTPException(
             status_code=429,
@@ -328,8 +352,13 @@ def create_task(
         logger.exception("Unexpected error creating task")
         raise HTTPException(status_code=500, detail="Internal server error. Please try again later.")
 
-    # Consume quota after task is successfully created
-    rate_limiter.try_increment(client_ip)
+    # Consume quota after task is successfully created (Pro users exempt)
+    rate_limiter.try_increment(
+        client_ip,
+        wallet_address=effective_wallet,
+        login_type=login_type,
+        login_id=login_id,
+    )
     return TaskResponse(
         taskId=record.task_id,
         status=record.status,
@@ -533,7 +562,9 @@ def google_login(payload: GoogleAuthRequest):
                 wallet_sessions.pop(k, None)
         wallet_sessions[token] = {
             "wallet_address": google_wallet,
-            "expires_at": expires_at,
+            "expires_at":     expires_at,
+            "login_type":     "google",
+            "login_id":       verified_email,
         }
     _persist_wallet_sessions()
 
@@ -683,7 +714,9 @@ def github_login(payload: GitHubAuthRequest):
                 wallet_sessions.pop(k, None)
         wallet_sessions[session_token] = {
             "wallet_address": github_wallet,
-            "expires_at": expires_at,
+            "expires_at":     expires_at,
+            "login_type":     "github",
+            "login_id":       github_login_name,
         }
     _persist_wallet_sessions()
 

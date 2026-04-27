@@ -88,6 +88,19 @@ Skill Security Audit 包含**强制 AI 代码审查**，启动前需配置以下
 > - `SKILL_AUDIT_AI_MODEL` 未设置时默认使用 `gpt-4o-mini`（OpenAI）或 `grok-3-mini`（xAI）。
 > - `SKILL_AUDIT_AI_DETAIL=true` 时，报告中会额外展示各维度风险分和 LLM 输出的具体风险项（findings）；默认关闭，仅显示"⚠️ Risk Detected"。
 
+### 订阅合约（Pro Plan 链上验证）
+
+| 变量名 | 说明 | 示例 |
+|--------|------|------|
+| `SUBSCRIPTION_ENV` | 使用 testnet 还是 mainnet | `testnet` / `mainnet`（默认 `mainnet`）|
+| `SUBSCRIPTION_CONTRACT_TESTNET` | BSC Testnet 合约地址 | `0x9E41...` |
+| `SUBSCRIPTION_CONTRACT_MAINNET` | BSC Mainnet 合约地址 | 部署主网后填入 |
+
+> **说明：**
+> - 本地开发设置 `SUBSCRIPTION_ENV=testnet`，服务器生产环境不设置（默认走 mainnet）。
+> - 合约地址未设置时，后端跳过链上验证，所有用户按 Free Plan 处理。
+> - 重新部署合约后只需更新 `.env` 里的地址，无需改代码。
+
 ### 项目图表指标接口（可选）
 
 | 变量名 | 说明 | 示例 |

@@ -12,6 +12,7 @@
   <meta name="author" content="Agentese Labs" />
   <meta property="og:site_name" content="Agentese" />
   <link rel="stylesheet" href="styles.css?v=20260409c" />
+  <script src="subscription-config.js"></script>
 </head>
 <body class="landing-only pricing-page">
   <div class="ambient-glow"></div>
@@ -159,7 +160,7 @@
                 <p class="plan-desc">For builders who need unlimited scans and faster iteration.</p>
               </div>
               <div class="plan-price">
-                <span class="plan-price__main">$19.9</span>
+                <span class="plan-price__main" id="pro-monthly-price">$19.9</span>
                 <span class="plan-price__sub">/ month, coming soon</span>
               </div>
             </div>
@@ -320,5 +321,23 @@
   </footer>
 
   <script src="i18n.js?v=20260409c"></script>
+  <script>
+    // ── 动态更新 Pro 价格 ──────────────────────────────────────────────────
+    function applyProPrice(usdt) {
+      var el = document.getElementById("pro-monthly-price");
+      if (el) el.textContent = "$" + usdt.toFixed(1);
+    }
+
+    // 1. 立即用缓存渲染（零延迟）
+    if (window.getCachedMonthlyPrice) {
+      var cached = window.getCachedMonthlyPrice();
+      if (cached) applyProPrice(cached.usdt);
+    }
+
+    // 2. 链上拉取最新价格后再更新（subscription-config.js 已在 load 时触发）
+    window.addEventListener("subscriptionPriceReady", function(e) {
+      if (e.detail) applyProPrice(e.detail.usdt);
+    });
+  </script>
 </body>
 </html>

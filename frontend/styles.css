@@ -5303,3 +5303,261 @@ button#run-task:hover:not(:disabled) {
   background: #fef2f2;
 }
 
+
+/* ── Upgrade to Pro button (nav) ─────────────────────────────────────────── */
+.upgrade-pro-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: var(--radius, 8px);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 150ms ease, transform 150ms ease;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.35);
+}
+.upgrade-pro-btn:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
+/* ── Upgrade to Pro Modal ────────────────────────────────────────────────── */
+.upgrade-modal-card {
+  position: relative;
+  background: var(--surface, #fff);
+  border-radius: 20px;
+  padding: 36px 32px 28px;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+  animation: modal-in 200ms ease;
+}
+
+.upgrade-modal-close {
+  position: absolute;
+  top: 16px; right: 16px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--surface-hover, #f1f5f9);
+  color: var(--text-muted, #64748b);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 120ms;
+}
+.upgrade-modal-close:hover { background: var(--border, #e2e8f0); }
+
+.upgrade-modal-header { text-align: center; margin-bottom: 24px; }
+
+.upgrade-modal-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.upgrade-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text, #1e293b);
+  margin: 0 0 6px;
+}
+
+.upgrade-modal-sub {
+  font-size: 13px;
+  color: var(--text-muted, #64748b);
+  margin: 0;
+}
+
+/* ── Plan option cards ───────────────────────────────────────────────────── */
+.upgrade-plan-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.upgrade-plan-option { display: contents; }
+.upgrade-plan-option input[type="radio"] { display: none; }
+
+.upgrade-plan-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 12px;
+  border: 2px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 140ms, background 140ms, box-shadow 140ms;
+  position: relative;
+  text-align: center;
+  background: var(--surface, #fff);
+}
+.upgrade-plan-card:hover {
+  border-color: #a5b4fc;
+  background: #f5f3ff;
+}
+.upgrade-plan-option input:checked + .upgrade-plan-card {
+  border-color: #6366f1;
+  background: #eef2ff;
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+
+.upgrade-plan-badge {
+  position: absolute;
+  top: -10px; left: 50%; transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.03em;
+  background: #e0e7ff;
+  color: #4338ca;
+  white-space: nowrap;
+}
+.upgrade-plan-badge--best {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff;
+}
+
+.upgrade-plan-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text, #1e293b);
+  margin-top: 6px;
+}
+
+.upgrade-plan-price {
+  font-size: 16px;
+  font-weight: 700;
+  color: #6366f1;
+}
+.upgrade-plan-unit {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted, #64748b);
+}
+
+/* ── CTA button ──────────────────────────────────────────────────────────── */
+.upgrade-modal-cta {
+  width: 100%;
+  padding: 13px;
+  border-radius: 12px;
+  border: none;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  transition: opacity 150ms, transform 150ms;
+  box-shadow: 0 4px 14px rgba(99,102,241,0.4);
+}
+.upgrade-modal-cta:not(:disabled):hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+.upgrade-modal-cta:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── Payment Wallet Button (Gmail/GitHub users) ──────────────────────────── */
+.payment-wallet-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius, 8px);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--surface, #fff);
+  color: var(--text, #1e293b);
+  transition: all 140ms ease;
+  white-space: nowrap;
+}
+.payment-wallet-btn:hover {
+  background: var(--surface-hover, #f1f5f9);
+  border-color: #a5b4fc;
+}
+.payment-wallet-btn.connected {
+  border-color: var(--success, #10b981);
+  color: var(--success, #10b981);
+  background: var(--success-subtle, #d1fae5);
+}
+.payment-wallet-btn.connected:hover {
+  background: #a7f3d0;
+}
+
+/* ── Payment Wallet Dropdown ─────────────────────────────────────────────── */
+.payment-wallet-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.payment-wallet-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 160px;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 4px;
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+.payment-wallet-wrap.is-open .payment-wallet-dropdown {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.payment-wallet-disconnect {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #ef4444;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms;
+}
+.payment-wallet-disconnect:hover { background: #fef2f2; }
+
+/* ── Upgrade modal — discount badge (top-right of card) ─────────────────── */
+.upgrade-plan-discount {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+  white-space: nowrap;
+  z-index: 1;
+}
+.upgrade-plan-discount--best {
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  color: #fff;
+  border-color: transparent;
+}

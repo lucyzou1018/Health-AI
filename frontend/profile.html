@@ -6,6 +6,7 @@
   <link rel="icon" type="image/svg+xml" href="caLogo.svg" />
   <link rel="shortcut icon" href="caLogo.svg" />
   <link rel="stylesheet" href="styles.css?v=20260423" />
+  <script src="subscription-config.js"></script>
   <style>
     /* ── Profile Page Layout ───────────────────────────────────────────── */
     .profile-page {
@@ -265,6 +266,22 @@
           <button class="lang-switch__option" type="button" role="menuitem" data-lang-option="zh-CN">简体中文</button>
         </div>
       </div>
+      <button id="upgrade-btn" class="upgrade-pro-btn" style="display:none;" onclick="showUpgradeModal()">
+        ⚡ Upgrade to Pro
+      </button>
+      <!-- Payment wallet connect/disconnect (Gmail/GitHub users only) -->
+      <div id="payment-wallet-wrap" class="payment-wallet-wrap" style="display:none;">
+        <button id="payment-wallet-btn" class="payment-wallet-btn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M16 3H8L2 7h20L16 3z"/><circle cx="17" cy="15" r="1" fill="currentColor"/></svg>
+          <span id="payment-wallet-text">Connect Wallet</span>
+        </button>
+        <div id="payment-wallet-dropdown" class="payment-wallet-dropdown" role="menu" aria-hidden="true">
+          <button class="payment-wallet-disconnect" id="payment-wallet-disconnect">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Disconnect Wallet
+          </button>
+        </div>
+      </div>
       <div class="user-menu-wrap" id="user-menu-wrap">
         <button id="wallet-connect" class="wallet-btn">
           <span class="wallet-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
@@ -291,6 +308,57 @@
       <!-- Rendered by JS -->
     </div>
   </main>
+
+  <!-- Upgrade to Pro Modal -->
+  <div class="modal-overlay" id="upgrade-modal" aria-hidden="true">
+    <div class="upgrade-modal-card" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
+      <button class="upgrade-modal-close" id="upgrade-modal-close" aria-label="Close">✕</button>
+      <div class="upgrade-modal-header">
+        <div class="upgrade-modal-icon">⚡</div>
+        <h3 class="upgrade-modal-title" id="upgrade-modal-title">Upgrade to Pro</h3>
+        <p class="upgrade-modal-sub">Choose your subscription duration</p>
+      </div>
+      <div class="upgrade-plan-options">
+        <label class="upgrade-plan-option">
+          <input type="radio" name="upgrade-months" value="1" />
+          <span class="upgrade-plan-card">
+            <span class="upgrade-plan-label">1 Month</span>
+            <span class="upgrade-plan-price">$19.9 <span class="upgrade-plan-unit">USDT</span></span>
+          </span>
+        </label>
+        <label class="upgrade-plan-option">
+          <input type="radio" name="upgrade-months" value="3" />
+          <span class="upgrade-plan-card">
+            <span class="upgrade-plan-badge">1 Quarter</span>
+            <span class="upgrade-plan-discount" id="disc-badge-3">5% OFF</span>
+            <span class="upgrade-plan-label">3 Months</span>
+            <span class="upgrade-plan-price">$56.71 <span class="upgrade-plan-unit">USDT</span></span>
+          </span>
+        </label>
+        <label class="upgrade-plan-option">
+          <input type="radio" name="upgrade-months" value="6" />
+          <span class="upgrade-plan-card">
+            <span class="upgrade-plan-badge">2 Quarters</span>
+            <span class="upgrade-plan-discount" id="disc-badge-6">10% OFF</span>
+            <span class="upgrade-plan-label">6 Months</span>
+            <span class="upgrade-plan-price">$107.46 <span class="upgrade-plan-unit">USDT</span></span>
+          </span>
+        </label>
+        <label class="upgrade-plan-option">
+          <input type="radio" name="upgrade-months" value="12" />
+          <span class="upgrade-plan-card">
+            <span class="upgrade-plan-badge upgrade-plan-badge--best">Best Value</span>
+            <span class="upgrade-plan-discount upgrade-plan-discount--best" id="disc-badge-12">15% OFF</span>
+            <span class="upgrade-plan-label">12 Months</span>
+            <span class="upgrade-plan-price">$202.98 <span class="upgrade-plan-unit">USDT</span></span>
+          </span>
+        </label>
+      </div>
+      <button class="upgrade-modal-cta" id="upgrade-modal-cta" disabled>
+        Continue with Payment
+      </button>
+    </div>
+  </div>
 
   <!-- Logout Modal (same as workspace) -->
   <div class="modal-overlay" id="disconnect-modal" aria-hidden="true">
@@ -432,6 +500,95 @@
 
       // Load stats from API
       loadStats();
+
+      // Plan 显示：所有登录方式都走链上查询
+      applyPlanUI();  // 先用缓存立即渲染
+      window.addEventListener("planStatusReady", function() { applyPlanUI(); });
+
+      if (loginType === "wallet" && walletAddress && window.fetchPlanFromChain) {
+        // wallet 用户：查 walletStatus(address)
+        window.fetchPlanFromChain(walletAddress).then(function() { applyPlanUI(); });
+      } else if (window.fetchPlanFromChainIdentity) {
+        // Google / GitHub 用户：查 identityStatus(keccak256(provider:id))
+        var _prov = loginType === "github" ? "github" : "google";
+        var _uid  = loginType === "github"
+          ? (githubLogin || loginEmail || "")
+          : (loginEmail || "");
+        if (_uid) {
+          window.fetchPlanFromChainIdentity(_prov, _uid).then(function() { applyPlanUI(); });
+        } else {
+          // 没有 id 信息，清除残留缓存显示 Free
+          if (window.clearPlanCache) window.clearPlanCache();
+          applyPlanUI();
+        }
+      }
+
+    }
+
+    // ── Plan UI：从 localStorage 读取，渲染 plan 标签 + 倒计时 ──────────────
+    var _countdownTimer = null;
+
+    function applyPlanUI() {
+      var cached = window.getCachedPlan ? window.getCachedPlan() : { isPro: false, expiryTs: 0 };
+      var planEl = document.getElementById("plan-label");
+      var btn    = document.getElementById("upgrade-btn");
+
+      if (btn) {
+        btn.style.display = "inline-flex";
+        btn.innerHTML = cached.isPro ? "🔥 Extend Pro Plan" : "⚡ Upgrade to Pro";
+      }
+
+      if (!planEl) return;
+
+      if (cached.isPro) {
+        planEl.innerHTML =
+          '<span id="pro-badge" style="' +
+          'display:inline-flex;align-items:center;gap:5px;' +
+          'padding:3px 12px 3px 8px;border-radius:99px;' +
+          'background:linear-gradient(135deg,#6366f1 0%,#a855f7 60%,#ec4899 100%);' +
+          'color:#fff;font-size:12px;font-weight:700;letter-spacing:0.04em;' +
+          'box-shadow:0 2px 12px rgba(139,92,246,0.45);vertical-align:middle;">' +
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="flex-shrink:0">' +
+          '<path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>' +
+          '</svg>PRO</span>' +
+          (cached.expiryTs > 0
+            ? '<span id="pro-countdown" style="margin-left:8px;font-size:12px;color:#64748b;"></span>'
+            : '');
+
+        // 启动倒计时
+        if (_countdownTimer) clearInterval(_countdownTimer);
+        if (cached.expiryTs > 0) {
+          function _tick() {
+            var el = document.getElementById("pro-countdown");
+            if (!el) { clearInterval(_countdownTimer); return; }
+            var now  = Math.floor(Date.now() / 1000);
+            var diff = cached.expiryTs - now;
+            if (diff <= 0) {
+              el.textContent = "Expired";
+              clearInterval(_countdownTimer);
+              // 过期后刷新 plan 状态
+              if (window.clearPlanCache) window.clearPlanCache();
+              applyPlanUI();
+              return;
+            }
+            var d  = Math.floor(diff / 86400);
+            var h  = Math.floor((diff % 86400) / 3600);
+            var m  = Math.floor((diff % 3600) / 60);
+            var s  = diff % 60;
+            var parts = [];
+            if (d > 0) parts.push(d + "d");
+            if (h > 0 || d > 0) parts.push(h + "h");
+            if (m > 0 || h > 0 || d > 0) parts.push(m + "m");
+            parts.push(s + "s");
+            el.textContent = "Expires in " + parts.join(" ");
+          }
+          _tick();
+          _countdownTimer = setInterval(_tick, 1000);
+        }
+      } else {
+        if (_countdownTimer) { clearInterval(_countdownTimer); _countdownTimer = null; }
+        planEl.textContent = "Free";
+      }
     }
 
     function doLogout() {
@@ -491,11 +648,12 @@
           ? 'http://localhost:8000'
           : window.location.origin
       );
+
+      // 查询审计次数
       fetch(API_BASE + "/api/wallet/history?limit=200", {
         headers: { "X-Wallet-Token": walletToken }
       }).then(function(r) { return r.ok ? r.json() : null; })
         .then(function(data) {
-          // API 直接返回数组，不是 { tasks: [...] }
           if (!Array.isArray(data)) return;
           var tasks    = data;
           var total    = tasks.length;
@@ -576,6 +734,257 @@
       }
     })();
 
+    // ── Payment status modal (mini progress overlay) ────────────────────────
+    function _profileShowStatusModal() {
+      var el = document.createElement("div");
+      el.style.cssText = "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.55);backdrop-filter:blur(4px);";
+      el.innerHTML = [
+        '<div style="background:#fff;border-radius:18px;padding:36px 32px;max-width:380px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2);">',
+        '<div id="_ps_icon" style="font-size:32px;margin-bottom:12px;">⏳</div>',
+        '<div id="_ps_msg" style="font-size:14px;color:#475569;line-height:1.6;min-height:40px;"></div>',
+        '<button id="_ps_close" style="display:none;margin-top:20px;padding:10px 24px;border-radius:9px;border:none;background:#6366f1;color:#fff;font-weight:600;cursor:pointer;font-size:14px;">OK</button>',
+        '</div>'
+      ].join("");
+      document.body.appendChild(el);
+      var msgEl = el.querySelector("#_ps_msg"), iconEl = el.querySelector("#_ps_icon"), closeEl = el.querySelector("#_ps_close");
+      closeEl.onclick = function() { document.body.removeChild(el); };
+      return {
+        setStatus: function(m) { msgEl.textContent = m; },
+        setDone:   function(m) { iconEl.textContent = "✅"; msgEl.innerHTML = "<strong>" + m + "</strong>"; closeEl.style.display = "inline-block"; },
+        setError:  function(m) { iconEl.textContent = "❌"; msgEl.textContent = m; closeEl.style.display = "inline-block"; },
+        close:     function()  { document.body.removeChild(el); },
+      };
+    }
+
+    // ── Payment handler for profile page ────────────────────────────────────
+    async function _profileHandlePayment(months) {
+      var statusModal = _profileShowStatusModal();
+      var _wasProBefore = window.getCachedPlan ? window.getCachedPlan().isPro : false;
+      try {
+        if (!window.executeSubscription || !window.executeSubscriptionForIdentity) {
+          statusModal.setError("Subscription module not loaded. Please refresh and try again.");
+          return;
+        }
+        statusModal.setStatus("Loading price…");
+        var priceInfo = (window.getCachedMonthlyPrice && window.getCachedMonthlyPrice())
+                     || await window.fetchSubscriptionMonthlyPrice();
+        if (!priceInfo) { statusModal.setError("Failed to fetch price. Check your network."); return; }
+        var totalRaw = priceInfo.raw * BigInt(months);
+
+        if (loginType === "wallet" && walletAddress) {
+          await window.executeSubscription(walletAddress, months, totalRaw, function(m) { statusModal.setStatus(m); });
+          statusModal.setStatus("Updating your account…");
+          if (window.fetchPlanFromChain) await window.fetchPlanFromChain(walletAddress);
+        } else if (loginType === "google" || loginType === "github") {
+          var _prov = loginType === "github" ? "github" : "google";
+          var _id   = loginType === "github" ? (githubLogin || loginEmail || "") : (loginEmail || "");
+          if (!_id) { statusModal.setError("Cannot determine your identity. Please re-login."); return; }
+          await window.executeSubscriptionForIdentity(_prov, _id, months, totalRaw, function(m) { statusModal.setStatus(m); });
+          statusModal.setStatus("Updating your account…");
+          if (window.fetchPlanFromChainIdentity) await window.fetchPlanFromChainIdentity(_prov, _id);
+        } else {
+          statusModal.setError("Please sign in before subscribing."); return;
+        }
+
+        var _successMsg = _wasProBefore
+          ? "🎉 You have extended your Pro Plan!"
+          : "🎉 You are now a Pro member!";
+        statusModal.setDone(_successMsg);
+        applyPlanUI();
+      } catch (err) {
+        var code = err && err.code;
+        var msg  = err && err.message ? err.message : String(err);
+        if (code === 4001 || msg.includes("User rejected") || msg.includes("user rejected") || msg.includes("rejected the request")) {
+          statusModal.close();
+        } else {
+          statusModal.setError(msg);
+        }
+      }
+    }
+
+    // ── Upgrade Modal ──────────────────────────────────────────────────────
+    function showUpgradeModal() {
+      var overlay  = document.getElementById("upgrade-modal");
+      var closeBtn = document.getElementById("upgrade-modal-close");
+      var ctaBtn   = document.getElementById("upgrade-modal-cta");
+      if (!overlay) return;
+
+      // 根据当前 plan 更新弹窗标题
+      var _cached  = window.getCachedPlan ? window.getCachedPlan() : { isPro: false };
+      var _titleEl = overlay.querySelector(".upgrade-modal-title");
+      var _subEl   = overlay.querySelector(".upgrade-modal-sub");
+      var _iconEl  = overlay.querySelector(".upgrade-modal-icon");
+      if (_cached.isPro) {
+        if (_titleEl) _titleEl.textContent = "Extend Pro Plan";
+        if (_subEl)   _subEl.textContent   = "Stack more time on your current Pro subscription";
+        if (_iconEl)  _iconEl.textContent  = "🔥";
+      } else {
+        if (_titleEl) _titleEl.textContent = "Upgrade to Pro";
+        if (_subEl)   _subEl.textContent   = "Choose your subscription duration";
+        if (_iconEl)  _iconEl.textContent  = "⚡";
+      }
+
+      overlay.querySelectorAll("input[name='upgrade-months']").forEach(function(r) { r.checked = false; });
+      if (ctaBtn) ctaBtn.disabled = true;
+
+      function onSelect() { if (ctaBtn) ctaBtn.disabled = false; }
+      overlay.querySelectorAll("input[name='upgrade-months']").forEach(function(r) {
+        r.addEventListener("change", onSelect);
+      });
+
+      function close() {
+        overlay.classList.remove("is-open");
+        overlay.setAttribute("aria-hidden", "true");
+        overlay.querySelectorAll("input[name='upgrade-months']").forEach(function(r) {
+          r.removeEventListener("change", onSelect);
+        });
+        if (closeBtn) closeBtn.removeEventListener("click", close);
+        if (ctaBtn)   ctaBtn.removeEventListener("click", onCta);
+        overlay.removeEventListener("click", onBackdrop);
+        document.removeEventListener("keydown", onEsc);
+      }
+      function onBackdrop(e) { if (e.target === overlay) close(); }
+      function onEsc(e)      { if (e.key === "Escape") close(); }
+      function onCta() {
+        var _needsWallet = (loginType === "google" || loginType === "github") && !window._paymentWalletProvider;
+        if (_needsWallet) {
+          // 连接钱包后刷新 CTA
+          if (typeof connectPaymentWallet === "function") {
+            connectPaymentWallet().then(function() {
+              if (window._paymentWalletProvider && ctaBtn) {
+                ctaBtn.textContent = "Continue with Payment";
+                ctaBtn.disabled    = !overlay.querySelector("input[name='upgrade-months']:checked");
+              }
+            });
+          }
+          return;
+        }
+        var sel = overlay.querySelector("input[name='upgrade-months']:checked");
+        if (!sel) return;
+        close();
+        _profileHandlePayment(parseInt(sel.value, 10));
+      }
+
+      if (closeBtn) closeBtn.addEventListener("click", close);
+      if (ctaBtn)   ctaBtn.addEventListener("click", onCta);
+      overlay.addEventListener("click", onBackdrop);
+      document.addEventListener("keydown", onEsc);
+      overlay.classList.add("is-open");
+      overlay.setAttribute("aria-hidden", "false");
+
+      // 动态从合约拉取价格
+      if (typeof window.fetchSubscriptionMonthlyPrice === "function") {
+        overlay.querySelectorAll(".upgrade-plan-price").forEach(function(el) {
+          el.dataset.orig = el.innerHTML;
+          el.innerHTML = '<span style="opacity:.45;font-size:12px;">Loading…</span>';
+        });
+        window.fetchSubscriptionMonthlyPrice().then(function(result) {
+          if (!result) {
+            overlay.querySelectorAll(".upgrade-plan-price").forEach(function(el) {
+              if (el.dataset.orig) el.innerHTML = el.dataset.orig;
+            });
+            return;
+          }
+          var p = result.usdt;
+          var prices = [p, p * 3, p * 6, p * 12];
+          overlay.querySelectorAll(".upgrade-plan-option").forEach(function(opt, i) {
+            var priceEl = opt.querySelector(".upgrade-plan-price");
+            if (priceEl && prices[i] !== undefined) {
+              priceEl.innerHTML = "$" + prices[i].toFixed(2) + ' <span class="upgrade-plan-unit">USDT</span>';
+            }
+          });
+        }).catch(function() {
+          overlay.querySelectorAll(".upgrade-plan-price").forEach(function(el) {
+            if (el.dataset.orig) el.innerHTML = el.dataset.orig;
+          });
+        });
+      }
+    }
+
+    // ── Payment Wallet (Gmail/GitHub users) ─────────────────────────────────
+    var paymentWalletAddress  = localStorage.getItem("payment_wallet_address") || null;
+    var paymentWalletProvider = null;
+
+    function _updatePaymentWalletUI() {
+      var isIdentityUser = loginType === "google" || loginType === "github";
+      var wrap  = document.getElementById("payment-wallet-wrap");
+      var btn   = document.getElementById("payment-wallet-btn");
+      var txtEl = document.getElementById("payment-wallet-text");
+      if (wrap)  wrap.style.display  = isIdentityUser ? "inline-flex" : "none";
+      if (!btn || !txtEl) return;
+      if (paymentWalletAddress) {
+        btn.classList.add("connected");
+        txtEl.textContent = paymentWalletAddress.slice(0, 6) + "…" + paymentWalletAddress.slice(-4);
+      } else {
+        btn.classList.remove("connected");
+        txtEl.textContent = "Connect Wallet";
+      }
+    }
+
+    async function connectPaymentWallet() {
+      var p = window.ethereum;
+      if (!p) { alert("No wallet found. Please install MetaMask or Rabby."); return; }
+      try {
+        // wallet_requestPermissions 会触发钱包重新弹出账户选择界面
+        await p.request({
+          method: "wallet_requestPermissions",
+          params: [{ eth_accounts: {} }],
+        });
+        var accounts = await p.request({ method: "eth_accounts" });
+        if (!accounts || accounts.length === 0) return;
+        paymentWalletAddress  = accounts[0];
+        paymentWalletProvider = p;
+        window._paymentWalletProvider = p;
+        localStorage.setItem("payment_wallet_address", paymentWalletAddress);
+        localStorage.setItem("payment_wallet_rdns", "");
+        _updatePaymentWalletUI();
+      } catch(e) { if (e.code !== 4001) console.error("Payment wallet connect failed:", e); }
+    }
+
+    function disconnectPaymentWallet() {
+      paymentWalletAddress  = null;
+      paymentWalletProvider = null;
+      window._paymentWalletProvider = null;
+      localStorage.removeItem("payment_wallet_address");
+      localStorage.removeItem("payment_wallet_rdns");
+      _updatePaymentWalletUI();
+    }
+
+    // 绑定 payment wallet 按钮 + 下拉菜单
+    (function() {
+      function openDrop()  {
+        var wrap = document.getElementById("payment-wallet-wrap");
+        var drop = document.getElementById("payment-wallet-dropdown");
+        if (wrap) wrap.classList.add("is-open");
+        if (drop) drop.setAttribute("aria-hidden", "false");
+      }
+      function closeDrop() {
+        var wrap = document.getElementById("payment-wallet-wrap");
+        var drop = document.getElementById("payment-wallet-dropdown");
+        if (wrap) wrap.classList.remove("is-open");
+        if (drop) drop.setAttribute("aria-hidden", "true");
+      }
+      document.addEventListener("click", function(e) {
+        if (e.target.closest("#payment-wallet-btn")) {
+          if (paymentWalletAddress) {
+            var wrap = document.getElementById("payment-wallet-wrap");
+            if (wrap && wrap.classList.contains("is-open")) closeDrop();
+            else openDrop();
+          } else {
+            connectPaymentWallet();
+          }
+          return;
+        }
+        if (e.target.closest("#payment-wallet-disconnect")) {
+          closeDrop(); disconnectPaymentWallet(); return;
+        }
+        if (!e.target.closest("#payment-wallet-wrap")) closeDrop();
+      });
+      document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") closeDrop();
+      });
+    })();
+
     // ── Boot ───────────────────────────────────────────────────────────────
     // 任意一种登录标识存在即视为已登录
     var isLoggedIn = !!(walletAddress || githubLogin || loginEmail);
@@ -584,6 +993,8 @@
     } else {
       renderNotLoggedIn();
     }
+    // 初始化 payment wallet UI
+    _updatePaymentWalletUI();
   </script>
 </body>
 </html>

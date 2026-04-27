@@ -409,8 +409,14 @@
         window.location.href = 'workspace.html';
 
       } catch (err) {
-        console.error('Wallet connect error:', err);
-        alert('Failed to connect wallet: ' + (err.message || err));
+        var _em = err && err.message ? err.message : String(err);
+        var _rejected = (err && err.code === 4001) ||
+          _em.includes('User rejected') || _em.includes('user rejected') ||
+          _em.includes('rejected the request');
+        if (!_rejected) {
+          console.error('Wallet connect error:', err);
+          alert('Failed to connect wallet: ' + _em);
+        }
         // Re-enable all wallet buttons
         var btns = walletList.querySelectorAll('.auth-btn');
         btns.forEach(function(b) { b.classList.remove('loading'); b.disabled = false; });
