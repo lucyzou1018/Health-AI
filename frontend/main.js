@@ -60,7 +60,7 @@ const PARAM_SCHEMA = {
     // Upload skill zip file instead of path/URL
   ],
   "multichain-contract-vuln": [
-    { id: "chain", label: "Chain Type", type: "select", options: ["evm"], placeholder: "evm" }
+    { id: "chain", label: "Chain Type", type: "select", options: ["evm", "solana"], placeholder: "evm" }
   ],
   "skill-stress-lab": [
     // command template and workdir use default values, not shown in UI
@@ -211,6 +211,7 @@ const GOOGLE_CLIENT_ID = window.HEALTH_AI_GOOGLE_CLIENT_ID || "744175699896-h7k6
 const GITHUB_CLIENT_ID = window.HEALTH_AI_GITHUB_CLIENT_ID || (function() {
   var h = window.location.hostname;
   if (h === "www.codeautrix.com" || h === "codeautrix.com") return "Ov23lia1DNtFes1ZAM3e"; // production
+  if (h === "codeautrix.agentese.ai") return "Ov23liP8rMZs6eXHkulK"; // agentese staging
   return "Ov23liGOlSlH9lK0zkah"; // localhost dev
 })();
 const SKILL_LABELS = {
