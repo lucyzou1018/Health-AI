@@ -785,8 +785,8 @@ def metrics_snapshot(
     # ── Auth (fallback — primary guard is the ASGI wrapper) ──────────────────
     # The ASGI wrapper drops the connection before any HTTP bytes are sent.
     # This check is a safety net only and should never be reached.
-    expected = os.environ.get("CHARTS_ACCESS_TOKEN", "f261d2107df7e17f191ed8fa498f8b27df7d2b3337e6bb24b9ee74aa865dcc95")
-    if access_token != expected:
+    expected = os.environ.get("CHARTS_ACCESS_TOKEN")
+    if expected is None or access_token != expected:
         return None
 
     # ── Time bound ───────────────────────────────────────────────────────────
@@ -916,8 +916,8 @@ async def _metrics_drop_guard(scope, receive, send):
     if scope["type"] == "http" and scope.get("path") == "/api/metrics/snapshot":
         qs      = _parse_qs(scope.get("query_string", b"").decode())
         token   = qs.get("access_token", [""])[0]
-        expected = os.environ.get("CHARTS_ACCESS_TOKEN", "f261d2107df7e17f191ed8fa498f8b27df7d2b3337e6bb24b9ee74aa865dcc95")
-        if token != expected:
+        expected = os.environ.get("CHARTS_ACCESS_TOKEN")
+        if expected is None or token != expected:
             return  # close TCP without sending any HTTP bytes
     await _inner_app(scope, receive, send)
 
